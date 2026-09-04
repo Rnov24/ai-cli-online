@@ -45,9 +45,13 @@ export const ContextPanel = React.memo(function ContextPanel({
   onExecuteCommand,
 }: ContextPanelProps) {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 1024);
+  const [isPhone, setIsPhone] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 480);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 1024);
+    const onResize = () => {
+      setIsMobile(window.innerWidth <= 1024);
+      setIsPhone(window.innerWidth <= 480);
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -83,9 +87,14 @@ export const ContextPanel = React.memo(function ContextPanel({
             border: 'none',
             color: 'var(--text-secondary)',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '16px',
             lineHeight: 1,
-            padding: '2px 4px',
+            minWidth: '32px',
+            minHeight: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '2px',
           }}
         >
           ➔
@@ -99,7 +108,7 @@ export const ContextPanel = React.memo(function ContextPanel({
         padding: '0 8px',
         backgroundColor: 'var(--bg-secondary)',
         borderBottom: '1px solid var(--border)',
-        height: '32px',
+        height: isMobile ? '38px' : '32px',
         gap: '4px',
         flexShrink: 0,
       }}>
@@ -111,8 +120,8 @@ export const ContextPanel = React.memo(function ContextPanel({
               onClick={() => onTabChange(tab)}
               style={{
                 flex: 1,
-                padding: '4px 0',
-                fontSize: '10px',
+                padding: isMobile ? '8px 0' : '4px 0',
+                fontSize: isMobile ? '11px' : '10px',
                 fontWeight: isActive ? 700 : 500,
                 color: isActive ? 'var(--accent-amber-bright)' : 'var(--text-secondary)',
                 border: 'none',
@@ -308,7 +317,7 @@ export const ContextPanel = React.memo(function ContextPanel({
             right: 0,
             top: 0,
             bottom: 0,
-            width: 'min(360px, 90vw)',
+            width: isPhone ? '100vw' : 'min(400px, 85vw)',
             height: '100%',
             backgroundColor: 'var(--bg-secondary)',
             borderLeft: '1px solid var(--border)',

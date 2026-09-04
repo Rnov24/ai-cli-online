@@ -104,7 +104,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
         backgroundColor: 'var(--bg-secondary)',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
-        height: '28px',
+        height: isMobile ? '32px' : '28px',
         fontFamily: 'var(--font-mono)',
         fontSize: '11px',
       }}>
@@ -261,7 +261,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
                   else if (planOpen) togglePlan(terminal.id);
                   else if (gitHistoryOpen) toggleGitHistory(terminal.id);
                 }}
-                style={{ padding: '2px 8px', fontSize: '11px' }}
+                style={{ padding: '4px 10px', fontSize: '11px', minHeight: '28px' }}
                 aria-label="Close panel"
               >
                 ✕ CLOSE

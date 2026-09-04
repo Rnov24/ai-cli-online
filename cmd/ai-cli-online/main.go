@@ -124,9 +124,7 @@ func runStart(daemon bool, portOverride int) {
 		cmd.Stdout = outFile
 		cmd.Stderr = outFile
 		cmd.Stdin = nil
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true, // Detach process group
-		}
+		setDaemonProcAttrs(cmd)
 
 		if err := cmd.Start(); err != nil {
 			log.Fatalf("Failed to start daemon: %v", err)

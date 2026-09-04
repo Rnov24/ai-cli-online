@@ -297,7 +297,7 @@ const DiffView = memo(function DiffView({ diff, fontSize }: { diff: string; font
 // ---------------------------------------------------------------------------
 
 const CommitItem = memo(function CommitItem({
-  commit, sessionId, token, fontSize, laneNode, maxLanes,
+  commit, sessionId, token, fontSize, laneNode, maxLanes, isMobile,
 }: {
   commit: CommitInfo;
   sessionId: string;
@@ -305,6 +305,7 @@ const CommitItem = memo(function CommitItem({
   fontSize: number;
   laneNode: LaneNode | undefined;
   maxLanes: number;
+  isMobile?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [diffFile, setDiffFile] = useState<string | null>(null);
@@ -340,54 +341,101 @@ const CommitItem = memo(function CommitItem({
       <div
         onClick={() => setExpanded(!expanded)}
         style={{
-          padding: '2px 8px',
+          padding: isMobile ? '6px 8px' : '2px 8px',
           cursor: 'pointer',
           display: 'flex',
           flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          height: ROW_HEIGHT,
+          alignItems: isMobile ? 'flex-start' : 'center',
+          gap: 6,
+          minHeight: ROW_HEIGHT,
+          borderBottom: isMobile ? '1px solid var(--border-subtle)' : 'none',
         }}
         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
       >
         {/* Graph cell */}
         {laneNode && maxLanes > 0 && (
-          <GraphCell laneNode={laneNode} maxLanes={maxLanes} />
+          <GraphCell laneNode={laneNode} maxLanes={isMobile ? Math.min(maxLanes, 4) : maxLanes} />
         )}
 
-        {/* Commit info — single row */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <RefBadges refs={commit.refs} fontSize={fontSize} />
-          <span style={{
-            fontSize: smSize,
-            color: 'var(--text-primary)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flex: 1,
-            minWidth: 0,
-          }}>
-            {commit.message}
-          </span>
-          <span style={{ fontSize: xsSize, color: 'var(--text-secondary)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-            {commit.author.split(' ')[0]} · {relativeTime(commit.date)}
-          </span>
-          <span
-            title="Click to copy full hash"
-            style={{ fontSize: xsSize, color: copied ? 'var(--accent-green)' : 'var(--accent-yellow)', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, opacity: copied ? 1 : 0.6, cursor: 'pointer', transition: 'color 0.2s, opacity 0.2s' }}
-            onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(commit.hash).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
-          >
-            {copied ? 'Copied' : commit.shortHash}
-          </span>
-          <span style={{ fontSize: xsSize, color: 'var(--text-secondary)', flexShrink: 0 }}>
-            {expanded ? '\u25BC' : '\u25B6'}
-          </span>
-        </div>
+        {/* Commit info */}
+        {isMobile ? (
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+              <RefBadges refs={commit.refs} fontSize={fontSize} />
+              <span style={{
+                fontSize: smSize,
+                color: 'var(--text-primary)',
+                fontWeight: 600,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1,
+                minWidth: 0,
+              }}>
+                {commit.message}
+              </span>
+              <span style={{ fontSize: xsSize, color: 'var(--text-secondary)', flexShrink: 0 }}>
+                {expanded ? '\u25BC' : '\u25B6'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: xsSize, color: 'var(--text-secondary)' }}>
+              <span>{commit.author.split(' ')[0]}</span>
+              <span>·</span>
+              <span>{relativeTime(commit.date)}</span>
+              <span
+                title="Click to copy full hash"
+                style={{
+                  color: copied ? 'var(--accent-green)' : 'var(--accent-yellow)',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                }}
+                onClick={e => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(commit.hash).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  });
+                }}
+              >
+                {copied ? 'Copied' : commit.shortHash}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <RefBadges refs={commit.refs} fontSize={fontSize} />
+            <span style={{
+              fontSize: smSize,
+              color: 'var(--text-primary)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: 1,
+              minWidth: 0,
+            }}>
+              {commit.message}
+            </span>
+            <span style={{ fontSize: xsSize, color: 'var(--text-secondary)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {commit.author.split(' ')[0]} · {relativeTime(commit.date)}
+            </span>
+            <span
+              title="Click to copy full hash"
+              style={{ fontSize: xsSize, color: copied ? 'var(--accent-green)' : 'var(--accent-yellow)', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, opacity: copied ? 1 : 0.6, cursor: 'pointer', transition: 'color 0.2s, opacity 0.2s' }}
+              onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(commit.hash).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
+            >
+              {copied ? 'Copied' : commit.shortHash}
+            </span>
+            <span style={{ fontSize: xsSize, color: 'var(--text-secondary)', flexShrink: 0 }}>
+              {expanded ? '\u25BC' : '\u25B6'}
+            </span>
+          </div>
+        )}
       </div>
 
       {expanded && (
-        <div style={{ padding: '0 10px 6px', marginLeft: graphWidth + 10 }}>
+        <div style={{ padding: isMobile ? '0 4px 6px' : '0 10px 6px', marginLeft: isMobile ? 8 : (graphWidth + 10) }}>
           {commit.files.length === 0 ? (
             <div style={{ fontSize: smSize, color: 'var(--text-secondary)', padding: '4px 0' }}>No files changed</div>
           ) : (
@@ -469,6 +517,14 @@ const CommitItem = memo(function CommitItem({
 export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token }: GitHistoryPanelProps) {
   const fontSize = useStore((s) => s.fontSize);
   const [commits, setCommits] = useState<CommitInfo[]>([]);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -595,14 +651,15 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
           }}
           style={{
             fontSize: smSize,
-            padding: '1px 2px',
+            padding: isMobile ? '4px 6px' : '1px 2px',
+            minHeight: isMobile ? '28px' : 'auto',
             border: '1px solid var(--border)',
             borderRadius: 3,
             backgroundColor: 'var(--bg-primary)',
             color: 'var(--text-primary)',
             outline: 'none',
             flexShrink: 0,
-            maxWidth: 130,
+            maxWidth: isMobile ? 110 : 130,
           }}
           title="Select branch"
         >
@@ -620,7 +677,8 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
           style={{
             flex: 1,
             fontSize: smSize,
-            padding: '2px 6px',
+            padding: isMobile ? '4px 8px' : '2px 6px',
+            minHeight: isMobile ? '28px' : 'auto',
             border: '1px solid var(--border)',
             borderRadius: 3,
             backgroundColor: 'var(--bg-primary)',
@@ -653,6 +711,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
             fontSize={fontSize}
             laneNode={laneMap.get(c.hash)}
             maxLanes={maxLanes}
+            isMobile={isMobile}
           />
         ))}
 

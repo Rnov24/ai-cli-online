@@ -84,7 +84,9 @@ const TOC_COLLAPSED_WIDTH = 22;
 export function MarkdownToc({ headings, scrollRef }: MarkdownTocProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem('md-toc-collapsed') === 'true';
+    const saved = localStorage.getItem('md-toc-collapsed');
+    if (saved !== null) return saved === 'true';
+    return typeof window !== 'undefined' && window.innerWidth <= 768;
   });
   const tocRef = useRef<HTMLDivElement>(null);
   const tickingRef = useRef(false);

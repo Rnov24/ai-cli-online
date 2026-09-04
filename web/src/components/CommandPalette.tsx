@@ -288,15 +288,21 @@ export function CommandPalette({
               fontFamily: 'var(--font-mono)',
             }}
           />
-          <span style={{
-            fontSize: '10px',
-            fontFamily: 'var(--font-mono)',
-            color: 'var(--text-muted)',
-            border: '1px solid var(--border)',
-            padding: '2px 5px',
-            borderRadius: '2px',
-          }}>
-            ESC
+          <span
+            onClick={onClose}
+            title="Close palette"
+            style={{
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+              padding: '3px 6px',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            ESC ✕
           </span>
         </div>
 

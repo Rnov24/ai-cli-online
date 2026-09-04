@@ -23,6 +23,13 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const loadDirectory = useCallback(async (path: string) => {
     setLoading(true);
@@ -175,7 +182,8 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
             onClick={handleNewFile}
             title="Create file"
             style={{
-              padding: '2px 6px',
+              padding: isMobile ? '5px 8px' : '2px 6px',
+              minHeight: isMobile ? '28px' : 'auto',
               borderRadius: '4px',
               border: '1px solid var(--border)',
               backgroundColor: 'var(--bg-tertiary)',
@@ -190,7 +198,8 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
             onClick={handleNewFolder}
             title="Create directory"
             style={{
-              padding: '2px 6px',
+              padding: isMobile ? '5px 8px' : '2px 6px',
+              minHeight: isMobile ? '28px' : 'auto',
               borderRadius: '4px',
               border: '1px solid var(--border)',
               backgroundColor: 'var(--bg-tertiary)',
@@ -217,133 +226,145 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
       )}
 
       {/* Main Split: File List (left/top) + File Preview (right/bottom) */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* File List */}
-        <div style={{
-          flex: selectedFile ? '0 0 40%' : '1 1 auto',
-          overflowY: 'auto',
-          borderBottom: selectedFile ? '1px solid var(--border)' : 'none',
-        }}>
-          {loading ? (
-            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
-              Loading files...
-            </div>
-          ) : entries.length === 0 ? (
-            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
-              Empty directory
-            </div>
-          ) : (
-            entries.map((entry) => (
-              <div
-                key={entry.name}
-                onClick={() => handleOpenItem(entry)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 12px',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid rgba(255,255,255,0.03)',
-                  backgroundColor: selectedFile?.endsWith(entry.name) ? 'var(--bg-hover)' : 'transparent',
-                  fontSize: '12px',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  transition: 'background-color 0.1s ease',
-                }}
-                onMouseEnter={(e) => {
-                  if (!selectedFile?.endsWith(entry.name)) {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!selectedFile?.endsWith(entry.name)) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                  <span>{entry.type === 'directory' ? '📁' : '📄'}</span>
-                  <span style={{
-                    color: entry.type === 'directory' ? 'var(--accent-blue)' : 'var(--text-bright)',
-                    fontWeight: entry.type === 'directory' ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}>
-                    {entry.name}
-                  </span>
-                </div>
+        {(!isMobile || !selectedFile) && (
+          <div style={{
+            flex: (!isMobile && selectedFile) ? '0 0 40%' : '1 1 auto',
+            overflowY: 'auto',
+            borderBottom: (!isMobile && selectedFile) ? '1px solid var(--border)' : 'none',
+          }}>
+            {loading ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                Loading files...
+              </div>
+            ) : entries.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                Empty directory
+              </div>
+            ) : (
+              entries.map((entry) => (
+                <div
+                  key={entry.name}
+                  onClick={() => handleOpenItem(entry)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: isMobile ? '8px 12px' : '6px 12px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid rgba(255,255,255,0.03)',
+                    backgroundColor: selectedFile?.endsWith(entry.name) ? 'var(--bg-hover)' : 'transparent',
+                    fontSize: '12px',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    transition: 'background-color 0.1s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectedFile?.endsWith(entry.name)) {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectedFile?.endsWith(entry.name)) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                    <span>{entry.type === 'directory' ? '📁' : '📄'}</span>
+                    <span style={{
+                      color: entry.type === 'directory' ? 'var(--accent-blue)' : 'var(--text-bright)',
+                      fontWeight: entry.type === 'directory' ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {entry.name}
+                    </span>
+                  </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                    {entry.type === 'file' ? formatBytes(entry.size) : ''}
-                  </span>
-                  {entry.type === 'file' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                      {entry.type === 'file' ? formatBytes(entry.size) : ''}
+                    </span>
+                    {entry.type === 'file' && (
+                      <button
+                        onClick={(e) => handleDownload(entry, e)}
+                        title="Download file"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          padding: isMobile ? '6px 8px' : '3px 6px',
+                          minWidth: isMobile ? '30px' : '24px',
+                          minHeight: isMobile ? '30px' : '24px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        ↓
+                      </button>
+                    )}
                     <button
-                      onClick={(e) => handleDownload(entry, e)}
-                      title="Download file"
+                      onClick={(e) => handleDelete(entry, e)}
+                      title="Delete"
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: 'var(--text-secondary)',
+                        color: 'var(--accent-red)',
                         cursor: 'pointer',
                         fontSize: '11px',
-                        padding: '3px 6px',
-                        minWidth: '24px',
-                        minHeight: '24px',
+                        padding: isMobile ? '6px 8px' : '3px 6px',
+                        minWidth: isMobile ? '30px' : '24px',
+                        minHeight: isMobile ? '30px' : '24px',
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        opacity: 0.7,
                       }}
                     >
-                      ↓
+                      ✕
                     </button>
-                  )}
-                  <button
-                    onClick={(e) => handleDelete(entry, e)}
-                    title="Delete"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--accent-red)',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      padding: '3px 6px',
-                      minWidth: '24px',
-                      minHeight: '24px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: 0.7,
-                    }}
-                  >
-                    ✕
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* File Preview */}
         {selectedFile && (
-          <div style={{ flex: '1 1 60%', display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
+          <div style={{
+            flex: isMobile ? '1 1 100%' : '1 1 60%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            backgroundColor: 'var(--bg-primary)',
+            height: '100%',
+          }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '4px 10px',
+              padding: '6px 10px',
               backgroundColor: 'var(--bg-secondary)',
               borderBottom: '1px solid var(--border)',
               fontSize: '11px',
               fontWeight: 600,
               color: 'var(--text-secondary)',
             }}>
-              <span>Preview: {selectedFile.split('/').pop()}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                📄 {selectedFile.split('/').pop()}
+              </span>
               <button
+                className="mecha-btn"
                 onClick={() => { setSelectedFile(null); setFileContent(null); }}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                style={{ padding: '2px 8px', fontSize: '10px' }}
               >
-                ✕ Close
+                {isMobile ? '← Back to list' : '✕ Close'}
               </button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>

@@ -50,7 +50,13 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
               color: 'var(--text-secondary)',
               cursor: 'pointer',
               fontFamily: 'var(--font-mono)',
-              fontSize: '14px',
+              fontSize: '15px',
+              minWidth: '32px',
+              minHeight: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '4px',
             }}
           >
             ✕
@@ -116,6 +122,7 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                   className="mecha-btn"
                   onClick={() => setFontSize(Math.max(10, fontSize - 1))}
                   disabled={fontSize <= 10}
+                  style={{ minWidth: '32px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   A−
                 </button>
@@ -124,7 +131,7 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                   fontSize: '12px',
                   fontWeight: 700,
                   color: 'var(--text-bright)',
-                  minWidth: '24px',
+                  minWidth: '28px',
                   textAlign: 'center',
                 }}>
                   {fontSize}px
@@ -133,6 +140,7 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                   className="mecha-btn"
                   onClick={() => setFontSize(Math.min(24, fontSize + 1))}
                   disabled={fontSize >= 24}
+                  style={{ minWidth: '32px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   A+
                 </button>

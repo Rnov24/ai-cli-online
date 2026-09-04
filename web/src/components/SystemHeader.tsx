@@ -66,7 +66,7 @@ export const SystemHeader = React.memo(function SystemHeader({
           onClick={onToggleMobileNav}
           title="Toggle Navigation Menu"
           aria-label="Toggle navigation drawer"
-          style={{ padding: '3px 8px', fontSize: '12px' }}
+          style={{ padding: '4px 10px', fontSize: '14px', minWidth: '34px', minHeight: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           ☰
         </button>
@@ -273,7 +273,7 @@ export const SystemHeader = React.memo(function SystemHeader({
           onClick={toggleTheme}
           title={`Switch to ${theme === 'dark' ? 'Industrial Light' : 'Mecha Dark'} mode`}
           aria-label="Toggle theme"
-          style={{ padding: '2px 6px', fontSize: '11px' }}
+          style={{ padding: '3px 8px', fontSize: '12px', minWidth: '32px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           {theme === 'dark' ? '☀' : '🌙'}
         </button>
@@ -284,7 +284,7 @@ export const SystemHeader = React.memo(function SystemHeader({
           onClick={onToggleContextPanel}
           title="Toggle Context Panel (Alt+C)"
           aria-label="Toggle system context panel"
-          style={{ padding: '2px 8px', fontSize: '10px' }}
+          style={{ padding: '3px 9px', fontSize: '11px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <span>◫</span>
           <span className="desktop-only" style={{ marginLeft: '4px' }}>CONTEXT</span>

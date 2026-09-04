@@ -629,8 +629,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '14px',
-          padding: '14px 16px 36px 16px',
+          gap: isMobile ? '10px' : '14px',
+          padding: isMobile ? '8px 8px 36px 8px' : '14px 16px 36px 16px',
           minHeight: '100%',
           boxSizing: 'border-box',
           width: '100%',
@@ -671,7 +671,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             </div>
 
             <h1 style={{
-              fontSize: '22px',
+              fontSize: isMobile ? '18px' : '22px',
               color: 'var(--text-bright)',
               marginBottom: '8px',
               fontWeight: 700,
@@ -682,7 +682,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             <p style={{
               fontSize: '12px',
               color: 'var(--text-secondary)',
-              marginBottom: '28px',
+              marginBottom: isMobile ? '18px' : '28px',
               lineHeight: 1.6,
               maxWidth: '520px',
             }}>
@@ -692,8 +692,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             {/* Quick Operational Triggers Grid */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: '10px',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: isMobile ? '8px' : '10px',
               width: '100%',
               textAlign: 'left',
               boxSizing: 'border-box',
@@ -844,7 +844,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
                 {/* Event Body Content */}
                 <div style={{
-                  padding: '12px 16px',
+                  padding: isMobile ? '8px 10px' : '12px 16px',
                   fontSize: '12px',
                   lineHeight: '1.6',
                   color: 'var(--text-primary)',
@@ -924,7 +924,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         </button>
       )}
 
-      {/* Quick Skill Chips Strip */}
+      {/* Quick Skill Chips Strip (Scrollable) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -971,10 +971,135 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         )}
       </div>
 
+      {/* Mobile Touch Quick-Keys Toolbar (Touch-friendly terminal & command navigation) */}
+      {isMobile && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '5px',
+          padding: '4px 10px',
+          backgroundColor: 'var(--bg-tertiary)',
+          borderTop: '1px solid var(--border)',
+          overflowX: 'auto',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          userSelect: 'none',
+        }}>
+          <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--accent-amber-bright)', marginRight: '2px' }}>
+            KEYS //
+          </span>
+          <button
+            className="mecha-btn"
+            onClick={() => {
+              setShowSlashMenu(false);
+              if (inputText) setInputText('');
+            }}
+            title="Escape / Clear Input"
+            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px' }}
+          >
+            ESC
+          </button>
+          <button
+            className="mecha-btn"
+            onClick={() => {
+              if (showSlashMenu && filteredCommands.length > 0) {
+                selectSlashCommand(filteredCommands[selectedSlashIndex].cmd);
+              } else if (inputText.startsWith('/')) {
+                setShowSlashMenu(true);
+              }
+            }}
+            title="Tab / Autocomplete"
+            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px' }}
+          >
+            TAB
+          </button>
+          <button
+            className="mecha-btn mecha-btn--danger"
+            onClick={() => {
+              if (isStreaming) handleStop();
+              else setInputText('');
+            }}
+            title="Abort stream or cancel"
+            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px' }}
+          >
+            ^C
+          </button>
+          <button
+            className="mecha-btn"
+            onClick={() => {
+              if (commandHistory.length > 0) {
+                const nextPtr = Math.min(commandHistory.length - 1, historyPointer + 1);
+                setHistoryPointer(nextPtr);
+                setInputText(commandHistory[nextPtr]);
+              }
+            }}
+            title="Previous command"
+            style={{ padding: '3px 9px', fontSize: '11px', minHeight: '26px' }}
+          >
+            ▲
+          </button>
+          <button
+            className="mecha-btn"
+            onClick={() => {
+              if (historyPointer >= 0) {
+                const nextPtr = historyPointer - 1;
+                setHistoryPointer(nextPtr);
+                setInputText(nextPtr >= 0 ? commandHistory[nextPtr] : '');
+              }
+            }}
+            title="Next command"
+            style={{ padding: '3px 9px', fontSize: '11px', minHeight: '26px' }}
+          >
+            ▼
+          </button>
+          <button
+            className="mecha-btn mecha-btn--cyan"
+            onClick={() => {
+              if (!inputText.startsWith('agy ')) {
+                setInputText('agy ' + inputText);
+              }
+              textareaRef.current?.focus();
+            }}
+            title="Prepend agy CLI"
+            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px' }}
+          >
+            agy ▶
+          </button>
+          <button
+            className="mecha-btn"
+            onClick={() => {
+              setInputText('/');
+              setShowSlashMenu(true);
+              setSlashFilter('');
+              textareaRef.current?.focus();
+            }}
+            title="Insert slash command"
+            style={{ padding: '3px 8px', fontSize: '11px', minHeight: '26px' }}
+          >
+            /
+          </button>
+          <button
+            className="mecha-btn"
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                if (text) setInputText((prev) => prev + text);
+              } catch {
+                // clipboard read permission denied
+              }
+            }}
+            title="Paste from clipboard"
+            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px' }}
+          >
+            📋 PASTE
+          </button>
+        </div>
+      )}
+
       {/* Command Console Input Dock */}
       <div style={{
         position: 'relative',
-        padding: '10px 14px',
+        padding: isMobile ? '6px 8px' : '10px 14px',
         backgroundColor: 'var(--bg-secondary)',
         borderTop: '1px solid var(--border)',
         flexShrink: 0,

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -89,19 +88,6 @@ func ReadPid(component string) (*ProcessInfo, error) {
 func RemovePid(component string) error {
 	path := GetPidPath(component)
 	return os.Remove(path)
-}
-
-func IsPidRunning(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-	// On Unix, sending signal 0 checks if the process is alive without actually killing it
-	err = process.Signal(syscall.Signal(0))
-	return err == nil
 }
 
 func CleanupStalePids() {

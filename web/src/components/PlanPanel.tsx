@@ -58,6 +58,14 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   // Plan mode state — directory-based (AiTasks/ directory with multiple .md files)
   const [planDir, setPlanDir] = useState<string | null>(null);
   const [planSelectedFile, setPlanSelectedFile] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+  const [mobileView, setMobileView] = useState<'browser' | 'editor'>('browser');
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [planMarkdown, setPlanMarkdown] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
   // When AiTasks/ directory is not found, show init guidance
@@ -221,12 +229,16 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
 
   // Switch file within AiTasks/ directory
   const handlePlanFileSelect = useCallback((fullPath: string) => {
-    if (fullPath === planSelectedFile) return;
+    if (fullPath === planSelectedFile) {
+      if (isMobile) setMobileView('editor');
+      return;
+    }
     savePlanScrollPosition();
     setPlanSelectedFile(fullPath);
     setPlanMarkdown('');
     planStreamedRef.current = null;
-  }, [planSelectedFile, savePlanScrollPosition]);
+    if (isMobile) setMobileView('editor');
+  }, [planSelectedFile, savePlanScrollPosition, isMobile]);
 
   // Handle file deletion — clear selection if deleted file is currently selected
   const handlePlanFileDelete = useCallback((fullPath: string) => {
@@ -234,15 +246,17 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
       setPlanSelectedFile(null);
       setPlanMarkdown('');
       planStreamedRef.current = null;
+      if (isMobile) setMobileView('browser');
     }
-  }, [planSelectedFile]);
+  }, [planSelectedFile, isMobile]);
 
   // Handle new file creation from PlanFileBrowser
   const handlePlanFileCreate = useCallback((fullPath: string) => {
     setPlanSelectedFile(fullPath);
     setPlanMarkdown('');
     planStreamedRef.current = null;
-  }, []);
+    if (isMobile) setMobileView('editor');
+  }, [isMobile]);
 
   // Handle Save from annotation renderer — send directly to terminal
   const handlePlanSave = useCallback((summary: string) => {
@@ -261,7 +275,8 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     setPlanSelectedFile(null);
     setPlanMarkdown('');
     planStreamedRef.current = null;
-  }, [savePlanScrollPosition]);
+    if (isMobile) setMobileView('browser');
+  }, [savePlanScrollPosition, isMobile]);
 
   // Refresh current plan file
   const handlePlanRefresh = useCallback(() => {
@@ -408,12 +423,56 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
         </div>
       )}
 
-      {/* Single-level body: file browser + divider + annotation editor */}
+      {/* Mobile view switcher bar */}
+      {isMobile && planDir && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border)',
+          padding: '2px 8px',
+          gap: '4px',
+          flexShrink: 0,
+        }}>
+          <button
+            className="mecha-btn"
+            onClick={() => setMobileView('browser')}
+            style={{
+              flex: 1,
+              padding: '4px 8px',
+              fontSize: '11px',
+              backgroundColor: mobileView === 'browser' ? 'var(--accent-amber-subtle)' : 'transparent',
+              color: mobileView === 'browser' ? 'var(--accent-amber-bright)' : 'var(--text-secondary)',
+              borderColor: mobileView === 'browser' ? 'var(--accent-amber)' : 'transparent',
+            }}
+          >
+            📁 Files {planSelectedFile ? `(${planSelectedFile.split('/').pop()})` : ''}
+          </button>
+          <button
+            className="mecha-btn"
+            onClick={() => setMobileView('editor')}
+            disabled={!planSelectedFile}
+            style={{
+              flex: 1,
+              padding: '4px 8px',
+              fontSize: '11px',
+              backgroundColor: mobileView === 'editor' ? 'var(--accent-amber-subtle)' : 'transparent',
+              color: mobileView === 'editor' ? 'var(--accent-amber-bright)' : 'var(--text-secondary)',
+              borderColor: mobileView === 'editor' ? 'var(--accent-amber)' : 'transparent',
+              opacity: planSelectedFile ? 1 : 0.4,
+            }}
+          >
+            ✏️ Document
+          </button>
+        </div>
+      )}
+
+      {/* Body: file browser + divider + annotation editor */}
       <div className="plan-overlay-body">
-        {/* Left: File browser */}
-        {planDir && (
+        {/* File browser */}
+        {planDir && (!isMobile || mobileView === 'browser') && (
           <>
-            <div style={{ width: fbWidth, flexShrink: 0, overflow: 'hidden' }}>
+            <div style={{ width: isMobile ? '100%' : fbWidth, flexShrink: 0, overflow: 'hidden', height: '100%' }}>
               <PlanFileBrowser
                 sessionId={sessionId}
                 token={token}
@@ -424,54 +483,67 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
                 onDeleteFile={handlePlanFileDelete}
               />
             </div>
-            <div
-              onMouseDown={handleFbDividerMouseDown}
-              style={{
-                width: 2,
-                flexShrink: 0,
-                cursor: 'col-resize',
-                backgroundColor: 'var(--border)',
-                transition: 'background-color 0.15s',
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--accent-blue)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--border)'; }}
-            />
+            {!isMobile && (
+              <div
+                onMouseDown={handleFbDividerMouseDown}
+                style={{
+                  width: 2,
+                  flexShrink: 0,
+                  cursor: 'col-resize',
+                  backgroundColor: 'var(--border)',
+                  transition: 'background-color 0.15s',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--accent-blue)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--border)'; }}
+              />
+            )}
           </>
         )}
 
-        {/* Center: Annotation editor */}
-        <div className="plan-overlay-center">
-          {planLoading ? (
-            <CenteredLoading label="Loading AiTasks/..." />
-          ) : showInitGuide ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: '0 20px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>AiTasks/ directory not found</span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: 12, textAlign: 'center' }}>
-                Run <code style={{ color: 'var(--accent-blue)', backgroundColor: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 3 }}>/init &lt;name&gt;</code> in the terminal to create a task
-              </span>
-            </div>
-          ) : planSelectedFile && (!planMarkdown && (fileStream.state.status === 'streaming' || fileStream.state.status === 'idle')) ? (
-            <CenteredLoading label={`Loading ${planSelectedFile.split('/').pop()}...`} percent={fileStream.state.totalSize > 0 ? Math.round((fileStream.state.receivedBytes / fileStream.state.totalSize) * 100) : undefined} />
-          ) : planSelectedFile ? (
-            <PlanAnnotationRenderer
-              ref={planAnnotationRef}
-              markdown={planMarkdown}
-              filePath={planSelectedFile}
-              sessionId={sessionId}
-              token={token}
-              onExecute={handlePlanSave}
-              onSend={onSendToTerminal}
-              onRefresh={handlePlanRefresh}
-              onClose={handleCloseFile}
-              onContentSaved={handleContentSaved}
-              readOnly={planSelectedFile.endsWith('/.index.json')}
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8 }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontStyle: 'italic' }}>Select a file from the left panel</span>
-            </div>
-          )}
-        </div>
+        {/* Annotation editor */}
+        {(!isMobile || mobileView === 'editor') && (
+          <div className="plan-overlay-center" style={{ width: '100%', height: '100%' }}>
+            {planLoading ? (
+              <CenteredLoading label="Loading AiTasks/..." />
+            ) : showInitGuide ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: '0 20px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>AiTasks/ directory not found</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12, textAlign: 'center' }}>
+                  Run <code style={{ color: 'var(--accent-blue)', backgroundColor: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 3 }}>/init &lt;name&gt;</code> in the terminal to create a task
+                </span>
+              </div>
+            ) : planSelectedFile && (!planMarkdown && (fileStream.state.status === 'streaming' || fileStream.state.status === 'idle')) ? (
+              <CenteredLoading label={`Loading ${planSelectedFile.split('/').pop()}...`} percent={fileStream.state.totalSize > 0 ? Math.round((fileStream.state.receivedBytes / fileStream.state.totalSize) * 100) : undefined} />
+            ) : planSelectedFile ? (
+              <PlanAnnotationRenderer
+                ref={planAnnotationRef}
+                markdown={planMarkdown}
+                filePath={planSelectedFile}
+                sessionId={sessionId}
+                token={token}
+                onExecute={handlePlanSave}
+                onSend={onSendToTerminal}
+                onRefresh={handlePlanRefresh}
+                onClose={handleCloseFile}
+                onContentSaved={handleContentSaved}
+                readOnly={planSelectedFile.endsWith('/.index.json')}
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8, padding: '16px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontStyle: 'italic' }}>Select a file from the file list</span>
+                {isMobile && (
+                  <button
+                    className="mecha-btn mecha-btn--cyan"
+                    onClick={() => setMobileView('browser')}
+                    style={{ padding: '6px 14px', fontSize: '11px', marginTop: '8px' }}
+                  >
+                    📁 Browse Files
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Task status bar */}

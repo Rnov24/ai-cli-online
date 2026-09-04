@@ -34,3 +34,7 @@ data/
 
 # SSL certificates (generate locally, don't commit)
 server/certs/
+
+# Executables
+*.exe
+

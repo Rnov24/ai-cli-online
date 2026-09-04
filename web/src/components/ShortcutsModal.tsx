@@ -64,7 +64,13 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
               color: 'var(--text-secondary)',
               cursor: 'pointer',
               fontFamily: 'var(--font-mono)',
-              fontSize: '14px',
+              fontSize: '15px',
+              minWidth: '32px',
+              minHeight: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '4px',
             }}
           >
             ✕
