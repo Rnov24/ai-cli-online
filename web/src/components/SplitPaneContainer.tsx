@@ -42,7 +42,7 @@ export function SplitPaneContainer() {
   const canClose = terminalCount > 1;
 
   return (
-    <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+    <div style={{ height: '100%', width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <LayoutRenderer node={layout} canClose={canClose} />
     </div>
   );
@@ -162,6 +162,9 @@ const SplitRenderer = memo(function SplitRenderer({ node, canClose }: { node: Sp
           minWidth: 0,
           minHeight: 0,
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
         }}
       >
         <LayoutRenderer node={child} canClose={canClose} />

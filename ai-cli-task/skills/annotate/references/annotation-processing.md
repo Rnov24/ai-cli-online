@@ -54,7 +54,7 @@ Before writing annotation content (insertion, replacement, or comment text) to t
 2. **Strip ANSI escape sequences**: Remove `\x1b[...` sequences (prevents terminal rendering exploits)
 3. **Preserve user intent**: Do NOT strip markdown formatting, code blocks, or visible text — only remove hidden/invisible content
 
-This mitigates the risk of annotation content containing hidden instructions that could influence Claude's behavior when subsequently reading the task file.
+This mitigates the risk of annotation content containing hidden instructions that could influence agy's behavior when subsequently reading the task file.
 
 ## Processing Logic
 

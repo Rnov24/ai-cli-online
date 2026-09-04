@@ -83,17 +83,19 @@ export async function createSession(
   rows: number,
   cwd: string,
 ): Promise<void> {
+  const startCmd = process.env.START_COMMAND ? [process.env.START_COMMAND] : [];
   await tmuxExec([
     'new-session',
     '-d',
     '-s', name,
     '-x', String(cols),
     '-y', String(rows),
+    ...startCmd,
   ], { cwd });
 
   await configureSession(name);
 
-  console.log(`[tmux] Created session: ${name} (${cols}x${rows}) in ${cwd}`);
+  console.log(`[tmux] Created session: ${name} (${cols}x${rows}) in ${cwd}${startCmd.length ? ` with ${startCmd[0]}` : ''}`);
 }
 
 /**
@@ -140,9 +142,9 @@ export async function killSession(name: string): Promise<void> {
   }
 }
 
-/** List all tmux sessions belonging to a given token */
-export async function listSessions(token: string): Promise<TmuxSessionInfo[]> {
-  const prefix = tokenToSessionName(token) + '-';
+/** List all tmux sessions belonging to a given token, or all sessions if token is omitted */
+export async function listSessions(token?: string): Promise<TmuxSessionInfo[]> {
+  const prefix = token ? tokenToSessionName(token) + '-' : '';
   try {
     const { stdout } = await tmuxExec([
       'list-sessions',
@@ -157,8 +159,8 @@ export async function listSessions(token: string): Promise<TmuxSessionInfo[]> {
       if (lastColon === -1) continue;
       const sessionName = line.slice(0, lastColon);
       const createdAt = parseInt(line.slice(lastColon + 1), 10);
-      if (!sessionName.startsWith(prefix)) continue;
-      const sessionId = sessionName.slice(prefix.length);
+      if (prefix && !sessionName.startsWith(prefix)) continue;
+      const sessionId = prefix ? sessionName.slice(prefix.length) : sessionName;
       results.push({ sessionName, sessionId, createdAt });
     }
     return results;
@@ -226,9 +228,23 @@ export async function getPaneCommand(sessionName: string): Promise<string> {
     const { stdout } = await tmuxExec([
       'list-panes', '-t', `=${sessionName}`, '-F', '#{pane_current_command}',
     ], { encoding: 'utf-8' });
-    return stdout.trim();
+    const cmd = stdout.trim();
+    if (cmd.startsWith('agy')) {
+      return 'agy';
+    }
+    return cmd;
   } catch {
     return '';
+  }
+}
+
+/** Check if Antigravity CLI (agy) is available on the system */
+export function isAgyAvailable(): boolean {
+  try {
+    execFileSync('agy', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -245,7 +261,7 @@ export function isTmuxAvailable(): boolean {
 /**
  * Clean up orphaned process trees from dead tmux sessions.
  *
- * With KillMode=process, tmux child processes (bash → claude → plugins) survive
+ * With KillMode=process, tmux child processes (bash → agy → plugins) survive
  * service restarts. When a tmux session is killed (by cleanup or manually), its
  * child processes may keep running as orphans. This function identifies tmux server
  * processes in the service cgroup whose sessions no longer exist and kills their

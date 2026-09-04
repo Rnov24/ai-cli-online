@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { setupWebSocket, clearWsIntervals } from './websocket.js';
-import { isTmuxAvailable, cleanupOrphanedProcesses } from './tmux.js';
+import { isTmuxAvailable, isAgyAvailable, cleanupOrphanedProcesses } from './tmux.js';
 import { cleanupOldDrafts, cleanupOldAnnotations, closeDb } from './db.js';
 import { safeTokenCompare } from './auth.js';
 
@@ -20,6 +20,9 @@ import filesRouter from './routes/files.js';
 import editorRouter from './routes/editor.js';
 import settingsRouter from './routes/settings.js';
 import gitRouter from './routes/git.js';
+import systemRouter from './routes/system.js';
+import { recordActivity, startIdleMonitoring } from './idleManager.js';
+import { registerPid, removePid, cleanupStalePids, isTermux } from './pidManager.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -51,7 +54,27 @@ async function main() {
   }
   console.log('tmux is available');
 
+  if (isAgyAvailable()) {
+    console.log('[agy] Google Antigravity CLI is available');
+  } else {
+    console.warn('[agy] WARNING: agy command not found in PATH. Please install Google Antigravity CLI.');
+  }
+
+  cleanupStalePids();
+  registerPid('server', { port: Number(PORT) });
+  startIdleMonitoring();
+
+  if (isTermux()) {
+    console.log('[platform] Running on Android (Termux) — mobile optimizations active');
+  }
+
   const app = express();
+
+  // Activity tracking for idle detection
+  app.use((_req, _res, next) => {
+    recordActivity();
+    next();
+  });
 
   if (TRUST_PROXY) {
     app.set('trust proxy', parseInt(TRUST_PROXY, 10) || TRUST_PROXY);
@@ -117,6 +140,7 @@ async function main() {
   app.use(editorRouter);
   app.use(settingsRouter);
   app.use(gitRouter);
+  app.use(systemRouter);
 
   // --- Static files ---
 
@@ -210,6 +234,7 @@ async function main() {
 
   const shutdown = () => {
     console.log('\n[shutdown] Closing server...');
+    removePid('server');
     clearWsIntervals();
     if (cleanupTimer) clearInterval(cleanupTimer);
     wss.clients.forEach((client) => {

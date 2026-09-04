@@ -49,7 +49,7 @@ fi
 # --- 确认信息 ---
 
 echo "================================"
-echo "  AI-CLI-Online 服务安装"
+echo "  AGY Online (Antigravity CLI) 服务安装"
 echo "================================"
 echo ""
 echo "  项目目录:  $PROJECT_DIR"
@@ -72,14 +72,14 @@ fi
 
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=AI-CLI-Online Web Terminal
+Description=AGY Online — Antigravity CLI Web Workspace
 After=network.target
 
 [Service]
 Type=simple
 User=${RUN_USER}
 WorkingDirectory=${PROJECT_DIR}/server
-Environment=PATH=${NODE_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PATH=${NODE_DIR}:${RUN_HOME}/.gemini/antigravity-cli/bin:/data/data/com.termux/files/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=NODE_ENV=production
 EnvironmentFile=-${PROJECT_DIR}/server/.env
 ExecStartPre=${NPM_BIN} run --prefix ${PROJECT_DIR} build

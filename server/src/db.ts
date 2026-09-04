@@ -13,6 +13,8 @@ if (!existsSync(DATA_DIR)) {
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('cache_size = -2000'); // 2MB cache (ideal for low-spec VPS & mobile)
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS drafts (
@@ -124,6 +126,14 @@ export function cleanupOldAnnotations(maxAgeDays = 7): number {
   const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
   const result = stmtAnnCleanup.run(cutoff);
   return result.changes;
+}
+
+export function checkpointDb(): void {
+  try {
+    db.pragma('wal_checkpoint(PASSIVE)');
+  } catch (err) {
+    console.error('[db:checkpoint]', err);
+  }
 }
 
 export function closeDb(): void {

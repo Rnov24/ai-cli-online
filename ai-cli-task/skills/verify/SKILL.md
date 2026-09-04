@@ -11,14 +11,14 @@ arguments:
     default: full
 ---
 
-# /moonview:verify — Test Execution & Verification
+# /verify — Test Execution & Verification
 
 Run domain-adapted tests and verification procedures for a task module, producing structured result files. Does not render a verdict — that is the responsibility of `check`.
 
 ## Usage
 
 ```
-/moonview:verify <task_module_path> [--checkpoint quick|full|step-N]
+/verify <task_module_path> [--checkpoint quick|full|step-N]
 ```
 
 ## Checkpoints

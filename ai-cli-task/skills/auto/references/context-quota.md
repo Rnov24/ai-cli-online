@@ -2,27 +2,27 @@
 
 ## Context Window Management
 
-The auto loop runs in a single long-lived Claude session. As the conversation accumulates, context window usage grows. Proactive compaction prevents context overflow:
+The auto loop runs in a single long-lived Antigravity (agy) session. As the conversation accumulates, context window usage grows. Proactive compaction prevents context overflow:
 
-1. **Threshold**: Before each iteration (loop step 2b), Claude checks context window usage. At **>= 70%** usage, proactively run `/compact` to compress context
+1. **Threshold**: Before each iteration (loop step 2b), agy checks context window usage. At **>= 70%** usage, proactively run `/compress` to compress context
 2. **Safety net**: Each sub-command writes `.summary.md` and directory-level `.summary.md` files, providing condensed recovery context after compaction
-3. **Post-compaction recovery**: After compaction, Claude re-reads `.auto-signal` (iteration + step position), `.index.json` (status), and `.summary.md` (task context) to resume the loop. See "Compaction recovery" in Context Advantage section of main SKILL.md
+3. **Post-compaction recovery**: After compaction, Antigravity agent re-reads `.auto-signal` (iteration + step position), `.index.json` (status), and `.summary.md` (task context) to resume the loop. See "Compaction recovery" in Context Advantage section of main SKILL.md
 
 ## Quota Exhaustion Handling
 
-When Claude's API quota (token usage / rate limit) is exhausted mid-auto-loop, this is **NOT a stall** and must be handled differently:
+When agy's API quota (token usage / rate limit) is exhausted mid-auto-loop, this is **NOT a stall** and must be handled differently:
 
 ### Daemon Behavior
 
 1. **Detection**: Heartbeat captures terminal output containing quota-related messages (`rate limit`, `quota exceeded`, `usage limit`, etc.)
 2. **Enter quota-wait mode**: Reset `stall_count` to 0, pause stall detection timers
 3. **Suspend timeout**: Quota-wait time does **NOT** count toward `timeoutMinutes`. The daemon pauses the timeout clock while in quota-wait mode
-4. **Continue heartbeat**: Keep polling at 60s interval, but only check for quota recovery (Claude resumes output) — do not apply stall determination logic
-5. **Exit quota-wait**: When heartbeat detects new output (Claude resumed), restore normal monitoring and resume timeout clock
+4. **Continue heartbeat**: Keep polling at 60s interval, but only check for quota recovery (agy resumes output) — do not apply stall determination logic
+5. **Exit quota-wait**: When heartbeat detects new output (agy resumed), restore normal monitoring and resume timeout clock
 
-### Claude Behavior
+### Antigravity CLI Behavior
 
-- Claude Code automatically waits and retries when quota is exhausted — no special handling needed inside the auto loop
+- Antigravity CLI automatically waits and retries when quota is exhausted — no special handling needed inside the auto loop
 - The auto loop resumes naturally when quota resets
 
 ### SQLite Extension

@@ -1,6 +1,6 @@
 ---
 name: auto
-description: Autonomous execution loop — single Claude session orchestrates plan/check/exec cycle internally
+description: Autonomous execution loop — single Antigravity (agy) session orchestrates plan/check/exec cycle internally
 arguments:
   - name: task_module
     description: "Path to the task module directory (e.g., AiTasks/auth-refactor)"
@@ -11,27 +11,27 @@ arguments:
     default: start
 ---
 
-# /moonview:auto — Autonomous Execution Loop
+# /auto — Autonomous Execution Loop
 
-Coordinate the full task lifecycle autonomously: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → report, with self-correction on failures. Runs as a **single Claude session** that internally dispatches sub-commands, preserving context across all steps.
+Coordinate the full task lifecycle autonomously: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → report, with self-correction on failures. Runs as a **single Antigravity (agy) session** that internally dispatches sub-commands, preserving context across all steps.
 
 ## Usage
 
 ```
-/moonview:auto <task_module_path> [--start|--stop|--status]
+/auto <task_module_path> [--start|--stop|--status]
 ```
 
 ## Architecture
 
-Auto mode runs as a **single long-lived Claude session** that internally loops through sub-commands. The backend daemon starts the session and monitors it externally; it does NOT dispatch individual commands.
+Auto mode runs as a **single long-lived Antigravity (agy) session** that internally loops through sub-commands. The backend daemon starts the session and monitors it externally; it does NOT dispatch individual commands.
 
 ### Components
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Claude (single session)                         │
+│  Antigravity agy (single session)                         │
 │                                                  │
-│  /moonview:auto <module>                      │
+│  /auto <module>                      │
 │    ├→ execute plan logic    ─┐                   │
 │    ├→ execute check logic    │  internal loop    │
 │    ├→ execute exec logic     │  (shared context) │
@@ -59,13 +59,13 @@ Auto mode runs as a **single long-lived Claude session** that internally loops t
 |--------|-------------------|--------------------------|
 | Context | Lost between steps, rebuilt from `.summary.md` | Naturally shared across all steps |
 | Token cost | Re-read files each step, duplicate context loading | Read once, incrementally update |
-| Coherence | Each step is blind to implicit decisions | Claude remembers why it made choices |
-| Latency | Shell prompt wait + Claude startup per step | Zero inter-step overhead |
+| Coherence | Each step is blind to implicit decisions | agy remembers why it made choices |
+| Latency | Shell prompt wait + agy startup per step | Zero inter-step overhead |
 | Daemon complexity | Command construction + dispatch + readiness check | Just monitoring + stop signal |
 
 ### Signal File (`.auto-signal`)
 
-After each sub-command step completes, Claude writes a progress signal to the task module. This is a **monitoring report** for the daemon, NOT a dispatch trigger:
+After each sub-command step completes, agy writes a progress signal to the task module. This is a **monitoring report** for the daemon, NOT a dispatch trigger:
 
 ```json
 {
@@ -81,7 +81,7 @@ After each sub-command step completes, Claude writes a progress signal to the ta
 Fields:
 - `step`: the sub-command that just completed
 - `result`: outcome of the step
-- `next`: what Claude will execute next (or `"(stop)"`)
+- `next`: what Antigravity agent will execute next (or `"(stop)"`)
 - `checkpoint`: context hint (e.g., `"post-plan"`, `"mid-exec"`, `"post-exec"`). Empty when not applicable
 - `iteration`: current iteration count (for daemon progress tracking). **Auto-mode only** — absent when sub-commands write `.auto-signal` in manual execution
 - `timestamp`: ISO 8601
@@ -96,7 +96,7 @@ The daemon does **NOT** construct or send commands based on the signal.
 
 ### Stop File (`.auto-stop`)
 
-The daemon writes `.auto-stop` to the task module directory to request graceful termination. Claude checks for this file before each iteration:
+The daemon writes `.auto-stop` to the task module directory to request graceful termination. agy checks for this file before each iteration:
 
 ```json
 {
@@ -120,11 +120,11 @@ The daemon validates `.auto-signal` fields for monitoring integrity:
 | `iteration` | Integer | ≥ 0 |
 | `timestamp` | Format check | ISO 8601 |
 
-Invalid signals are logged but do not affect Claude's internal loop (daemon is observer, not dispatcher).
+Invalid signals are logged but do not affect agy's internal loop (daemon is observer, not dispatcher).
 
 ### Stall Detection & Recovery
 
-Claude Code may stall mid-execution. The daemon detects stalls via heartbeat polling (60s interval, 3 consecutive unchanged captures = suspected stall) and recovers via pattern matching (continuation prompts, y/n prompts, shell prompt restart). Recovery limits: 3 per iteration, 10 total.
+Antigravity CLI (agy) may stall mid-execution. The daemon detects stalls via heartbeat polling (60s interval, 3 consecutive unchanged captures = suspected stall) and recovers via pattern matching (continuation prompts, y/n prompts, shell prompt restart). Recovery limits: 3 per iteration, 10 total.
 
 > **See `references/stall-detection.md`** for the full heartbeat polling logic, stall determination rules, pattern matching recovery table, and recovery limits.
 
@@ -134,12 +134,12 @@ Proactive `/compact` at >= 70% context usage prevents overflow. `.summary.md` fi
 
 **Compaction frequency limit**: If 3 or more compactions occur within the same iteration (indicating the task generates more context per sub-command than compaction can reclaim), the auto loop should stop with a warning: "context budget insufficient for this task — consider breaking into smaller sub-tasks or increasing context window". The daemon tracks compaction count per iteration via the `iteration` field in `.auto-signal`.
 
-> **See `references/context-quota.md`** for the full context management strategy, quota exhaustion handling (daemon + Claude behavior), and SQLite `quota_wait_since` extension.
+> **See `references/context-quota.md`** for the full context management strategy, quota exhaustion handling (daemon + Antigravity agent behavior), and SQLite `quota_wait_since` extension.
 
 ## State Machine
 
 ```
-AUTO LOOP (4 phases — all within single Claude session)
+AUTO LOOP (4 phases — all within single Antigravity (agy) session)
 
 Phase 1: Planning
   plan ──→ verify ──→ check(post-plan) ─── PASS ──────────→ [Phase 2]
@@ -175,7 +175,7 @@ Terminal: merge conflict → (stop, status stays executing — retryable)
 
 ## Internal Loop Logic
 
-The auto skill runs this loop within a single Claude session:
+The auto skill runs this loop within a single Antigravity (agy) session:
 
 ```
 1. Read .index.json → determine entry point (status-based routing)
@@ -192,7 +192,7 @@ The auto skill runs this loop within a single Claude session:
 3. Cleanup: delete .auto-signal, report final status
 ```
 
-**Signal ownership in auto mode**: Each sub-command's SKILL.md includes a "write `.auto-signal`" step. In auto mode, the auto loop **subsumes** that step — Claude writes the signal once at step 2e (with the `iteration` field included). The sub-command's own signal-write instruction is skipped to avoid double-writing. In manual (non-auto) execution, sub-commands write `.auto-signal` themselves (without `iteration` field).
+**Signal ownership in auto mode**: Each sub-command's SKILL.md includes a "write `.auto-signal`" step. In auto mode, the auto loop **subsumes** that step — agy writes the signal once at step 2e (with the `iteration` field included). The sub-command's own signal-write instruction is skipped to avoid double-writing. In manual (non-auto) execution, sub-commands write `.auto-signal` themselves (without `iteration` field).
 
 **How to detect auto mode** (for inline execution): When executing a sub-command's steps inline within the auto loop, skip any step that says "Write `.auto-signal`". The auto loop's step 2e handles it. This is implicit — the auto loop code simply does not execute the signal-write step from each SKILL.md. No environment variable or flag is needed because auto mode always uses inline execution (Read + execute steps), never Skill tool invocation.
 
@@ -211,7 +211,7 @@ The auto skill runs this loop within a single Claude session:
 
 ### Result-Based Routing
 
-After each step, Claude evaluates the result and determines the next step internally:
+After each step, agy evaluates the result and determines the next step internally:
 
 | step | result | next | checkpoint | Rationale |
 |------|--------|------|------------|-----------|
@@ -239,7 +239,7 @@ After each step, Claude evaluates the result and determines the next step intern
 
 ### Context Advantage
 
-Because all steps run in one session, Claude naturally retains:
+Because all steps run in one session, agy naturally retains:
 - Plan decisions and trade-offs from the planning phase
 - Check feedback and evaluation rationale
 - Implementation details and workarounds from execution
@@ -247,7 +247,7 @@ Because all steps run in one session, Claude naturally retains:
 
 The `.summary.md` file is still written by each sub-command as a **compaction safety net** — if the context window overflows and compaction occurs, `.summary.md` provides the condensed recovery context. But during normal auto execution, live conversation context is the primary source of truth.
 
-**Compaction recovery**: If context compaction occurs mid-loop, Claude loses the iteration counter and current step position. To recover:
+**Compaction recovery**: If context compaction occurs mid-loop, agy loses the iteration counter and current step position. To recover:
 1. Read `.auto-signal` — the `iteration` field gives the last completed iteration count; `step` and `next` give the position in the loop. **If `.auto-signal` doesn't exist** (cleaned up or never written): fall back to step 2 — use `.index.json` status for position recovery and start iteration from 0
 2. Read `.index.json` — status confirms the current lifecycle phase
 3. Read `.summary.md` — condensed task context from the last sub-command
@@ -285,11 +285,11 @@ When `POST /api/sessions/:id/task-auto` is called:
 
 1. **Validate**: check no active auto loop for this session or task_dir
 2. **Insert** `task_auto` row into SQLite
-3. **Send** `claude "/moonview:auto <taskDir>"` to the session's PTY
+3. **Send** `agy "/auto <taskDir>"` to the session's PTY
 4. **Start** `fs.watch` on `taskDir` for `.auto-signal` changes
 5. **Start** heartbeat polling timer (60s interval)
 
-The daemon does NOT send any further commands after step 3. Claude's internal loop handles all subsequent orchestration.
+The daemon does NOT send any further commands after step 3. agy's internal loop handles all subsequent orchestration.
 
 ### SQLite State
 
@@ -322,9 +322,9 @@ CREATE TABLE task_auto (
 - **Stall detection**: heartbeat polling (60s) + pattern matching recovery, with per-iteration (3) and total (10) recovery limits
 - **Context management**: proactive `/compact` at ≥ 70% context window usage, with `.summary.md` as compaction safety net
 - **Quota exhaustion**: detected and handled as wait (not stall), timeout clock paused during quota-wait
-- **Pause on blocked**: Auto stops immediately on `blocked` status (Claude's internal loop exits)
-- **Manual override**: User can `/moonview:auto --stop` at any time, or daemon writes `.auto-stop` via `DELETE` API
-- **Graceful stop**: Claude checks for `.auto-stop` before each iteration, ensuring clean exit between steps (not mid-step)
+- **Pause on blocked**: Auto stops immediately on `blocked` status (agy's internal loop exits)
+- **Manual override**: User can `/auto --stop` at any time, or daemon writes `.auto-stop` via `DELETE` API
+- **Graceful stop**: agy checks for `.auto-stop` before each iteration, ensuring clean exit between steps (not mid-step)
 - **Single instance per session**: Only one auto loop per session (enforced by SQLite PK). If an auto task is already running, `POST` returns 409 Conflict
 - **Single instance per task**: UNIQUE constraint on `task_dir` prevents same task from running in multiple sessions
 
@@ -339,24 +339,24 @@ The frontend is a **pure observer** for auto mode, except for start/stop control
   - Current step (from latest `.auto-signal`)
   - Running / stopped status
 - **Stop button**: sends `DELETE /api/sessions/:id/task-auto` (daemon writes `.auto-stop`)
-- Does NOT drive the loop — Claude's internal loop handles all orchestration
+- Does NOT drive the loop — agy's internal loop handles all orchestration
 
 ## Cleanup
 
-When auto mode stops (complete, blocked, cancelled, or manual stop), cleanup is split between Claude and the daemon:
+When auto mode stops (complete, blocked, cancelled, or manual stop), cleanup is split between Antigravity agent and the daemon:
 
-**Claude-side** (inside the session, at loop exit):
+**agy-side** (inside the session, at loop exit):
 1. Delete `.auto-signal` file if exists
 2. Delete `.auto-stop` file if exists (consumed, no longer needed)
 
 **Daemon-side** (backend, after detecting loop exit or stop):
 1. Stop heartbeat polling timer
 2. Stop `fs.watch` on task directory
-3. **Delete stale files**: remove `.auto-signal`, `.auto-signal.tmp`, and `.auto-stop` from `task_dir` if they exist (Claude-side cleanup may have been skipped due to crash/kill)
+3. **Delete stale files**: remove `.auto-signal`, `.auto-signal.tmp`, and `.auto-stop` from `task_dir` if they exist (agy-side cleanup may have been skipped due to crash/kill)
 4. Remove `task_auto` row from SQLite (clears all stall detection state)
 5. Frontend status indicator clears on next poll
 
-The daemon detects loop exit by: (a) receiving a `DELETE` API call (user stop), (b) heartbeat detecting shell prompt (Claude exited), or (c) `.auto-signal` with `next: "(stop)"` (natural completion). In all cases, daemon performs its cleanup steps above.
+The daemon detects loop exit by: (a) receiving a `DELETE` API call (user stop), (b) heartbeat detecting shell prompt (agy exited), or (c) `.auto-signal` with `next: "(stop)"` (natural completion). In all cases, daemon performs its cleanup steps above.
 
 ## Git
 
@@ -368,22 +368,22 @@ On backend server restart, auto state is recovered from SQLite:
 
 1. **Read** all `task_auto` rows with `status = 'running'`
 2. **For each active row**:
-   a. **Delete stale `.auto-stop`** if exists in `task_dir` (prevents restarted Claude from immediately exiting due to leftover stop file from pre-crash state)
+   a. **Delete stale `.auto-stop`** if exists in `task_dir` (prevents restarted agy from immediately exiting due to leftover stop file from pre-crash state)
    b. Check terminal state via `tmux capture-pane`:
-      - If Claude auto session still running → re-establish monitoring (fs.watch + heartbeat)
-      - If shell prompt visible (Claude exited) → restart with backoff: send `claude "/moonview:auto <task_dir>"` to PTY (Claude's internal loop reads `.index.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in a new SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection
+      - If Antigravity agent auto session still running → re-establish monitoring (fs.watch + heartbeat)
+      - If shell prompt visible (agy exited) → restart with backoff: send `agy "/auto <task_dir>"` to PTY (agy's internal loop reads `.index.json` to determine resume point). **Restart limit**: max 3 restarts per `task_dir`. Track restart count in a new SQLite column `restart_count INTEGER DEFAULT 0`. If exceeded, set row status to `'failed'` and log error "auto loop exceeded restart limit — likely crash loop, manual intervention required". Do NOT delete the row — leave for admin inspection
    c. Reset `stall_count` to `0` and `last_capture_hash` to `""` (fresh monitoring baseline)
    d. Start heartbeat polling timer
    e. Re-establish `fs.watch` on `task_dir` for `.auto-signal`
 3. **Resume** normal daemon operation (signal watching + heartbeat polling)
 
-On restart, Claude's auto loop re-reads `.index.json` and `.summary.md` to reconstruct context. The conversation context from the previous session is lost, but `.summary.md` provides the condensed recovery information.
+On restart, agy's auto loop re-reads `.index.json` and `.summary.md` to reconstruct context. The conversation context from the previous session is lost, but `.summary.md` provides the condensed recovery information.
 
 ## Notes
 
-- Auto mode starts with a single `claude "/moonview:auto <module>"` CLI invocation; all subsequent steps execute within that same session
+- Auto mode starts with a single `agy "/auto <module>"` CLI invocation; all subsequent steps execute within that same session
 - The daemon's only active intervention is writing `.auto-stop`; all other daemon activity is passive monitoring
 - `.auto-signal` and `.auto-stop` are transient files — should be in `.gitignore`
 - The daemon logs all signal events and stall detections to server console for debugging
 - **Known trade-off**: First entry on `executing` status always runs `check --checkpoint post-exec`. If execution was incomplete (`completed_steps` < total), check will detect this and route back to exec via NEEDS_FIX, adding one extra iteration. This is acceptable because the auto skill does not re-parse `.plan.md` to count total steps at entry
-- **Context window overflow**: If Claude's context compacts during a long auto run, `.summary.md` (written by each sub-command) provides recovery context. The auto loop continues normally after compaction — each sub-command re-reads relevant files as specified in its SKILL.md
+- **Context window overflow**: If agy's context compacts during a long auto run, `.summary.md` (written by each sub-command) provides recovery context. The auto loop continues normally after compaction — each sub-command re-reads relevant files as specified in its SKILL.md

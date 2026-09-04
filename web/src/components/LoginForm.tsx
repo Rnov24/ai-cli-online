@@ -7,9 +7,7 @@ export function LoginForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputToken.trim()) {
-      setToken(inputToken.trim());
-    }
+    setToken(inputToken.trim() || 'default');
   };
 
   return (
@@ -55,9 +53,9 @@ export function LoginForm() {
             marginBottom: '6px',
             letterSpacing: '0.5px',
           }}>
-            AI-Cli Online
+            AGY Online
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Terminal in your browser</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Antigravity CLI in your browser</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -82,7 +80,7 @@ export function LoginForm() {
               className="login-input"
               value={inputToken}
               onChange={(e) => setInputToken(e.target.value)}
-              placeholder="Enter your AUTH_TOKEN"
+              placeholder="Enter AUTH_TOKEN (leave blank if none set)"
               autoFocus
               autoComplete="current-password"
               style={{
@@ -96,24 +94,24 @@ export function LoginForm() {
                 outline: 'none',
               }}
             />
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '6px' }}>
+              Haven't set a password? Just leave blank and click Connect.
+            </p>
           </div>
 
           <button
             type="submit"
             className="login-submit"
-            disabled={!inputToken.trim()}
             style={{
               width: '100%',
               padding: '11px',
-              background: inputToken.trim()
-                ? 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%)'
-                : 'var(--bg-hover)',
-              color: inputToken.trim() ? 'var(--bg-primary)' : 'var(--text-secondary)',
+              background: 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%)',
+              color: 'var(--bg-primary)',
               border: 'none',
               borderRadius: '8px',
               fontSize: '14px',
               fontWeight: 600,
-              cursor: inputToken.trim() ? 'pointer' : 'not-allowed',
+              cursor: 'pointer',
               letterSpacing: '0.3px',
             }}
           >
@@ -128,16 +126,13 @@ export function LoginForm() {
           fontSize: '11px',
         }}>
           <p>
-            Token is configured in{' '}
-            <code style={{
+            Configured via <code style={{
               backgroundColor: 'var(--bg-primary)',
               padding: '2px 6px',
               borderRadius: '4px',
               border: '1px solid var(--border)',
               fontSize: '11px',
-            }}>
-              server/.env
-            </code>
+            }}>.env</code> (AUTH_TOKEN)
           </p>
         </div>
       </div>

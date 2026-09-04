@@ -9,7 +9,7 @@ arguments:
     required: false
 ---
 
-# /moonview:ai-cli-task — Task Lifecycle Management
+# /ai-cli-task — Task Lifecycle Management
 
 Single entry point for task lifecycle management in the `AiTasks/` directory.
 
@@ -491,29 +491,29 @@ Per-type seed methodology files are centralized in `skills/init/references/seed-
 
 **Main SKILL.md** contains the workflow: prerequisites, execution steps, state transitions, git conventions, `.auto-signal` definitions, and notes. It should be self-sufficient for understanding the sub-command's behavior.
 
-**references/** contains large reference tables and domain-specific details that are only needed in specific situations. The main SKILL.md references these files with `See references/<file>.md` directives — Claude reads them on demand when the context requires it.
+**references/** contains large reference tables and domain-specific details that are only needed in specific situations. The main SKILL.md references these files with `See references/<file>.md` directives — agy reads them on demand when the context requires it.
 
 ### init
 
-`/moonview:init <module_name> [--title "..."] [--tags t1,t2] [--worktree]`
+`/init <module_name> [--title "..."] [--tags t1,t2] [--worktree]`
 
 Create task module directory + `.index.json` (status `draft`, type empty) + `.target.md` template. Create git branch `task/<module_name>`, checkout to it (or create worktree with `--worktree`). Type is auto-discovered by `research` during planning. Module name: ASCII letters/digits/hyphens/underscores (`[a-zA-Z0-9_-]+`).
 
 ### plan
 
-`/moonview:plan <task_module> [--generate]`
+`/plan <task_module> [--generate]`
 
 Research codebase + `.target.md` → write implementation plan to `.plan.md` → status `planning`. Annotation processing is handled by the `annotate` sub-command.
 
 ### research
 
-`/moonview:research <task_module> [--scope full|gap] [--caller plan|verify|check|exec]`
+`/research <task_module> [--scope full|gap] [--caller plan|verify|check|exec]`
 
 Collect and organize external domain knowledge into `AiTasks/.references/`, perform type discovery & refinement, and build `.type-profile.md`. Acts as the intelligence arm of the task lifecycle — separating research from other phases for clearer logic. Two scopes: `full` (comprehensive, first plan) and `gap` (incremental, fill missing topics). `--caller` specifies the invoking phase (default `plan`), directing collection focus and `.auto-signal` routing. Status-neutral — does not change task status. Invoked automatically from multiple phases: `plan` (first plan → `--scope full`, re-plan → `--scope gap`), `verify`/`check`/`exec` (when missing domain knowledge → `--scope gap --caller <phase>`), or standalone for preparatory/supplementary research.
 
 ### check
 
-`/moonview:check <task_module> [--checkpoint post-plan|mid-exec|post-exec]`
+`/check <task_module> [--checkpoint post-plan|mid-exec|post-exec]`
 
 Decision maker at three lifecycle checkpoints:
 
@@ -527,33 +527,33 @@ ACCEPT signals → `merge` sub-command for refactoring + merge. Tests MUST pass 
 
 ### verify
 
-`/moonview:verify <task_module> [--checkpoint quick|full|step-N]`
+`/verify <task_module> [--checkpoint quick|full|step-N]`
 
 Run domain-adapted tests and verification procedures, producing structured result files in `.test/`. Does not render verdicts — that is `check`'s responsibility. Three checkpoint scopes: `quick` (build + lint + type check), `full` (all criteria + acceptance + regression), `step-N` (criteria for step N only). Status-neutral — does not change task status. Can be invoked standalone or internally by `check`/`exec`.
 
 ### exec
 
-`/moonview:exec <task_module> [--step N]`
+`/exec <task_module> [--step N]`
 
 Execute implementation plan step-by-step. Prerequisite: status `review` or `executing` (NEEDS_FIX continuation). Reads `.plan.md` + `.analysis/` + `.test/`, implements changes, verifies per step against `.test/` criteria. On significant issues → signal `(mid-exec)` for mid-exec evaluation. On all steps complete → signal `(done)` for post-exec verification. Project file commits use `feat`/`fix` type.
 
 ### merge
 
-`/moonview:merge <task_module>`
+`/merge <task_module>`
 
 Merge completed task branch to main with automated conflict resolution. Prerequisite: status `executing` with ACCEPT verdict. Performs pre-merge refactoring, attempts merge (up to 3 conflict resolution retries with build/test verification), post-merge cleanup (worktree + branch). On persistent conflict → stays `executing` (retryable after manual resolution).
 
 ### report
 
-`/moonview:report <task_module> [--format full|summary]`
+`/report <task_module> [--format full|summary]`
 
 Generate `.report.md` from all task artifacts. Informational only — no status change. For `complete` tasks, includes change history via commit message pattern matching (works after branch deletion). Full format: Summary, Objective, Plan, Changes, Verification, Issues, Dependencies, Lessons.
 
 ### auto
 
-`/moonview:auto <task_module> [--start|--stop|--status]`
+`/auto <task_module> [--start|--stop|--status]`
 
-Single-session autonomous loop: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → report, with self-correction. A single Claude session internally orchestrates all steps; the backend daemon monitors progress via `fs.watch` on `.auto-signal` and enforces safety limits.
+Single-session autonomous loop: plan → verify → check → exec → verify → check(mid) → exec → verify → check(post) → merge → report, with self-correction. A single Antigravity (agy) session internally orchestrates all steps; the backend daemon monitors progress via `fs.watch` on `.auto-signal` and enforces safety limits.
 
 Entry point and routing details are in `skills/auto/SKILL.md` — status-based first entry table, signal-based routing table, and state machine diagram.
 
@@ -561,14 +561,14 @@ Entry point and routing details are in `skills/auto/SKILL.md` — status-based f
 
 ### cancel
 
-`/moonview:cancel <task_module> [--reason "..."] [--cleanup]`
+`/cancel <task_module> [--reason "..."] [--cleanup]`
 
 Cancel any non-terminal task → `cancelled`. Rejected on `complete`/`cancelled`. Stops auto if running. Snapshots uncommitted changes before cancelling. With `--cleanup`, removes worktree + deletes branch. Without `--cleanup`, branch preserved for reference.
 
 ### list
 
 ```
-/moonview:list [<task_module>] [--deps] [--timeline]
+/list [<task_module>] [--deps] [--timeline]
 ```
 
 Read-only task query. Without arguments: summary table of all tasks. With `<task_module>`: single task details. With `--deps`: Mermaid dependency graph. With `--timeline <module>`: status transition timeline from git history. Pure read-only — no files written, no status changes, no git commits, no `.auto-signal`.
@@ -576,13 +576,13 @@ Read-only task query. Without arguments: summary table of all tasks. With `<task
 ### annotate
 
 ```
-/moonview:annotate <task_file_path> <annotation_file_path> [--silent]
+/annotate <task_file_path> <annotation_file_path> [--silent]
 ```
 
 Process `.tmp-annotations.json` from the Plan panel (Insert/Delete/Replace/Comment) with cross-impact assessment (None/Low/Medium/High) → update task file → delete annotation file. Comments add `> 💬`/`> 📝` blockquotes, never modify existing content. REJECT on `complete`/`cancelled`. State transitions mirror `plan`: `draft`→`planning`, `review`/`executing`→`re-planning`, `blocked`→`planning`.
 
 ### summarize
 
-`/moonview:summarize <task_module> [--all]`
+`/summarize <task_module> [--all]`
 
 Regenerate `.summary.md` for context recovery or refresh. Reads all task artifacts (`.index.json`, `.target.md`, `.plan.md`, `.analysis/`, `.bugfix/`, `.test/`, `.notes/`) and produces a condensed summary. With `--all`, also regenerates each sub-directory's `.summary.md`. Status-neutral — does not change task status. No `.auto-signal` (maintenance tool, not part of auto loop).

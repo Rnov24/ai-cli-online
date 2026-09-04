@@ -14,14 +14,14 @@ arguments:
     default: interactive
 ---
 
-# /moonview:annotate — Annotation Processing
+# /annotate — Annotation Processing
 
 Process `.tmp-annotations.json` from the Plan panel. Supports 4 annotation types: Insert, Delete, Replace, Comment. Each is triaged for cross-impact and conflict before execution.
 
 ## Usage
 
 ```
-/moonview:annotate <task_file_path> <annotation_file_path> [--silent]
+/annotate <task_file_path> <annotation_file_path> [--silent]
 ```
 
 ## Annotation Types

@@ -7,14 +7,14 @@ arguments:
     required: true
 ---
 
-# /moonview:merge — Merge Task Branch to Main
+# /merge — Merge Task Branch to Main
 
 Merge a completed task's branch into main, with automated conflict resolution and verification.
 
 ## Usage
 
 ```
-/moonview:merge <task_module_path>
+/merge <task_module_path>
 ```
 
 ## Prerequisites
@@ -105,7 +105,7 @@ On successful merge:
 - Merge is separated from `check` to isolate conflict resolution logic
 - The 3-attempt limit prevents infinite resolution loops
 - Each resolution attempt includes full verification (build + test) to ensure resolved code is correct
-- On merge failure, status stays `executing` (not `blocked`) so merge can be retried. The user should manually resolve conflicts and then run `/moonview:merge` again
+- On merge failure, status stays `executing` (not `blocked`) so merge can be retried. The user should manually resolve conflicts and then run `/merge` again
 - After manual resolution, if the user has already merged manually, they can update `.index.json` status to `complete` directly
 - Pre-merge refactoring is optional — if no cleanup needed, skip directly to merge
 - **Worktree signal race prevention**: In worktree mode, `.auto-signal` is written to the main worktree's `AiTasks/<module>/` path (not the task worktree), ensuring the daemon can read it after worktree removal. The daemon MUST watch the main worktree path for all signal files

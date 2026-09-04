@@ -10,14 +10,14 @@ arguments:
     required: false
 ---
 
-# /moonview:summarize — Context Summary Regeneration
+# /summarize — Context Summary Regeneration
 
 Regenerate `.summary.md` files for a task module. Used to recover lost context or refresh stale summaries after manual edits.
 
 ## Usage
 
 ```
-/moonview:summarize <task_module_path> [--all]
+/summarize <task_module_path> [--all]
 ```
 
 ## When to Use

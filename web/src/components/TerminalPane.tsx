@@ -1,173 +1,123 @@
 import { memo, useRef, useState, useCallback, useEffect } from 'react';
 import { useStore } from '../store';
-import { TerminalView } from './TerminalView';
+import { AiChatView } from './AiChatView';
 import { PlanPanel } from './PlanPanel';
 import { GitHistoryPanel } from './GitHistoryPanel';
-import { MarkdownEditor, MarkdownEditorHandle } from './MarkdownEditor';
 import { DownloadPopup } from './DownloadPopup';
 import { uploadFiles, fetchCwd } from '../api/files';
 import { usePanelResize } from '../hooks/usePanelResize';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
+import { TaskPipelineBar } from './TaskPipelineBar';
+import { WorkspaceFilesPanel } from './WorkspaceFilesPanel';
 
 import type { TerminalInstance } from '../types';
-import type { TerminalViewHandle } from './TerminalView';
 
 interface TerminalPaneProps {
   terminal: TerminalInstance;
   canClose: boolean;
 }
 
-const NARROW_THRESHOLD = 600;
-
-const narrowQuery = typeof window !== 'undefined'
-  ? window.matchMedia(`(max-width: ${NARROW_THRESHOLD - 1}px)`)
-  : null;
-
-function useIsNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => narrowQuery?.matches ?? false);
-  useEffect(() => {
-    if (!narrowQuery) return;
-    const handler = (e: MediaQueryListEvent) => setNarrow(e.matches);
-    narrowQuery.addEventListener('change', handler);
-    return () => narrowQuery.removeEventListener('change', handler);
-  }, []);
-  return narrow;
-}
-
-export const TerminalPane = memo(function TerminalPane({ terminal }: TerminalPaneProps) {
-  const isNarrow = useIsNarrow();
+export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: TerminalPaneProps) {
   const splitTerminal = useStore((s) => s.splitTerminal);
+  const removeTerminal = useStore((s) => s.removeTerminal);
   const token = useStore((s) => s.token);
-  const toggleChat = useStore((s) => s.toggleChat);
   const togglePlan = useStore((s) => s.togglePlan);
   const toggleGitHistory = useStore((s) => s.toggleGitHistory);
-  const { chatOpen, planOpen, gitHistoryOpen } = terminal.panels;
+  const { planOpen, gitHistoryOpen } = terminal.panels;
+
+  const [filesOpen, setFilesOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const outerRef = useRef<HTMLDivElement>(null);
   const topRowRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const terminalViewRef = useRef<TerminalViewHandle>(null);
-  const editorRef = useRef<MarkdownEditorHandle>(null);
 
-  // Panel resize hooks
+  // Panel resize hook
   const [planWidthPercent, handlePlanDividerMouseDown] = usePanelResize(
     `plan-width-${terminal.id}`, 50,
     { containerRef: topRowRef, axis: 'x', min: 20, max: 80, bodyClass: 'resizing-panes' },
   );
 
-  const [chatHeightPercent, handleChatDividerMouseDown] = usePanelResize(
-    `doc-height-${terminal.id}`, 35,
-    { containerRef: outerRef, axis: 'y', offset: 24, min: 15, max: 60, invert: true, bodyClass: 'resizing-panes-v' },
-  );
-
-  // Poll CWD for display in title bar
-  const [cwd, setCwd] = useState('');
-  useEffect(() => {
-    if (!token || !terminal.connected) return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const dir = await fetchCwd(token, terminal.id);
-        if (!cancelled) setCwd(dir);
-      } catch { /* ignore */ }
-    };
-    poll();
-    const iv = setInterval(poll, 5000);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, [token, terminal.id, terminal.connected]);
-
-  const handleSplit = useCallback(async (direction: 'horizontal' | 'vertical') => {
-    let cwd: string | undefined;
-    if (token) {
-      try { cwd = await fetchCwd(token, terminal.id); } catch { /* use default */ }
-    }
-    splitTerminal(terminal.id, direction, cwd);
-  }, [token, terminal.id, splitTerminal]);
-
   // Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [editorHasContent, setEditorHasContent] = useState(false);
 
-  // Download popup
+  // Download popup state
   const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // CWD state
+  const [cwd, setCwd] = useState<string | null>(null);
+  const [externalCommand, setExternalCommand] = useState<{ cmd: string; id: number } | undefined>();
+
+  useAdaptivePolling(
+    useCallback(async () => {
+      if (!token) return;
+      try {
+        const dir = await fetchCwd(token, terminal.id);
+        setCwd(dir);
+      } catch {
+        // ignore errors
+      }
+    }, [token, terminal.id]),
+    { intervalMs: 5000, backgroundIntervalMs: 0, enabled: Boolean(token) },
+  );
+
+  const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !token) return;
+
     setUploading(true);
     setUploadProgress(0);
     try {
-      await uploadFiles(token, terminal.id, files, (percent) => {
+      await uploadFiles(token, terminal.id, Array.from(files), (percent) => {
         setUploadProgress(percent);
       });
-    } catch (err) {
-      console.error('[upload] Failed:', err);
-      alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } catch {
+      // ignore
     } finally {
       setUploading(false);
       setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  };
+  }, [token, terminal.id]);
 
-  // Send editor text to terminal PTY
-  const sendTimerRef = useRef<number>(undefined);
-  const handleEditorSend = useCallback((text: string) => {
-    if (terminalViewRef.current) {
-      const merged = text.replace(/\r?\n/g, ' ').trimEnd();
-      terminalViewRef.current.sendInput(merged);
-      sendTimerRef.current = window.setTimeout(() => terminalViewRef.current?.sendInput('\r'), 50);
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => { if (sendTimerRef.current) clearTimeout(sendTimerRef.current); };
-  }, []);
-
-  // Plan Send -> send annotations directly to terminal PTY
-  const handlePlanSendToTerminal = useCallback((text: string) => {
-    if (terminalViewRef.current) {
-      const merged = text.replace(/\r?\n/g, ' ').trimEnd();
-      terminalViewRef.current.sendInput(merged);
-      setTimeout(() => terminalViewRef.current?.sendInput('\r'), 50);
-    }
-  }, []);
+  const handleSplit = useCallback((direction: 'horizontal' | 'vertical') => {
+    splitTerminal(terminal.id, direction);
+  }, [splitTerminal, terminal.id]);
 
   const handleCloseDownload = useCallback(() => setShowDownloadPopup(false), []);
 
   return (
     <div ref={outerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, minHeight: 0 }}>
-      {/* Title bar */}
+      {/* Mecha Pane Title Bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '3px 10px',
+        padding: '2px 8px',
         backgroundColor: 'var(--bg-secondary)',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
-        height: '24px',
+        height: '28px',
+        fontFamily: 'var(--font-mono)',
+        fontSize: '11px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
-          <span style={{
-            display: 'inline-block',
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            backgroundColor: terminal.connected ? 'var(--accent-green)' : 'var(--accent-red)',
-            flexShrink: 0,
-          }} />
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flexShrink: 0 }}>
-            {terminal.id}
-            {terminal.connected
-              ? (terminal.sessionResumed ? ' (resumed)' : '')
-              : ' (disconnected)'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+          <span className="pulse-dot pulse-dot--online" />
+          <span style={{ fontWeight: 700, color: 'var(--text-bright)', flexShrink: 0, letterSpacing: '0.4px' }}>
+            PROCESS // {terminal.id}
           </span>
           {cwd && (
             <span
               style={{
-                fontSize: '11px',
-                color: 'var(--text-secondary)',
+                fontSize: '10px',
+                color: 'var(--text-muted)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -181,6 +131,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal }: TerminalPan
             </span>
           )}
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <input
             ref={fileInputRef}
@@ -190,23 +141,24 @@ export const TerminalPane = memo(function TerminalPane({ terminal }: TerminalPan
             onChange={handleUpload}
           />
           <button
-            className="pane-btn"
+            className="mecha-btn"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            style={uploading ? { color: 'var(--accent-yellow)' } : undefined}
+            style={uploading ? { color: 'var(--accent-amber-bright)', padding: '2px 6px', fontSize: '10px' } : { padding: '2px 6px', fontSize: '10px' }}
             title={uploading ? `Uploading ${uploadProgress}%` : 'Upload files'}
             aria-label="Upload files"
           >
-            {uploading ? `${uploadProgress}%` : '\u2191'}
+            {uploading ? `${uploadProgress}%` : <><span>↑</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Upload</span></>}
           </button>
           <div style={{ position: 'relative' }}>
             <button
-              className="pane-btn"
+              className="mecha-btn"
               onClick={() => setShowDownloadPopup(true)}
               title="Download files"
               aria-label="Download files"
+              style={{ padding: '2px 6px', fontSize: '10px' }}
             >
-              {'\u2193'}
+              <span>↓</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Download</span>
             </button>
             {showDownloadPopup && token && (
               <DownloadPopup
@@ -217,63 +169,148 @@ export const TerminalPane = memo(function TerminalPane({ terminal }: TerminalPan
             )}
           </div>
           <button
-            className={`pane-btn${chatOpen ? ' pane-btn--active' : ''}`}
-            onClick={() => toggleChat(terminal.id)}
-            title="Toggle Chat panel"
-            aria-label="Toggle Chat panel"
+            className={`mecha-btn${filesOpen ? ' mecha-btn--active' : ''}`}
+            onClick={() => setFilesOpen((prev) => !prev)}
+            title="Toggle Workspace Files"
+            aria-label="Toggle Files Explorer"
+            style={{ padding: '2px 6px', fontSize: '10px' }}
           >
-            Chat
+            <span>◇</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Files</span>
           </button>
           <button
-            className={`pane-btn${planOpen ? ' pane-btn--active' : ''}`}
+            className={`mecha-btn${planOpen ? ' mecha-btn--active' : ''}`}
             onClick={() => togglePlan(terminal.id)}
-            title="Toggle Task annotation panel"
+            title="Toggle Task & Plan Panel"
             aria-label="Toggle Task annotation panel"
+            style={{ padding: '2px 6px', fontSize: '10px' }}
           >
-            Task
+            <span>⌁</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Tasks</span>
           </button>
           <button
-            className={`pane-btn${gitHistoryOpen ? ' pane-btn--active' : ''}`}
+            className={`mecha-btn${gitHistoryOpen ? ' mecha-btn--active' : ''}`}
             onClick={() => toggleGitHistory(terminal.id)}
-            title="Toggle Git history panel"
+            title="Toggle Git History Panel"
             aria-label="Toggle Git history panel"
+            style={{ padding: '2px 6px', fontSize: '10px' }}
           >
-            Git
+            <span>🌿</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Git</span>
           </button>
           <button
-            className="pane-btn"
-            onClick={() => handleSplit(isNarrow ? 'vertical' : 'horizontal')}
-            title={isNarrow ? 'Split vertical (screen too narrow for horizontal)' : 'Split horizontal (left/right)'}
+            className="mecha-btn desktop-only"
+            onClick={() => handleSplit('horizontal')}
+            title="Split pane horizontally"
             aria-label="Split horizontal"
+            style={{ padding: '2px 5px', fontSize: '10px' }}
           >
-            |
+            ◫
           </button>
           <button
-            className="pane-btn"
+            className="mecha-btn desktop-only"
             onClick={() => handleSplit('vertical')}
-            title="Split vertical (top/bottom)"
+            title="Split pane vertically"
             aria-label="Split vertical"
+            style={{ padding: '2px 5px', fontSize: '10px' }}
           >
-            ─
+            ◫v
           </button>
+          {canClose && (
+            <button
+              className="mecha-btn mecha-btn--danger"
+              onClick={() => removeTerminal(terminal.id)}
+              title="Close this split pane"
+              aria-label="Close pane"
+              style={{ padding: '2px 5px', fontSize: '10px' }}
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main area: Plan/Git (left) | Right column (Terminal + Chat) */}
-      <div ref={topRowRef} style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden', minHeight: 0 }}>
-        {(planOpen || gitHistoryOpen) && (
-          <>
-            <div style={{ width: `${planWidthPercent}%`, minWidth: 200, flexShrink: 0, overflow: 'hidden' }}>
-              {planOpen && (
+      {/* Main area: Files/Plan/Git (left/overlay) | Native AI Command Stream (center/right) */}
+      <div ref={topRowRef} style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden', minHeight: 0, position: 'relative' }}>
+        {/* Mobile Overlay for Secondary Panels */}
+        {isMobile && (filesOpen || planOpen || gitHistoryOpen) && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 30,
+            backgroundColor: 'var(--bg-primary)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '4px 10px',
+              backgroundColor: 'var(--bg-secondary)',
+              borderBottom: '1px solid var(--border)',
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              flexShrink: 0,
+            }}>
+              <span style={{ fontWeight: 700, color: 'var(--accent-amber-bright)' }}>
+                {filesOpen ? '// WORKSPACE FILES' : planOpen ? '// TASKS & PLAN' : '// GIT HISTORY'}
+              </span>
+              <button
+                className="mecha-btn"
+                onClick={() => {
+                  if (filesOpen) setFilesOpen(false);
+                  else if (planOpen) togglePlan(terminal.id);
+                  else if (gitHistoryOpen) toggleGitHistory(terminal.id);
+                }}
+                style={{ padding: '2px 8px', fontSize: '11px' }}
+                aria-label="Close panel"
+              >
+                ✕ CLOSE
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              {filesOpen && (
+                <WorkspaceFilesPanel
+                  sessionId={terminal.id}
+                  token={token || ''}
+                />
+              )}
+              {planOpen && !filesOpen && (
                 <PlanPanel
                   sessionId={terminal.id}
                   token={token || ''}
-                  connected={terminal.connected}
-                  onRequestFileStream={(path) => terminalViewRef.current?.requestFileStream(path)}
-                  onSendToTerminal={handlePlanSendToTerminal}
+                  connected={true}
+                  onSendToTerminal={(cmd) => setExternalCommand({ cmd, id: Date.now() })}
                 />
               )}
-              {gitHistoryOpen && (
+              {gitHistoryOpen && !filesOpen && !planOpen && (
+                <GitHistoryPanel
+                  sessionId={terminal.id}
+                  token={token || ''}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Split for Secondary Panels */}
+        {!isMobile && (filesOpen || planOpen || gitHistoryOpen) && (
+          <>
+            <div style={{ width: `${planWidthPercent}%`, minWidth: 220, flexShrink: 0, overflow: 'hidden' }}>
+              {filesOpen && (
+                <WorkspaceFilesPanel
+                  sessionId={terminal.id}
+                  token={token || ''}
+                />
+              )}
+              {planOpen && !filesOpen && (
+                <PlanPanel
+                  sessionId={terminal.id}
+                  token={token || ''}
+                  connected={true}
+                  onSendToTerminal={(cmd) => setExternalCommand({ cmd, id: Date.now() })}
+                />
+              )}
+              {gitHistoryOpen && !filesOpen && !planOpen && (
                 <GitHistoryPanel
                   sessionId={terminal.id}
                   token={token || ''}
@@ -290,92 +327,28 @@ export const TerminalPane = memo(function TerminalPane({ terminal }: TerminalPan
                 backgroundColor: 'var(--border)',
                 transition: 'background-color 0.15s',
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--accent-blue)'; }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--accent-amber)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--border)'; }}
             />
           </>
         )}
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-          <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minWidth: 80 }}>
-            <TerminalView ref={terminalViewRef} sessionId={terminal.id} />
-            {!terminal.connected && (
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'var(--bg-secondary)',
-                opacity: 0.85,
-                zIndex: 2,
-                pointerEvents: 'none',
-              }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic' }}>
-                  Connecting...
-                </span>
-              </div>
-            )}
+        {/* Central Pure AI Command Timeline with Task Pipeline Bar */}
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="desktop-only">
+            <TaskPipelineBar
+              onRunSkill={(cmd) => setExternalCommand({ cmd, id: Date.now() })}
+            />
           </div>
-
-          {chatOpen && (
-            <>
-              <div
-                className="md-editor-divider"
-                onMouseDown={handleChatDividerMouseDown}
-              />
-              <div style={{ height: `${chatHeightPercent}%`, minHeight: 80, flexShrink: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 8px',
-                  height: '22px',
-                  flexShrink: 0,
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderBottom: '1px solid var(--border)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--accent-blue)', fontWeight: 500 }}>Chat</span>
-                    <button
-                      className="pane-btn"
-                      onClick={() => editorRef.current?.send()}
-                      disabled={!editorHasContent}
-                      title="Send to terminal (Ctrl+Enter)"
-                      style={!editorHasContent ? { opacity: 0.4, cursor: 'default' } : { color: 'var(--accent-green)' }}
-                    >
-                      Send
-                    </button>
-                    <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>Ctrl+Enter</span>
-                  </div>
-                </div>
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <MarkdownEditor
-                    ref={editorRef}
-                    onSend={handleEditorSend}
-                    onContentChange={setEditorHasContent}
-                    sessionId={terminal.id}
-                    token={token || ''}
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <AiChatView
+              sessionId={terminal.id}
+              token={token || ''}
+              externalCommand={externalCommand}
+            />
+          </div>
         </div>
       </div>
-
-      {terminal.error && (
-        <div style={{
-          padding: '2px 8px',
-          backgroundColor: 'var(--bg-secondary)',
-          borderTop: '1px solid var(--accent-red)',
-          color: 'var(--accent-red)',
-          fontSize: '11px',
-          flexShrink: 0,
-        }}>
-          {terminal.error}
-        </div>
-      )}
     </div>
   );
 });

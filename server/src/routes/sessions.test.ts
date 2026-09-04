@@ -165,12 +165,12 @@ describe('GET /api/sessions/:sessionId/pane-command', () => {
   });
 
   it('returns command on success', async () => {
-    mockGetPaneCommand.mockResolvedValue('claude');
+    mockGetPaneCommand.mockResolvedValue('agy');
 
     const app = createApp();
     const res = await request(app).get('/api/sessions/t1/pane-command');
     expect(res.status).toBe(200);
-    expect(res.body.command).toBe('claude');
+    expect(res.body.command).toBe('agy');
   });
 
   it('returns empty string on error', async () => {

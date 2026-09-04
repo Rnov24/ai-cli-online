@@ -285,10 +285,23 @@ export async function restoreFromServer(
       }
     }
 
+    const urlSession = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('session')
+      : null;
+    const matchedTab = urlSession ? reconciled.tabs.find((t) => t.id === urlSession && t.status === 'open') : null;
     const activeTab =
+      matchedTab ||
       reconciled.tabs.find((t) => t.id === reconciled.activeTabId && t.status === 'open') ||
       reconciled.tabs.find((t) => t.status === 'open');
     const activeTabId = activeTab?.id || '';
+
+    if (typeof window !== 'undefined' && activeTabId) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('session') !== activeTabId) {
+        url.searchParams.set('session', activeTabId);
+        window.history.replaceState(null, '', url.toString());
+      }
+    }
 
     setState({
       tabsLoading: false,

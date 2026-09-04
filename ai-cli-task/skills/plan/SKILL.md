@@ -10,14 +10,14 @@ arguments:
     required: false
 ---
 
-# /moonview:plan — Plan Generation
+# /plan — Plan Generation
 
 Generate an implementation plan from `.target.md`. Annotation processing is handled by the `annotate` sub-command.
 
 ## Usage
 
 ```
-/moonview:plan <task_module> [--generate]
+/plan <task_module> [--generate]
 ```
 
 `--generate` is the default behavior — the flag exists for explicitness when invoked from auto mode or scripts. Omitting it has the same effect.
@@ -25,7 +25,7 @@ Generate an implementation plan from `.target.md`. Annotation processing is hand
 ## Execution Steps
 
 1. Read `.target.md` for requirements
-2. **Invoke research** (which handles type discovery): Delegate reference collection AND type determination to the `research` sub-command. **Invocation method**: in auto mode, Read `skills/research/SKILL.md` and execute its numbered steps inline (skipping its `.auto-signal` write — auto loop handles it). In manual/standalone mode, use Skill tool to invoke `/moonview:research`. See `skills/research/SKILL.md` and `references/type-profiling.md` for details:
+2. **Invoke research** (which handles type discovery): Delegate reference collection AND type determination to the `research` sub-command. **Invocation method**: in auto mode, Read `skills/research/SKILL.md` and execute its numbered steps inline (skipping its `.auto-signal` write — auto loop handles it). In manual/standalone mode, use Skill tool to invoke `/research`. See `skills/research/SKILL.md` and `references/type-profiling.md` for details:
    - **First plan** (status `draft`/`planning`, no existing `.plan.md`): invoke research with `--scope full --caller plan` — research will analyze `.target.md`, validate/override any user-specified type, detect hybrid domains, build `.type-profile.md`, and collect comprehensive references
    - **Re-plan** (status `re-planning`/`review`/`executing`): invoke research with `--scope gap --caller plan` — incremental type refinement and reference collection
 3. **Read** `.type-profile.md` — research has created or updated this. Verify the type classification makes sense in context. If plan disagrees with research's classification, update `.type-profile.md` with rationale and adjust `type` in `.index.json`

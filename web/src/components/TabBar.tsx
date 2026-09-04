@@ -13,7 +13,7 @@ export const TabBar = React.memo(() => {
   const [renameValue, setRenameValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const openTabs = tabs.filter(tab => tab.status === 'open');
+  const openTabs = tabs.filter((tab) => tab.status === 'open');
 
   useEffect(() => {
     if (renamingTabId && inputRef.current) {
@@ -68,8 +68,28 @@ export const TabBar = React.memo(() => {
   const showCloseButton = openTabs.length > 1;
 
   return (
-    <div className="tab-bar">
-      {openTabs.map(tab => {
+    <div
+      className="tab-bar"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 8px',
+        height: '30px',
+        backgroundColor: 'var(--bg-secondary)',
+        borderTop: '1px solid var(--border)',
+        flexShrink: 0,
+        overflowX: 'auto',
+        gap: '4px',
+        fontFamily: 'var(--font-mono)',
+        fontSize: '11px',
+        userSelect: 'none',
+      }}
+    >
+      <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', marginRight: '4px', letterSpacing: '0.8px' }}>
+        TABS //
+      </span>
+
+      {openTabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         const isRenaming = renamingTabId === tab.id;
         const terminalCount = tab.terminalIds.length;
@@ -77,10 +97,24 @@ export const TabBar = React.memo(() => {
         return (
           <div
             key={tab.id}
-            className={`tab-item ${isActive ? 'tab-item--active' : ''}`}
             onClick={() => handleTabClick(tab.id)}
             onDoubleClick={() => handleDoubleClick(tab)}
             onMouseDown={(e) => handleMiddleClick(e, tab.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '3px 10px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              borderRadius: '2px 2px 0 0',
+              backgroundColor: isActive ? 'var(--bg-primary)' : 'transparent',
+              color: isActive ? 'var(--accent-amber-bright)' : 'var(--text-secondary)',
+              borderBottom: isActive ? '2px solid var(--accent-amber)' : '2px solid transparent',
+              borderLeft: isActive ? '1px solid var(--border)' : '1px solid transparent',
+              borderRight: isActive ? '1px solid var(--border)' : '1px solid transparent',
+              transition: 'all 0.15s ease',
+            }}
           >
             {isRenaming ? (
               <input
@@ -90,19 +124,49 @@ export const TabBar = React.memo(() => {
                 onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={commitRename}
                 onKeyDown={handleRenameKeyDown}
-                className="tab-item__rename-input"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--accent-amber)',
+                  color: 'var(--text-bright)',
+                  fontSize: '11px',
+                  fontFamily: 'inherit',
+                  padding: '0 4px',
+                  borderRadius: '2px',
+                  outline: 'none',
+                  width: '90px',
+                }}
               />
             ) : (
               <>
-                <span className="tab-item__name">
-                  {tab.name} {terminalCount > 0 && `(${terminalCount})`}
+                <span style={{
+                  maxWidth: '140px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontWeight: isActive ? 700 : 500,
+                }}>
+                  {tab.name}
                 </span>
+                {terminalCount > 1 && (
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                    [{terminalCount}]
+                  </span>
+                )}
                 {showCloseButton && (
                   <button
-                    className="tab-item__close"
                     onClick={(e) => handleCloseClick(e, tab.id)}
-                    title="Close tab"
+                    title="Close session tab"
                     aria-label="Close tab"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      padding: '0 2px',
+                      lineHeight: 1,
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent-red)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
                   >
                     ×
                   </button>
@@ -112,13 +176,20 @@ export const TabBar = React.memo(() => {
           </div>
         );
       })}
+
       <button
-        className="tab-bar-add"
         onClick={() => addTab()}
-        title="New tab"
+        title="Initialize new session tab (⌘N)"
         aria-label="Add new tab"
+        className="mecha-btn"
+        style={{
+          padding: '2px 7px',
+          fontSize: '11px',
+          height: '22px',
+          marginLeft: '4px',
+        }}
       >
-        +
+        + NEW
       </button>
     </div>
   );

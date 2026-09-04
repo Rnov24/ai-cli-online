@@ -49,7 +49,7 @@ router.get('/api/sessions/:sessionId/cwd', async (req, res) => {
   }
 });
 
-// Get current pane command (to detect if claude is running)
+// Get current pane command (to detect if agy is running)
 router.get('/api/sessions/:sessionId/pane-command', async (req, res) => {
   const sessionName = resolveSession(req, res);
   if (!sessionName) return;

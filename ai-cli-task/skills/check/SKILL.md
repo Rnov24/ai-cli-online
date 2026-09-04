@@ -11,14 +11,14 @@ arguments:
     default: post-plan
 ---
 
-# /moonview:check — Plan Feasibility Check
+# /check — Plan Feasibility Check
 
 Check the implementation plan at three lifecycle checkpoints. Acts as the decision maker in the task state machine.
 
 ## Usage
 
 ```
-/moonview:check <task_module_path> [--checkpoint post-plan|mid-exec|post-exec]
+/check <task_module_path> [--checkpoint post-plan|mid-exec|post-exec]
 ```
 
 ## Checkpoints

@@ -6,7 +6,7 @@
 
 在浏览器中运行的 AI 开发环境。持久化终端会话、结构化任务生命周期、自主执行 — 单个 Node.js 进程即可运行。
 
-专为在不稳定网络下运行 Claude Code、Codex CLI、Gemini CLI 或任意 AI CLI 而构建。tmux 保证断网后进程存活；浏览器 UI 在终端旁提供规划、批注和对话面板。
+专为运行 **Google Antigravity CLI (`agy`)** 而构建。tmux 保证断网后进程存活；浏览器 UI 在终端旁提供规划、批注和对话面板。
 
 **npm:** https://www.npmjs.com/package/ai-cli-online | **GitHub:** https://github.com/huacheng/ai-cli-online
 
@@ -36,9 +36,11 @@
 ```
 
 - **Plan 面板** — 浏览 `AiTasks/` 文件，4 种批注类型标注文档，向 AI 发送结构化反馈
-- **终端** — 完整 xterm.js + WebGL 渲染，二进制协议实现超低延迟
-- **Chat 编辑器** — 多行 Markdown 编辑器，斜杠命令，草稿服务端持久化
-- 三个面板可同时打开，各自独立调整大小
+- **终端** — 完整 xterm.js + WebGL 渲染，二进制协议实现超低延迟，带手机触控辅助按键栏
+- **Chat 编辑器** — 多行 Markdown 编辑器，Antigravity 斜杠命令，草稿服务端持久化
+- **移动端与 Termux 原生支持** — 支持 Termux:Boot 开机自启，wake-lock 防休眠，注册独立 PID
+- **空闲节能服务 (Idle Serving)** — 无客户端连接时自动进入低功耗休眠，提交 SQLite WAL，GC 回收内存 (仅 ~70MB RSS)
+- 面板可同时打开，各自独立调整大小
 
 ## AI 任务生命周期
 
@@ -58,7 +60,7 @@ init → plan → check → exec → check → merge → report
 | **exec** | 逐步执行计划，每步验证 |
 | **merge** | 合并任务分支到主干，冲突解决（最多 3 次重试） |
 | **report** | 生成完成报告，提炼经验到知识库 |
-| **auto** | 在单个 Claude 会话中自主运行完整生命周期 |
+| **auto** | 在单个 Antigravity (`agy`) 会话中自主运行完整生命周期 |
 | **cancel** | 停止执行，设为已取消，可选清理 |
 
 ### 自主模式
@@ -67,7 +69,7 @@ init → plan → check → exec → check → merge → report
 /ai-cli-task auto my-feature
 ```
 
-一条命令触发完整生命周期。单个 Claude 会话在内部依次运行 plan → check → exec → merge → report，所有步骤共享上下文。守护进程通过 `.auto-signal` 文件监控进度，强制超时，检测停滞。
+一条命令触发完整生命周期。单个 Antigravity (`agy`) 会话在内部依次运行 plan → check → exec → merge → report，所有步骤共享上下文。守护进程通过 `.auto-signal` 文件监控进度，强制超时，检测停滞。
 
 ### 任务结构
 
@@ -143,14 +145,52 @@ ai-cli-online
 git clone https://github.com/huacheng/ai-cli-online.git
 cd ai-cli-online
 npm install
-npm run build
-npm start
+npm run build      # 编译 Web UI 并打包为单一 Go 可执行二进制
+./bin/ai-cli-online start
 ```
 
 ## 前提条件
 
-- Node.js >= 18
-- tmux 已安装（`sudo apt install tmux` 或 `brew install tmux`）
+- Go >= 1.22（源码编译需要）
+- tmux 已安装（Termux: `pkg install tmux`，Ubuntu: `sudo apt install tmux`）
+- agy 已安装（Google Antigravity CLI）
+
+## 进程管理与 CLI 命令
+
+支持 PID 文件跟踪和后台守护进程模式：
+
+```bash
+# 后台守护进程模式启动
+./bin/ai-cli-online start -d
+
+# 查看运行状态、PID、内存与运行时间
+./bin/ai-cli-online status
+
+# 停止正在运行的守护进程
+./bin/ai-cli-online stop
+
+# 重启服务
+./bin/ai-cli-online restart
+```
+
+## 移动端与 Termux 开机自启服务
+
+AGY Online 原生适配 Android Termux 环境：
+
+1. **设备开机自启**:
+   ```bash
+   bash scripts/install-termux-boot.sh
+   ```
+   安装 Termux:Boot 钩子 `~/.termux/boot/start-ai-cli-online.sh`，手机开机时自动在后台启动 Web 服务。
+
+2. **Wake-Lock 防休眠**:
+   启动脚本自动调用 `termux-wake-lock`，防止 Android 锁屏灭屏后挂起 CPU 和网络连接。
+
+3. **手机虚拟辅助按键**:
+   Web 终端提供移动端快捷触控工具栏（`ESC`、`TAB`、`^C`、方向键、`agy ▶`、`/`、剪贴板粘贴），点击 `⌨️` 即可切换，彻底解决手机软键盘无特殊键的问题。
+
+4. **空闲节能模式 (Idle Serving)**:
+   当浏览器没有活动连接超过 60 秒时，后端自动转入低功耗空闲状态：提交 SQLite WAL 并调用 GC 释放未使用内存（空闲内存仅约 70MB RSS）。
 
 ## 配置
 
@@ -177,21 +217,23 @@ TRUST_PROXY=1                    # nginx 反代时设为 1
         │
         ↕ WebSocket binary/JSON + REST API
         │
-Express 服务 (Node.js)
-  ├── WebSocket ↔ PTY relay
-  ├── tmux 会话管理
-  ├── 文件传输 API
-  ├── SQLite (草稿、批注、设置)
-  └── 路由模块 (sessions, files, editor, settings)
+Go 原生服务 (单一静态可执行文件)
+  ├── 嵌入式 Web UI 静态资源 (embed.FS)
+  ├── WebSocket ↔ PTY 转发 (creack/pty + coder/websocket)
+  ├── tmux 会话管理 (~/.tmux-sockets/ai-cli-online)
+  ├── 文件传输 API (tar.gz 流式归档、上传、下载)
+  ├── 纯 Go SQLite (草稿、批注、设置，基于 modernc.org/sqlite)
+  └── REST 路由处理 (sessions, files, editor, settings, git, system)
         │
         ↕ PTY / tmux sockets
         │
-tmux sessions → shell → Claude Code / AI agents
+tmux sessions → shell → Google Antigravity CLI (agy) / AI agents
   └── AiTasks/ 生命周期 (init/plan/check/exec/merge/report/auto)
 ```
 
 - **前端**: React + Zustand + xterm.js (WebGL)
-- **后端**: Node.js + Express + node-pty + WebSocket + better-sqlite3
+- **后端**: Go (Golang) + `creack/pty` + `coder/websocket` + `modernc.org/sqlite` (纯 Go，零 CGO)
+- **交付产物**: 单一独立静态可执行二进制 (`bin/ai-cli-online`)，内置嵌入前端所有静态资源
 - **会话管理**: tmux（持久化终端会话）
 - **布局系统**: Tab 标签页 + 递归分割树（LeafNode / SplitNode）
 - **传输协议**: 二进制帧（热路径）+ JSON（控制消息）

@@ -42,14 +42,18 @@ export interface ServerSession {
 
 // Tab types for multi-terminal grouping
 export type TabStatus = 'open' | 'closed';
+export type SessionStatus = 'ACTIVE' | 'IDLE' | 'RUNNING' | 'WAITING' | 'COMPLETED' | 'ERROR' | 'ARCHIVED';
 
 export interface TabState {
   id: string;               // e.g., "tab1", "tab2"
   name: string;             // user-visible label
   status: TabStatus;
+  sessionStatus?: SessionStatus;
   terminalIds: string[];    // ordered terminal IDs owned by this tab
   layout: LayoutNode | null;
   createdAt: number;        // Date.now() at creation
+  updatedAt?: number;       // Date.now() at last update
+  messageCount?: number;    // number of messages in this session
   panelStates?: Record<string, PanelState>;  // per-terminal panel state (persisted across refresh)
 }
 

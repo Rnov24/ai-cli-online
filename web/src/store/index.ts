@@ -73,10 +73,23 @@ export const useStore = create<AppState>((...args) => {
               }
             }
           }
+          const urlSession = typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('session')
+            : null;
+          const matchedTab = urlSession ? localSaved.tabs.find((t) => t.id === urlSession && t.status === 'open') : null;
           const activeTab =
+            matchedTab ||
             localSaved.tabs.find((t) => t.id === localSaved.activeTabId && t.status === 'open') ||
             localSaved.tabs.find((t) => t.status === 'open');
           const activeTabId = activeTab?.id || '';
+
+          if (typeof window !== 'undefined' && activeTabId) {
+            const url = new URL(window.location.href);
+            if (url.searchParams.get('session') !== activeTabId) {
+              url.searchParams.set('session', activeTabId);
+              window.history.replaceState(null, '', url.toString());
+            }
+          }
 
           set({
             token,
@@ -156,14 +169,24 @@ export const useStore = create<AppState>((...args) => {
         panels: { chatOpen: false, planOpen: false, gitHistoryOpen: false },
       };
       const leaf: LayoutNode = { type: 'leaf', terminalId: termId };
+      const now = Date.now();
       const tab: TabState = {
         id: tabId,
-        name: name || `Tab ${state.nextTabId}`,
+        name: name || `Session-${state.nextTabId}`,
         status: 'open',
+        sessionStatus: 'ACTIVE',
+        messageCount: 0,
         terminalIds: [termId],
         layout: leaf,
-        createdAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
       };
+
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('session', tabId);
+        window.history.replaceState(null, '', url.toString());
+      }
 
       set({
         tabs: [...state.tabs, tab],
@@ -182,6 +205,14 @@ export const useStore = create<AppState>((...args) => {
       const state = get();
       const tab = state.tabs.find((t) => t.id === tabId);
       if (!tab || tab.status !== 'open') return;
+
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('session') !== tabId) {
+          url.searchParams.set('session', tabId);
+          window.history.replaceState(null, '', url.toString());
+        }
+      }
 
       set({
         activeTabId: tabId,
@@ -328,9 +359,20 @@ export const useStore = create<AppState>((...args) => {
     },
 
     renameTab: (tabId, name) => {
-      const newTabs = updateTab(get().tabs, tabId, (t) => ({ ...t, name }));
+      const now = Date.now();
+      const newTabs = updateTab(get().tabs, tabId, (t) => ({ ...t, name, updatedAt: now }));
       set({ tabs: newTabs });
       persistTabs(toPersistable(get()));
+    },
+
+    updateTabSessionMeta: (tabId, meta) => {
+      const newTabs = updateTab(get().tabs, tabId, (t) => ({
+        ...t,
+        ...meta,
+        updatedAt: meta.updatedAt ?? Date.now(),
+      }));
+      set({ tabs: newTabs });
+      persistTabsDebounced(toPersistable(get()));
     },
 
     // --- Terminal actions (scoped to active tab) ----------------------------

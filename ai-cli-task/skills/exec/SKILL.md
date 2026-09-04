@@ -10,14 +10,14 @@ arguments:
     required: false
 ---
 
-# /moonview:exec — Execute Implementation Plan
+# /exec — Execute Implementation Plan
 
 Execute the implementation plan for a task module that has passed evaluation.
 
 ## Usage
 
 ```
-/moonview:exec <task_module_path> [--step N]
+/exec <task_module_path> [--step N]
 ```
 
 ## Prerequisites
@@ -132,10 +132,10 @@ For long-running executions, intermediate progress can be observed by:
 ## Notes
 
 - Each step should be atomic — if a step fails, previous steps remain applied
-- The executor should follow project coding conventions (check CLAUDE.md if present)
+- The executor should follow project coding conventions (check AGENTS.md, GEMINI.md, or CLAUDE.md if present)
 - When status is `executing` (NEEDS_FIX), exec reads both `.bugfix/` and `.analysis/` latest files, using the most recent by filename date as fix guidance (`.bugfix/` = mid-exec source, `.analysis/` = post-exec source)
 - When `--step N` is used, the executor verifies prerequisites for that step are met, then signals `(step-N)` on completion for mid-exec checkpoint
-- After successful execution of all steps, the user should run `/moonview:check --checkpoint post-exec`
+- After successful execution of all steps, the user should run `/check --checkpoint post-exec`
 - Per-step verification against `.test/` criteria is done during execution; full test suite / acceptance testing is part of the post-exec evaluation by `check`
 - **Evidence-based decisions**: When uncertain about APIs, library usage, or compatibility, use shell commands to verify (curl official docs, check installed versions, read node_modules source, etc.) before implementing
 - **Concurrency**: Exec acquires `AiTasks/<module>/.lock` before proceeding and releases on completion (see Concurrency Protection in `commands/ai-cli-task.md`)

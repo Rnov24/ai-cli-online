@@ -2,9 +2,9 @@
 
 ## 项目概述
 
-AI-CLI-Online 是在浏览器中运行的 AI 开发环境，专为运行 Claude Code、Codex CLI、Gemini CLI 或任意 AI CLI 而构建。通过 xterm.js + tmux 提供持久化终端会话，配合 Plan 批注面板、Git History 面板和 Chat 编辑器，形成终端 + 规划 + 执行的一体化工作区。支持 ai-cli-task 插件的 13-skill 任务生命周期（init/plan/research/check/verify/exec/merge/report/auto/cancel/list/annotate/summarize），实现结构化 AI 任务的自主执行。
+AI-CLI-Online (AGY Online) 是在浏览器中运行的 AI 开发环境，专为运行 Google Antigravity CLI (`agy`) 而构建。通过 xterm.js + tmux 提供持久化终端会话，配合 Plan 批注面板、Git History 面板和 Chat 编辑器，形成终端 + 规划 + 执行的一体化工作区。支持 ai-cli-task 插件的 13-skill 任务生命周期（init/plan/research/check/verify/exec/merge/report/auto/cancel/list/annotate/summarize），实现结构化 AI 任务的自主执行。
 
-核心能力：Tab 多标签页、多终端分屏（水平/垂直任意嵌套）、2D 网格面板布局（[Plan/Git | Xterm] + [Chat]，Plan/Git 互斥占左侧）、Plan 批注系统（AiTasks/ 目录多文件批注 + Mermaid 图表）、Git History 面板（提交浏览 + diff 查看 + 分支图可视化 + refs 徽章 + --all 分支切换）、Chat 编辑器（多行编辑 + 斜杠命令 + 草稿持久化）、Light/Dark 主题切换、鼠标选中自动复制 + 右键粘贴、capture-pane 滚动历史回看（带 ANSI 颜色）。
+核心能力：Tab 多标签页、多终端分屏（水平/垂直任意嵌套）、2D 网格面板布局（[Plan/Git | Xterm] + [Chat]，Plan/Git 互斥占左侧）、Plan 批注系统（AiTasks/ 目录多文件批注 + Mermaid 图表）、Git History 面板（提交浏览 + diff 查看 + 分支图可视化 + refs 徽章 + --all 分支切换）、Chat 编辑器（多行编辑 + Antigravity 斜杠命令 + 草稿持久化）、Light/Dark 主题切换、鼠标选中自动复制 + 右键粘贴、capture-pane 滚动历史回看（带 ANSI 颜色）。
 
 ## 架构
 
@@ -12,7 +12,7 @@ AI-CLI-Online 是在浏览器中运行的 AI 开发环境，专为运行 Claude 
 浏览器 (xterm.js + WebGL)
   ├── Plan 面板 (批注编辑器)
   ├── Git History 面板 (提交浏览 + diff 查看 + 分支图可视化)
-  ├── Chat 编辑器 (Markdown + /命令)
+  ├── Chat 编辑器 (Markdown + Antigravity /命令)
   └── 终端视图 (WebGL 渲染器)
         │
         ↕ WebSocket binary/JSON + REST API
@@ -26,7 +26,7 @@ Express 服务 (Node.js)
         │
         ↕ PTY / tmux sockets
         │
-tmux sessions → shell → Claude Code / AI agents
+tmux sessions → shell → Google Antigravity CLI (agy) / AI agents
   └── AiTasks/ 生命周期 (init/plan/research/check/verify/exec/merge/report/auto/cancel/list/annotate/summarize)
 ```
 
@@ -183,7 +183,7 @@ init → plan → check → exec → check → merge → report
 | **exec** | 逐步执行计划，每步验证 |
 | **merge** | 合并任务分支到主干，冲突解决（最多 3 次重试） |
 | **report** | 生成完成报告，提炼经验到知识库 |
-| **auto** | 在单个 Claude 会话中自主运行完整生命周期 |
+| **auto** | 在单个 Antigravity (`agy`) 会话中自主运行完整生命周期 |
 | **cancel** | 停止执行，设为已取消，可选清理 |
 | **list** | 只读查询任务状态与依赖关系 |
 | **annotate** | 处理 Plan 面板批注（从 plan 分离） |

@@ -6,7 +6,7 @@
 
 An AI-powered development environment that runs in your browser. Persistent terminal sessions, structured task lifecycle, and autonomous execution — all through a single Node.js process.
 
-Built for running Claude Code, Codex CLI, Gemini CLI, or any other AI CLI over unstable networks. tmux keeps everything alive when connections drop; the browser UI provides planning, annotation, and chat panels alongside the terminal.
+Built exclusively for running **Google Antigravity CLI (`agy`)** over local or unstable networks. tmux keeps everything alive when connections drop; the browser UI provides planning, annotation, and chat panels alongside the terminal.
 
 **npm:** https://www.npmjs.com/package/ai-cli-online | **GitHub:** https://github.com/huacheng/ai-cli-online
 
@@ -36,9 +36,11 @@ Built for running Claude Code, Codex CLI, Gemini CLI, or any other AI CLI over u
 ```
 
 - **Plan Panel** — browse `AiTasks/` files, annotate documents with 4 annotation types, send structured feedback to AI
-- **Terminal** — full xterm.js with WebGL rendering, binary protocol for ultra-low latency
+- **Terminal** — full xterm.js with WebGL rendering, binary protocol for ultra-low latency, and touch quick-keys for mobile
 - **Chat Editor** — multi-line Markdown editor with slash commands, server-side draft persistence
-- All three panels can be open simultaneously, each independently resizable
+- **Mobile & Termux Ready** — auto-start at Android device boot via Termux:Boot, wake-lock CPU protection, and registered PID tracking
+- **Idle Serving** — automatic low-power idle mode when 0 clients connected; checkpoints SQLite and trims memory (RSS ~70MB)
+- All panels can be open simultaneously, each independently resizable
 
 ## AI Task Lifecycle
 
@@ -58,7 +60,7 @@ init → plan → check → exec → check → merge → report
 | **exec** | Execute plan steps with per-step verification |
 | **merge** | Merge task branch to main with conflict resolution (up to 3 retries) |
 | **report** | Generate completion report, distill lessons to experience database |
-| **auto** | Run the full lifecycle autonomously in a single Claude session |
+| **auto** | Run the full lifecycle autonomously in a single Antigravity (`agy`) session |
 | **cancel** | Stop execution, set status to cancelled, optional cleanup |
 
 ### Auto Mode
@@ -67,7 +69,7 @@ init → plan → check → exec → check → merge → report
 /ai-cli-task auto my-feature
 ```
 
-One command triggers the entire lifecycle. A single Claude session runs plan → check → exec → merge → report internally, sharing context across all steps. A daemon monitors progress via `.auto-signal` files, enforces timeouts, and detects stalls.
+One command triggers the entire lifecycle. A single Antigravity (`agy`) session runs plan → check → exec → merge → report internally, sharing context across all steps. A daemon monitors progress via `.auto-signal` files, enforces timeouts, and detects stalls.
 
 ### Task Structure
 
@@ -143,14 +145,52 @@ ai-cli-online
 git clone https://github.com/huacheng/ai-cli-online.git
 cd ai-cli-online
 npm install
-npm run build
-npm start
+npm run build      # Compiles React Web UI and builds the single Go binary
+./bin/ai-cli-online start
 ```
 
 ## Prerequisites
 
-- Node.js >= 18
-- tmux installed (`sudo apt install tmux` or `brew install tmux`)
+- Go >= 1.22 (to build from source)
+- tmux installed (`pkg install tmux` on Termux, `sudo apt install tmux` on Ubuntu)
+- agy installed (Google Antigravity CLI)
+
+## Process Management & CLI Commands
+
+Manage the server lifecycle with PID tracking and background daemon mode:
+
+```bash
+# Start in background daemon mode
+./bin/ai-cli-online start -d
+
+# Check running status, PID, memory, and uptime
+./bin/ai-cli-online status
+
+# Stop running server daemon
+./bin/ai-cli-online stop
+
+# Restart server
+./bin/ai-cli-online restart
+```
+
+## Mobile & Termux Auto-Serving on Boot
+
+AGY Online provides first-class support for running on Android devices via Termux:
+
+1. **Auto-Start on Device Boot**:
+   ```bash
+   bash scripts/install-termux-boot.sh
+   ```
+   This creates a boot hook in `~/.termux/boot/start-ai-cli-online.sh` that starts the server whenever your Android device powers on.
+
+2. **Wake-Lock & Battery Optimization**:
+   The installer automatically acquires `termux-wake-lock` to ensure Android does not put the CPU to sleep when the screen is off.
+
+3. **Touch Quick-Keys Bar**:
+   The Web UI provides a mobile-friendly touch toolbar (`ESC`, `TAB`, `^C`, arrows, `agy ▶`, `/`, paste) toggleable via `⌨️`, eliminating mobile virtual keyboard friction.
+
+4. **Idle Power-Saving**:
+   When no browser tabs are connected, the backend automatically transitions to low-power idle mode, committing SQLite WAL and releasing garbage-collected memory (reducing RAM to ~70MB).
 
 ## Configuration
 
@@ -177,21 +217,23 @@ Browser (xterm.js + WebGL)
         │
         ↕ WebSocket binary/JSON + REST API
         │
-Express Server (Node.js)
-  ├── WebSocket ↔ PTY relay
-  ├── tmux session manager
-  ├── File transfer API
-  ├── SQLite (drafts, annotations, settings)
-  └── Route modules (sessions, files, editor, settings)
+Go Native Server (Single static executable)
+  ├── Embedded Web UI assets (embed.FS)
+  ├── WebSocket ↔ PTY relay (creack/pty + coder/websocket)
+  ├── tmux session manager (~/.tmux-sockets/ai-cli-online)
+  ├── File transfer API (tar.gz streaming, upload, download)
+  ├── SQLite (drafts, annotations, settings via modernc.org/sqlite)
+  └── REST route handlers (sessions, files, editor, settings, git, system)
         │
         ↕ PTY / tmux sockets
         │
-tmux sessions → shell → Claude Code / AI agents
+tmux sessions → shell → Google Antigravity CLI (agy) / AI agents
   └── AiTasks/ lifecycle (init/plan/check/exec/merge/report/auto)
 ```
 
 - **Frontend**: React + Zustand + xterm.js (WebGL)
-- **Backend**: Node.js + Express + node-pty + WebSocket + better-sqlite3
+- **Backend**: Go (Golang) + `creack/pty` + `coder/websocket` + `modernc.org/sqlite` (Pure Go, 0 CGO)
+- **Binary**: Single self-contained static executable (`bin/ai-cli-online`) with embedded Web UI assets
 - **Session Manager**: tmux (persistent terminal sessions)
 - **Layout**: Tabs + recursive split tree (LeafNode / SplitNode)
 - **Transport**: Binary frames (hot path) + JSON (control messages)

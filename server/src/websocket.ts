@@ -17,6 +17,7 @@ import { createReadStream, type ReadStream } from 'fs';
 import { stat as fsStat } from 'fs/promises';
 import { PtySession } from './pty.js';
 import type { ClientMessage, ServerMessage } from './types.js';
+import { recordActivity, onConnectionCountChange } from './idleManager.js';
 
 /** WebSocket with keepalive flag for server-side ping/pong tracking */
 interface AliveWebSocket extends WebSocket {
@@ -232,6 +233,7 @@ export function setupWebSocket(
           existing.close(4002, 'Replaced by new connection');
         }
         activeConnections.set(sessionName, ws);
+        onConnectionCountChange(activeConnections.size);
 
         // Check or create tmux session
         const resumed = await hasSession(sessionName);
@@ -299,6 +301,7 @@ export function setupWebSocket(
     }
 
     ws.on('message', async (raw, isBinary) => {
+      recordActivity();
       try {
         // Binary hot-path: [1-byte type][payload]
         if (isBinary && Buffer.isBuffer(raw) && raw.length >= 1) {
@@ -461,6 +464,7 @@ export function setupWebSocket(
         console.log(`[WS] Client disconnected, session: ${sessionName}`);
         if (activeConnections.get(sessionName) === ws) {
           activeConnections.delete(sessionName);
+          onConnectionCountChange(activeConnections.size);
         }
       }
       ptySession?.kill();

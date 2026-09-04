@@ -13,17 +13,17 @@ arguments:
     required: false
 ---
 
-# /moonview:list — Read-Only Task Query
+# /list — Read-Only Task Query
 
 Query task status, details, and relationships. Pure read-only — no files written, no status changes, no git commits.
 
 ## Usage
 
 ```
-/moonview:list                           # List all tasks
-/moonview:list <task_module>             # Single task details
-/moonview:list --deps                    # Dependency graph (all tasks)
-/moonview:list --timeline <task_module>  # Status transition timeline
+/list                           # List all tasks
+/list <task_module>             # Single task details
+/list --deps                    # Dependency graph (all tasks)
+/list --timeline <task_module>  # Status transition timeline
 ```
 
 ## Modes

@@ -11,14 +11,14 @@ arguments:
     default: full
 ---
 
-# /moonview:report — Generate Completion Report
+# /report — Generate Completion Report
 
 Generate a structured completion report for a task module, documenting what was planned, executed, and verified.
 
 ## Usage
 
 ```
-/moonview:report <task_module_path> [--format full|summary]
+/report <task_module_path> [--format full|summary]
 ```
 
 ## Prerequisites

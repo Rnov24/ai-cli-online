@@ -37,3 +37,48 @@ export type ServerMessage =
   | { type: 'file-stream-start'; size: number; mtime: number }
   | { type: 'file-stream-end' }
   | { type: 'file-stream-error'; error: string };
+
+export interface SystemStatus {
+  server: {
+    pid: number;
+    uptime: number;
+    memory: {
+      rssMb: number;
+      heapUsedMb: number;
+      heapTotalMb: number;
+    };
+    idle: boolean;
+    activeConnections: number;
+  };
+  tmux: {
+    available: boolean;
+    sessionsCount: number;
+  };
+  agy: {
+    available: boolean;
+  };
+  platform: {
+    isTermux: boolean;
+    os: string;
+    arch: string;
+    nodeVersion: string;
+  };
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, any>;
+  output?: string;
+  status: 'running' | 'success' | 'error';
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: number;
+  thinking?: string;
+  toolCalls?: ToolCall[];
+  status?: 'sending' | 'streaming' | 'done' | 'error';
+}

@@ -7,6 +7,7 @@ import { registerFileStreamHandler, unregisterFileStreamHandler } from '../fileS
 import { fetchFiles } from '../api/files';
 import type { FileEntry } from '../api/files';
 import { fetchFileContent } from '../api/docs';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface PlanPanelProps {
   sessionId: string;
@@ -109,18 +110,21 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
         if (!cancelled) setPlanLoading(false);
       }
 
-      // Check if ai-cli-task plugin is installed by reading installed_plugins.json
+      // Check if ai-cli-task plugin is installed in Antigravity by reading import_manifest.json
       try {
         if (cancelled) return;
         if (home) {
-          const pluginFile = `${home}/.claude/plugins/installed_plugins.json`;
-          const result = await fetchFileContent(token, sessionId, pluginFile, 0);
+          const manifestFile = `${home}/.gemini/config/import_manifest.json`;
+          const result = await fetchFileContent(token, sessionId, manifestFile, 0);
           if (!cancelled && result) {
             try {
               const parsed = JSON.parse(result.content);
-              const pluginMap = parsed.plugins || parsed;
-              if (!('ai-cli-task@moonview' in pluginMap)) setShowPluginPrompt(true);
+              const imports = parsed.imports || [];
+              const hasPlugin = imports.some((imp: { name?: string }) => imp.name === 'ai-cli-task');
+              if (!hasPlugin) setShowPluginPrompt(true);
             } catch { setShowPluginPrompt(true); }
+          } else {
+            setShowPluginPrompt(true);
           }
         }
       } catch { /* ignore — file not accessible or doesn't exist */ }
@@ -129,10 +133,10 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, token]);
 
-  // Auto-detect AiTasks/ creation when init guide is shown (poll every 3s)
-  useEffect(() => {
-    if (!showInitGuide || !connected) return;
-    const iv = setInterval(async () => {
+  // Auto-detect AiTasks/ creation adaptively (pauses when tab is hidden)
+  useAdaptivePolling(
+    useCallback(async () => {
+      if (!showInitGuide || !connected) return;
       try {
         const res = await fetchFiles(token, sessionId);
         const aiTasksEntry = res.files.find((f: FileEntry) => f.name === 'AiTasks' && f.type === 'directory');
@@ -146,9 +150,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
           }
         }
       } catch { /* ignore */ }
-    }, 3000);
-    return () => clearInterval(iv);
-  }, [showInitGuide, connected, token, sessionId, planFileKey]);
+    }, [showInitGuide, connected, token, sessionId, planFileKey]),
+    { intervalMs: 3000, backgroundIntervalMs: 0, enabled: Boolean(showInitGuide && connected) },
+  );
 
   // Register file stream event bus handler
   useEffect(() => {
@@ -177,11 +181,10 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     }
   }, [fileStream.state.status, fileStream.state.content, planSelectedFile]);
 
-  // Poll for file changes (3s interval, uses 304 Not Modified)
-  useEffect(() => {
-    if (!planSelectedFile || !connected || !planMarkdown) return;
-    const iv = setInterval(async () => {
-      if (!planMtimeRef.current) return;
+  // Poll for file changes adaptively (3s when visible, paused when hidden, uses 304 Not Modified)
+  useAdaptivePolling(
+    useCallback(async () => {
+      if (!planSelectedFile || !connected || !planMarkdown || !planMtimeRef.current) return;
       try {
         const result = await fetchFileContent(token, sessionId, planSelectedFile, planMtimeRef.current);
         if (result) {
@@ -190,9 +193,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
           planMtimeRef.current = result.mtime;
         }
       } catch { /* ignore network errors */ }
-    }, 3000);
-    return () => clearInterval(iv);
-  }, [planSelectedFile, connected, planMarkdown, token, sessionId]);
+    }, [planSelectedFile, connected, planMarkdown, token, sessionId]),
+    { intervalMs: 3000, backgroundIntervalMs: 0, enabled: Boolean(planSelectedFile && connected && planMarkdown) },
+  );
 
   // Plan scroll position memory: filePath → scrollTop
   const planScrollPositionsRef = useRef(new Map<string, number>());
@@ -319,13 +322,12 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   const [taskMeta, setTaskMeta] = useState<{ status: string; phase: string; type: string; completed_steps: number; title: string } | null>(null);
   const taskMetaMtimeRef = useRef(0);
   useEffect(() => { setTaskMeta(null); taskMetaMtimeRef.current = 0; }, [moduleDir]);
-  useEffect(() => {
-    if (!moduleDir || !connected) return;
-    let cancelled = false;
-    const poll = async () => {
+  // Task status polling (.index.json) adaptively
+  useAdaptivePolling(
+    useCallback(async () => {
+      if (!moduleDir || !connected) return;
       try {
         const result = await fetchFileContent(token, sessionId, `${moduleDir}/.index.json`, taskMetaMtimeRef.current || undefined);
-        if (cancelled) return;
         if (result) {
           taskMetaMtimeRef.current = result.mtime;
           try {
@@ -334,36 +336,33 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
           } catch { /* invalid JSON */ }
         }
       } catch { /* file not found or error */ }
-    };
-    poll();
-    const iv = setInterval(poll, 3000);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, [moduleDir, connected, token, sessionId]);
+    }, [moduleDir, connected, token, sessionId]),
+    { intervalMs: 3000, backgroundIntervalMs: 0, enabled: Boolean(moduleDir && connected) },
+  );
 
-  // Auto signal polling
+  // Auto signal polling adaptively
   const [autoSignal, setAutoSignal] = useState<{ step: string; result: string; next: string; iteration?: number } | null>(null);
   useEffect(() => { setAutoSignal(null); }, [moduleDir]);
-  useEffect(() => {
-    if (!moduleDir || !connected) return;
-    let cancelled = false;
-    const poll = async () => {
+  useAdaptivePolling(
+    useCallback(async () => {
+      if (!moduleDir || !connected) return;
       try {
         const result = await fetchFileContent(token, sessionId, `${moduleDir}/.auto-signal`);
-        if (cancelled) return;
         if (result) {
-          try { const data = JSON.parse(result.content); setAutoSignal({ step: data.step, result: data.result, next: data.next, iteration: data.iteration }); } catch { setAutoSignal(null); }
+          try {
+            const data = JSON.parse(result.content);
+            setAutoSignal({ step: data.step, result: data.result, next: data.next, iteration: data.iteration });
+          } catch { setAutoSignal(null); }
         }
-      } catch { if (!cancelled) setAutoSignal(null); }
-    };
-    poll();
-    const iv = setInterval(poll, 2000);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, [moduleDir, connected, token, sessionId]);
+      } catch { setAutoSignal(null); }
+    }, [moduleDir, connected, token, sessionId]),
+    { intervalMs: 2000, backgroundIntervalMs: 0, enabled: Boolean(moduleDir && connected) },
+  );
 
   // Auto start handler
   const handleAutoStart = useCallback(() => {
     if (!currentModule || !onSendToTerminal) return;
-    onSendToTerminal(`/moonview:auto AiTasks/${currentModule.name}`);
+    onSendToTerminal(`/auto AiTasks/${currentModule.name}`);
   }, [currentModule, onSendToTerminal]);
 
   return (
@@ -386,13 +385,13 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
           fontSize: 12,
           flexShrink: 0,
         }}>
-          <span style={{ color: 'var(--accent-yellow)', flex: 1 }}>ai-cli-task plugin not installed</span>
+          <span style={{ color: 'var(--accent-yellow)', flex: 1 }}>ai-cli-task plugin not installed in Antigravity</span>
           <button
             className="pane-btn"
             style={{ color: 'var(--accent-green)', fontSize: 11 }}
             onClick={() => {
               if (onSendToTerminal) {
-                onSendToTerminal('/plugin marketplace add huacheng/moonview && /plugin install ai-cli-task@moonview');
+                onSendToTerminal('agy plugin install ./ai-cli-task');
               }
               setShowPluginPrompt(false);
             }}
@@ -448,7 +447,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: '0 20px' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>AiTasks/ directory not found</span>
               <span style={{ color: 'var(--text-secondary)', fontSize: 12, textAlign: 'center' }}>
-                Run <code style={{ color: 'var(--accent-blue)', backgroundColor: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 3 }}>/moonview:init &lt;name&gt;</code> in the terminal to create a task
+                Run <code style={{ color: 'var(--accent-blue)', backgroundColor: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 3 }}>/init &lt;name&gt;</code> in the terminal to create a task
               </span>
             </div>
           ) : planSelectedFile && (!planMarkdown && (fileStream.state.status === 'streaming' || fileStream.state.status === 'idle')) ? (

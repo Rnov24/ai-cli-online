@@ -1,11 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useStore } from './store';
 import { LoginForm } from './components/LoginForm';
 import { SplitPaneContainer } from './components/SplitPaneContainer';
 import { SessionSidebar } from './components/SessionSidebar';
 import { TabBar } from './components/TabBar';
+import { SystemHeader } from './components/SystemHeader';
+import { NavigationRail } from './components/NavigationRail';
+import { ContextPanel } from './components/ContextPanel';
+import { CommandPalette } from './components/CommandPalette';
+import { ShortcutsModal } from './components/ShortcutsModal';
+import { SettingsModal } from './components/SettingsModal';
+import { fetchSystemStatus } from './api/system';
+import { fetchCwd } from './api/files';
+import { useAdaptivePolling } from './hooks/useAdaptivePolling';
+import type { SystemStatus } from 'ai-cli-online-shared';
 
-// Read token from localStorage only (URL-based token removed for security — avoids log/history leak)
 function getInitialToken(): string | null {
   return localStorage.getItem('ai-cli-online-token');
 }
@@ -14,193 +23,317 @@ function App() {
   const token = useStore((s) => s.token);
   const setToken = useStore((s) => s.setToken);
   const tabs = useStore((s) => s.tabs);
+  const activeTabId = useStore((s) => s.activeTabId);
   const addTab = useStore((s) => s.addTab);
-  const toggleSidebar = useStore((s) => s.toggleSidebar);
-  const fontSize = useStore((s) => s.fontSize);
-  const setFontSize = useStore((s) => s.setFontSize);
   const tabsLoading = useStore((s) => s.tabsLoading);
   const theme = useStore((s) => s.theme);
-  const toggleTheme = useStore((s) => s.toggleTheme);
 
-  // Initialize token from URL/localStorage on mount
+  const [authChecking, setAuthChecking] = useState(true);
+
+  // Layout states
+  const [railExpanded, setRailExpanded] = useState<boolean>(() => {
+    return localStorage.getItem('agy-rail-expanded') === 'true';
+  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [contextPanelOpen, setContextPanelOpen] = useState(false);
+  const [contextTab, setContextTab] = useState<'agent' | 'tasks' | 'files' | 'git'>('agent');
+
+  // Modals
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+
+  // Active session details
+  const activeTab = useMemo(() => tabs.find((t) => t.id === activeTabId), [tabs, activeTabId]);
+  const primaryTerminalId = activeTab?.terminalIds[0] || 'default';
+  const [cwd, setCwd] = useState<string | null>(null);
+
+  // Session stats (for ContextPanel telemetry)
+  const [sessionStats] = useState({
+    messageCount: 0,
+    toolCallCount: 0,
+    totalTokens: 0,
+  });
+
+  const toggleRailExpanded = useCallback(() => {
+    setRailExpanded((prev) => {
+      const next = !prev;
+      localStorage.setItem('agy-rail-expanded', String(next));
+      return next;
+    });
+  }, []);
+
+  // Initialize token from localStorage or auto-detect open access
   useEffect(() => {
-    const saved = getInitialToken();
-    if (saved && !token) {
-      setToken(saved);
-    }
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+    const initAuth = async () => {
+      const saved = getInitialToken();
+      if (saved) {
+        setToken(saved);
+        setAuthChecking(false);
+        return;
+      }
 
-  // Auto-create first tab after login (wait for server restore to finish)
+      try {
+        const res = await fetch('/api/auth/verify');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated || data.authRequired === false) {
+            setToken('default');
+            setAuthChecking(false);
+            return;
+          }
+        }
+      } catch {
+        // network issue, proceed to login form
+      }
+
+      setAuthChecking(false);
+    };
+
+    initAuth();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-create first tab after login
   useEffect(() => {
     if (token && !tabsLoading && tabs.filter((t) => t.status === 'open').length === 0) {
-      addTab('Default');
+      addTab('Mission-01');
     }
-  }, [token, tabsLoading]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, tabsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // System status monitoring (memory, idle state, PID) adaptively polled
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  useAdaptivePolling(
+    useCallback(async () => {
+      if (!token) return;
+      try {
+        const s = await fetchSystemStatus(token);
+        setSystemStatus(s);
+      } catch {
+        // ignore
+      }
+    }, [token]),
+    { intervalMs: 10000, backgroundIntervalMs: 0, enabled: Boolean(token) },
+  );
+
+  // Poll CWD for active session
+  useAdaptivePolling(
+    useCallback(async () => {
+      if (!token || !primaryTerminalId) return;
+      try {
+        const dir = await fetchCwd(token, primaryTerminalId);
+        setCwd(dir);
+      } catch {
+        // ignore
+      }
+    }, [token, primaryTerminalId]),
+    { intervalMs: 5000, backgroundIntervalMs: 0, enabled: Boolean(token && primaryTerminalId) },
+  );
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput =
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement;
+
+      // Cmd+K / Ctrl+K: Command Palette
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // Cmd+N / Ctrl+N: New Session
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n' && !isInput) {
+        e.preventDefault();
+        addTab();
+        return;
+      }
+
+      // Alt+C: Toggle Context Panel
+      if (e.altKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        setContextPanelOpen((prev) => !prev);
+        return;
+      }
+
+      // Alt+T: Open Tasks
+      if (e.altKey && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        setContextTab('tasks');
+        setContextPanelOpen(true);
+        return;
+      }
+
+      // Alt+F: Open Files
+      if (e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setContextTab('files');
+        setContextPanelOpen(true);
+        return;
+      }
+
+      // Alt+G: Open Git
+      if (e.altKey && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        setContextTab('git');
+        setContextPanelOpen(true);
+        return;
+      }
+
+      // Question mark: Open Shortcuts (when not typing)
+      if (e.key === '?' && !isInput && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShortcutsModalOpen(true);
+        return;
+      }
+
+      // Esc: Close any active modal
+      if (e.key === 'Escape') {
+        if (commandPaletteOpen) {
+          setCommandPaletteOpen(false);
+          return;
+        }
+        if (shortcutsModalOpen) {
+          setShortcutsModalOpen(false);
+          return;
+        }
+        if (settingsModalOpen) {
+          setSettingsModalOpen(false);
+          return;
+        }
+        if (mobileNavOpen) {
+          setMobileNavOpen(false);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    commandPaletteOpen,
+    shortcutsModalOpen,
+    settingsModalOpen,
+    mobileNavOpen,
+    addTab,
+  ]);
+
+  const handleSelectPanel = (panel: 'chat' | 'agent' | 'tasks' | 'files' | 'git') => {
+    if (panel === 'chat') {
+      // Focus chat
+      return;
+    }
+    setContextTab(panel);
+    setContextPanelOpen(true);
+  };
+
+  if (authChecking) {
+    return null;
+  }
 
   if (!token) {
     return <LoginForm />;
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
-      {/* Header */}
-      <header style={{
+    <div
+      data-theme={theme}
+      style={{
+        height: '100%',
+        width: '100%',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '6px 16px',
-        backgroundColor: 'var(--bg-secondary)',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{
-            fontSize: '15px',
-            fontWeight: 'bold',
-            color: 'var(--accent-blue)',
-            letterSpacing: '0.5px',
-          }}>
-            AI-Cli Online
-          </span>
-          <span style={{
-            fontSize: '11px',
-            color: 'var(--text-secondary)',
-            fontWeight: 400,
-          }}>
-            v{__APP_VERSION__}
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Font size controls */}
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '2px',
-            padding: '1px 4px',
-            borderRadius: '6px',
-            backgroundColor: 'rgba(0,0,0,0.2)',
-          }}>
-            <button
-              className="header-btn"
-              onClick={() => setFontSize(fontSize - 1)}
-              disabled={fontSize <= 10}
-              title="Decrease font size"
-              style={{ fontSize: '11px', padding: '1px 5px', minWidth: 0 }}
-            >
-              A−
-            </button>
-            <span style={{ fontSize: '11px', color: 'var(--text-primary)', minWidth: '20px', textAlign: 'center' }}>
-              {fontSize}
-            </span>
-            <button
-              className="header-btn"
-              onClick={() => setFontSize(fontSize + 1)}
-              disabled={fontSize >= 24}
-              title="Increase font size"
-              style={{ fontSize: '11px', padding: '1px 5px', minWidth: 0 }}
-            >
-              A+
-            </button>
-          </span>
-          <NetworkIndicator />
-          <button
-            className="header-btn"
-            onClick={toggleTheme}
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? '☀' : '🌙'}
-          </button>
-          <button
-            className="header-btn"
-            onClick={toggleSidebar}
-            title="Toggle Tabs & Terminals Sidebar"
-            aria-label="Toggle sidebar"
-          >
-            ☰
-          </button>
-          <button
-            className="header-btn header-btn--muted"
-            onClick={() => {
-              if (window.confirm('Logout will close all terminals. Continue?')) {
-                setToken(null);
-              }
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </header>
+        flexDirection: 'column',
+        backgroundColor: 'var(--bg-base)',
+        color: 'var(--text-primary)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Mecha System Telemetry Header */}
+      <SystemHeader
+        systemStatus={systemStatus}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onToggleContextPanel={() => setContextPanelOpen(!contextPanelOpen)}
+        contextPanelOpen={contextPanelOpen}
+        onToggleMobileNav={() => setMobileNavOpen(true)}
+        activeSessionName={activeTab ? activeTab.name : undefined}
+        cwd={cwd}
+      />
 
-      {/* Content area: terminals + sidebar */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <main style={{ flex: 1, overflow: 'hidden' }}>
+      {/* Main Workspace Frame: Navigation Rail + Central Split Workspace + Context Panel */}
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        {/* Left Collapsible Navigation Rail */}
+        <NavigationRail
+          expanded={railExpanded}
+          onToggleExpanded={toggleRailExpanded}
+          mobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
+          activePanel={contextPanelOpen ? contextTab : 'chat'}
+          onSelectPanel={handleSelectPanel}
+          onOpenSettings={() => setSettingsModalOpen(true)}
+          onOpenShortcuts={() => setShortcutsModalOpen(true)}
+        />
+
+        {/* Central Command Stream / Terminal Split Container */}
+        <main style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <SplitPaneContainer />
         </main>
+
+        {/* Right Collapsible System Context Panel */}
+        <ContextPanel
+          isOpen={contextPanelOpen}
+          onClose={() => setContextPanelOpen(false)}
+          activeTab={contextTab}
+          onTabChange={setContextTab}
+          sessionId={primaryTerminalId}
+          token={token}
+          systemStatus={systemStatus}
+          messageCount={sessionStats.messageCount}
+          toolCallCount={sessionStats.toolCallCount}
+          totalTokens={sessionStats.totalTokens}
+          onExecuteCommand={() => {}}
+        />
+
+        {/* Legacy tabs & tmux session management sidebar (if toggled) */}
         <SessionSidebar />
       </div>
 
       {/* Tab bar at bottom */}
       <TabBar />
+
+      {/* Command Palette (⌘K) */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onOpenTasks={() => {
+          setContextTab('tasks');
+          setContextPanelOpen(true);
+        }}
+        onOpenFiles={() => {
+          setContextTab('files');
+          setContextPanelOpen(true);
+        }}
+        onOpenGit={() => {
+          setContextTab('git');
+          setContextPanelOpen(true);
+        }}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenShortcuts={() => setShortcutsModalOpen(true)}
+      />
+
+      {/* Keyboard Shortcuts Reference Modal (?) */}
+      <ShortcutsModal
+        isOpen={shortcutsModalOpen}
+        onClose={() => setShortcutsModalOpen(false)}
+      />
+
+      {/* System Settings Modal (⚙) */}
+      <SettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        systemStatus={systemStatus}
+      />
     </div>
-  );
-}
-
-const SIGNAL_BARS = [1, 2, 3, 4] as const;
-
-/** Global network quality indicator in header */
-function NetworkIndicator() {
-  const latency = useStore((s) => s.latency);
-
-  if (latency === null) {
-    return (
-      <span style={{ fontSize: '10px', color: 'var(--scrollbar-thumb-hover)' }} title="Measuring latency...">
-        --ms
-      </span>
-    );
-  }
-
-  let color: string;
-  let bars: number;
-  if (latency < 50) {
-    color = 'var(--accent-green)'; bars = 4;
-  } else if (latency < 150) {
-    color = 'var(--accent-yellow)'; bars = 3;
-  } else if (latency < 300) {
-    color = 'var(--accent-orange)'; bars = 2;
-  } else {
-    color = 'var(--accent-red)'; bars = 1;
-  }
-
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'end',
-        gap: '1.5px',
-        padding: '2px 8px',
-        borderRadius: '10px',
-        backgroundColor: 'rgba(0,0,0,0.2)',
-      }}
-      title={`Latency: ${latency}ms`}
-    >
-      {SIGNAL_BARS.map((i) => (
-        <span
-          key={i}
-          style={{
-            display: 'inline-block',
-            width: '2.5px',
-            height: `${3 + i * 2}px`,
-            backgroundColor: i <= bars ? color : 'var(--border)',
-            borderRadius: '1px',
-            transition: 'background-color 0.3s ease',
-          }}
-        />
-      ))}
-      <span style={{ fontSize: '10px', color, marginLeft: '4px', fontWeight: 500 }}>
-        {latency}ms
-      </span>
-    </span>
   );
 }
 

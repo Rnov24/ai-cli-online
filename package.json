@@ -1,7 +1,7 @@
 {
   "name": "ai-cli-online",
   "version": "3.0.17",
-  "description": "AI-Cli Online - Web Terminal for Claude Code via xterm.js + tmux",
+  "description": "AI-Cli Online - Web Terminal for Google Antigravity CLI (agy) via xterm.js + tmux",
   "license": "MIT",
   "bin": {
     "ai-cli-online": "bin/ai-cli-online.mjs"
@@ -22,8 +22,10 @@
     "web-terminal",
     "xterm",
     "tmux",
-    "claude",
-    "claude-code",
+    "antigravity",
+    "antigravity-cli",
+    "agy",
+    "google-antigravity",
     "cli"
   ],
   "files": [
@@ -47,10 +49,12 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
     "dev:server": "npm run dev --workspace=server",
     "dev:web": "npm run dev --workspace=web",
-    "build": "npm run build --workspace=shared && npm run build --workspace=server && npm run build --workspace=web",
-    "start": "npm run start --workspace=server",
-    "test": "npm run test --workspace=server && npm run test --workspace=web",
-    "test:watch": "npm run test:watch --workspace=server"
+    "build": "npm run build --workspace=shared && npm run build --workspace=web && go build -o bin/ai-cli-online ./cmd/ai-cli-online",
+    "build:go": "go build -o bin/ai-cli-online ./cmd/ai-cli-online",
+    "start": "./bin/ai-cli-online start",
+    "test": "npm run test --workspace=web && go test -v ./...",
+    "test:go": "go test -v ./...",
+    "test:watch": "npm run test:watch --workspace=web"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

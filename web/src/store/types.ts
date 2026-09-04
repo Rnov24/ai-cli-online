@@ -4,6 +4,7 @@ import type {
   SplitDirection,
   ServerSession,
   TabState,
+  SessionStatus,
 } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +62,7 @@ export interface CoreSlice {
   reopenTab: (tabId: string) => void;
   deleteTab: (tabId: string) => Promise<void>;
   renameTab: (tabId: string, name: string) => void;
+  updateTabSessionMeta: (tabId: string, meta: { sessionStatus?: SessionStatus; messageCount?: number; updatedAt?: number }) => void;
 
   // Terminal actions (scoped to active tab)
   addTerminal: (direction?: SplitDirection, customSessionId?: string) => string;
