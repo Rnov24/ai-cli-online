@@ -2,6 +2,16 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { TurnAnchor, PresentationMode } from './TurnAnchor';
 import { InteractiveClarifyModal } from './InteractiveClarifyModal';
 import { SystemDiagnosticsModal } from './SystemDiagnosticsModal';
+import {
+  RobotIcon,
+  LaptopIcon,
+  ClipboardIcon,
+  BoltIcon,
+  TargetIcon,
+  StethoscopeIcon,
+  DownloadIcon,
+  TrashIcon,
+} from './icons';
 import { fetchSessionJournal, TurnJournalItem } from '../api/journal';
 import { exportSessionToHtml } from '../utils/exportHtml';
 import { useStore } from '../store';
@@ -13,6 +23,41 @@ import {
   createWorkspace,
   WorkspaceModePayload,
 } from '../api/workspaces';
+
+// Ensure localStorage has a working fallback in test/jsdom/opaque-origin environments under Node 22+
+try {
+  let hasWorkingStorage = false;
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+      localStorage.getItem('__test__');
+      hasWorkingStorage = true;
+    }
+  } catch {
+    hasWorkingStorage = false;
+  }
+
+  if (!hasWorkingStorage) {
+    const map = new Map<string, string>();
+    const memStorage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, val: string) => { map.set(key, String(val)); },
+      removeItem: (key: string) => { map.delete(key); },
+      clear: () => { map.clear(); },
+      get length() { return map.size; },
+      key: (i: number) => Array.from(map.keys())[i] ?? null,
+    };
+    if (typeof globalThis !== 'undefined') {
+      try {
+        Object.defineProperty(globalThis, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        Object.defineProperty(window, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+  }
+} catch {}
 
 interface AiChatViewProps {
   sessionId: string;
@@ -1027,6 +1072,47 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     return () => window.removeEventListener('agy:insert-command', handleInsert);
   }, [handleSendMessage]);
 
+  // Listen for conversation resume/new from SessionSidebar or History Browser
+  useEffect(() => {
+    const handleResume = (e: Event) => {
+      const custom = e as CustomEvent<{ targetSessionId?: string; conversationId: string; messages: ChatMessage[] }>;
+      if (custom.detail?.targetSessionId && custom.detail.targetSessionId !== sessionId) return;
+      if (!custom.detail?.conversationId) return;
+
+      setConversationId(custom.detail.conversationId);
+      localStorage.setItem(`chat-conversation-${sessionId}`, custom.detail.conversationId);
+
+      if (Array.isArray(custom.detail.messages)) {
+        setMessages(custom.detail.messages);
+        localStorage.setItem(`chat-messages-${sessionId}`, JSON.stringify(custom.detail.messages));
+      }
+      setInterruptedTurn(null);
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 50);
+    };
+
+    const handleNew = (e: Event) => {
+      const custom = e as CustomEvent<{ targetSessionId?: string }>;
+      if (custom.detail?.targetSessionId && custom.detail.targetSessionId !== sessionId) return;
+
+      setConversationId('');
+      localStorage.removeItem(`chat-conversation-${sessionId}`);
+      setMessages([]);
+      localStorage.removeItem(`chat-messages-${sessionId}`);
+      setInterruptedTurn(null);
+    };
+
+    window.addEventListener('agy:resume-conversation', handleResume);
+    window.addEventListener('agy:new-conversation', handleNew);
+    return () => {
+      window.removeEventListener('agy:resume-conversation', handleResume);
+      window.removeEventListener('agy:new-conversation', handleNew);
+    };
+  }, [sessionId]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showSlashMenu && filteredCommands.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -1103,7 +1189,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         overflow: 'hidden',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
-          <span style={{ color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          <span className="mobile-hide" style={{ color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
             COMMAND STREAM //
           </span>
           <span
@@ -1123,7 +1209,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             }}
             title={isHome ? 'Home Persona: General Agentic Assistant' : 'Workspace Persona: Autonomous Coding Agent'}
           >
-            {isHome ? '🤖 ASSISTANT' : '💻 CODING AGENT'}
+            <span>{isHome ? <RobotIcon size={13} /> : <LaptopIcon size={13} />}</span>
+            <span className="mobile-hide">{isHome ? ' ASSISTANT' : ' CODING AGENT'}</span>
           </span>
           <span className={`tech-badge ${
             agentState === 'EXECUTING'
@@ -1141,6 +1228,31 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             }`} />
             {agentState}
           </span>
+
+          {conversationId && (
+            <span
+              style={{
+                fontSize: '9px',
+                color: 'var(--accent-amber-bright)',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '2px',
+                padding: '1px 5px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+              title={`Active AGY Conversation: ${conversationId}\nClick to copy ID`}
+              onClick={() => {
+                navigator.clipboard.writeText(conversationId);
+              }}
+            >
+              <span className="mobile-hide" style={{ opacity: 0.6 }}>CID:</span>
+              <span style={{ fontWeight: 700 }}>{conversationId.slice(0, 8)}</span>
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -1149,6 +1261,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             {(['worklog', 'transparent', 'final'] as PresentationMode[]).map((mode) => (
               <button
                 key={mode}
+                data-testid={`mode-${mode}`}
+                aria-label={`presentation-mode-${mode}`}
                 onClick={() => setGlobalPresentationMode(mode)}
                 title={`Switch presentation mode to ${mode}`}
                 style={{
@@ -1160,9 +1274,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
                   fontWeight: globalPresentationMode === mode ? 700 : 400,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '2px',
                 }}
               >
-                {mode === 'worklog' ? 'LOG' : mode === 'transparent' ? 'STREAM' : 'FINAL'}
+                <span>{mode === 'worklog' ? <ClipboardIcon size={11} /> : mode === 'transparent' ? <BoltIcon size={11} /> : <TargetIcon size={11} />}</span>
+                <span className="mobile-hide">{mode === 'worklog' ? 'LOG' : mode === 'transparent' ? 'STREAM' : 'FINAL'}</span>
               </button>
             ))}
           </div>
@@ -1177,9 +1295,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               cursor: 'pointer',
               fontSize: '10px',
               fontFamily: 'var(--font-mono)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
             }}
           >
-            [DIAG]
+            <StethoscopeIcon size={12} />
+            <span className="mobile-hide">DIAG</span>
           </button>
 
           <button
@@ -1192,12 +1314,18 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               cursor: 'pointer',
               fontSize: '10px',
               fontFamily: 'var(--font-mono)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
             }}
           >
-            [EXPORT]
+            <DownloadIcon size={12} />
+            <span className="mobile-hide">EXPORT</span>
           </button>
 
-          <span>EVENTS: {messages.length}</span>
+          <span title={`${messages.length} events`}>
+            <span className="mobile-hide">EVENTS: </span>{messages.length}
+          </span>
           <span className="desktop-only">TOOLS: {totalToolCalls}</span>
           {totalTokens > 0 && <span className="desktop-only">TOKENS: {(totalTokens / 1000).toFixed(1)}k</span>}
           {messages.length > 0 && (
@@ -1211,9 +1339,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 cursor: 'pointer',
                 fontSize: '10px',
                 fontFamily: 'var(--font-mono)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '2px',
               }}
             >
-              [RESET]
+              <TrashIcon size={12} />
+              <span className="mobile-hide">RESET</span>
             </button>
           )}
         </div>
@@ -1965,14 +2097,15 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
             marginTop: '4px',
             paddingTop: '4px',
             borderTop: '1px dashed var(--border-subtle)',
             fontSize: '10px',
             color: 'var(--text-muted)',
-            gap: '8px',
+            gap: '6px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -2025,7 +2158,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               <span className="desktop-only">Shift+⏎ newline</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', flexWrap: 'wrap' }}>
               {isStreaming ? (
                 <>
                   {inputText.trim() && (

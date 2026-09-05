@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ToolCall } from 'ai-cli-online-shared';
+import { CloseIcon, CheckIcon } from './icons';
 
 interface ToolCallCardProps {
   toolCall: ToolCall;
@@ -138,8 +139,8 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
             </span>
           )}
           {toolCall.status === 'error' && (
-            <span className="tech-badge tech-badge--danger" style={{ fontSize: '9px', padding: '1px 5px' }}>
-              ✕ FAILED
+            <span className="tech-badge tech-badge--danger" style={{ fontSize: '9px', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <CloseIcon size={11} /> FAILED
             </span>
           )}
           <span style={{ color: 'var(--text-muted)', fontSize: '10px', marginLeft: '2px' }}>
@@ -260,9 +261,12 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
                     cursor: 'pointer',
                     fontSize: '9px',
                     fontFamily: 'var(--font-mono)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
                   }}
                 >
-                  {copied ? '✓ COPIED' : '[COPY]'}
+                  {copied ? <><CheckIcon size={11} /> COPIED</> : '[COPY]'}
                 </button>
               </div>
               <pre style={{
