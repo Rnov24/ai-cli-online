@@ -1,0 +1,18 @@
+{
+  "name": "AGY Online — Antigravity Workspace",
+  "short_name": "AGY Online",
+  "description": "Terminal & Autonomous Task Development Workspace for Google Antigravity CLI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
