@@ -14,7 +14,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
-          'markdown': ['marked', 'dompurify'],
+          'markdown': ['marked', 'dompurify', 'katex'],
           'highlighter': ['prismjs'],
         },
       },

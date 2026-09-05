@@ -20,6 +20,15 @@ type AnnotationResult struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
+type Workspace struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	IsHome    bool   `json:"isHome"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
 func Open(dataDir string) (*DB, error) {
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create data dir: %w", err)
@@ -68,8 +77,19 @@ func Open(dataDir string) (*DB, error) {
 		PRIMARY KEY (session_name, file_path)
 	);
 
+	CREATE TABLE IF NOT EXISTS workspaces (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		path TEXT NOT NULL UNIQUE,
+		is_home INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_drafts_updated_at ON drafts(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_annotations_updated_at ON annotations(updated_at);
+	CREATE INDEX IF NOT EXISTS idx_workspaces_updated_at ON workspaces(updated_at);
+	CREATE INDEX IF NOT EXISTS idx_workspaces_is_home ON workspaces(is_home);
 	`
 	if _, err := sqlDb.Exec(schema); err != nil {
 		sqlDb.Close()
@@ -173,4 +193,91 @@ func (d *DB) SaveAnnotation(sessionName, filePath, content string, updatedAt int
 	`
 	_, err := d.db.Exec(query, sessionName, filePath, content, updatedAt)
 	return err
+}
+
+// --- Workspace Methods ---
+
+func (d *DB) ListWorkspaces() ([]Workspace, error) {
+	rows, err := d.db.Query("SELECT id, name, path, is_home, created_at, updated_at FROM workspaces ORDER BY is_home DESC, updated_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Workspace
+	for rows.Next() {
+		var w Workspace
+		var isHomeInt int
+		if err := rows.Scan(&w.Id, &w.Name, &w.Path, &isHomeInt, &w.CreatedAt, &w.UpdatedAt); err != nil {
+			return nil, err
+		}
+		w.IsHome = isHomeInt == 1
+		list = append(list, w)
+	}
+	if list == nil {
+		list = []Workspace{}
+	}
+	return list, nil
+}
+
+func (d *DB) AddWorkspace(id, name, path string, isHome bool) (*Workspace, error) {
+	now := time.Now().UnixMilli()
+	isHomeInt := 0
+	if isHome {
+		isHomeInt = 1
+	}
+	query := `
+	INSERT INTO workspaces (id, name, path, is_home, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?)
+	ON CONFLICT(path) DO UPDATE SET
+		name = excluded.name,
+		updated_at = excluded.updated_at
+	`
+	_, err := d.db.Exec(query, id, name, path, isHomeInt, now, now)
+	if err != nil {
+		return nil, err
+	}
+	return &Workspace{
+		Id:        id,
+		Name:      name,
+		Path:      path,
+		IsHome:    isHome,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
+func (d *DB) DeleteWorkspace(id string) error {
+	_, err := d.db.Exec("DELETE FROM workspaces WHERE id = ? AND is_home = 0", id)
+	return err
+}
+
+func (d *DB) GetWorkspaceByPath(path string) (*Workspace, error) {
+	var w Workspace
+	var isHomeInt int
+	err := d.db.QueryRow("SELECT id, name, path, is_home, created_at, updated_at FROM workspaces WHERE path = ?", path).
+		Scan(&w.Id, &w.Name, &w.Path, &isHomeInt, &w.CreatedAt, &w.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	w.IsHome = isHomeInt == 1
+	return &w, nil
+}
+
+func (d *DB) GetWorkspaceById(id string) (*Workspace, error) {
+	var w Workspace
+	var isHomeInt int
+	err := d.db.QueryRow("SELECT id, name, path, is_home, created_at, updated_at FROM workspaces WHERE id = ?", id).
+		Scan(&w.Id, &w.Name, &w.Path, &isHomeInt, &w.CreatedAt, &w.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	w.IsHome = isHomeInt == 1
+	return &w, nil
 }

@@ -1,6 +1,10 @@
 import { marked, type Token } from 'marked';
 import DOMPurify from 'dompurify';
 import type { PlanAnnotations } from '../types/annotations';
+import { setupMarkedMath } from '../utils/markdownMath';
+
+// Initialize KaTeX math extensions for marked parser
+setupMarkedMath(marked);
 
 /* ── ID generation ── */
 
@@ -23,8 +27,8 @@ export function scrollKey(sessionId: string, filePath: string) {
 export function tokenToHtml(token: Token): string {
   const raw = String(marked.parser([token as Token], { async: false }));
   return DOMPurify.sanitize(raw, {
-    ADD_TAGS: ['img'],
-    ADD_ATTR: ['src', 'alt', 'title', 'width', 'height'],
+    ADD_TAGS: ['img', 'span', 'div', 'button'],
+    ADD_ATTR: ['src', 'alt', 'title', 'width', 'height', 'class', 'style', 'aria-hidden'],
   });
 }
 

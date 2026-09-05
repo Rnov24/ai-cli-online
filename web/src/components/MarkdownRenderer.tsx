@@ -18,6 +18,11 @@ import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-diff';
 import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-latex';
+import { setupMarkedMath, renderMathBlock } from '../utils/markdownMath';
+
+// Initialize KaTeX math extensions for marked parser
+setupMarkedMath(marked);
 
 interface MarkdownRendererProps {
   content: string;
@@ -42,6 +47,8 @@ function normalizeLang(lang: string): string {
     case 'html': case 'xml': case 'svg': return 'markup';
     case 'css': return 'css';
     case 'mermaid': return 'mermaid';
+    case 'latex': case 'tex': return 'latex';
+    case 'math': return 'math';
     default: return l || 'text';
   }
 }
@@ -63,7 +70,7 @@ function addLineNumbers(html: string): string {
   const lines = html.split('\n');
   if (lines.length <= 1) return html;
   return lines
-    .map((line, i) => `<span class="code-line"><span class="line-num">${i + 1}</span><span class="line-text">${line}</span></span>`)
+    .map((line, i) => `<span class="code-line"><span class="line-num">${i + 1}</span><span class="line-text">${line || ' '}</span></span>`)
     .join('\n');
 }
 
@@ -83,6 +90,11 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
       // Leave mermaid for hook to render
       if (language === 'mermaid') {
         return `<pre><code class="language-mermaid">${token.text}</code></pre>`;
+      }
+
+      // Render math code fence blocks directly via KaTeX
+      if (language === 'math') {
+        return renderMathBlock(token.text);
       }
 
       let highlighted = token.text;
@@ -127,8 +139,8 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
     }) as string;
 
     return DOMPurify.sanitize(raw, {
-      ADD_TAGS: ['button', 'span'],
-      ADD_ATTR: ['onclick', 'data-code', 'class'],
+      ADD_TAGS: ['button', 'span', 'div'],
+      ADD_ATTR: ['onclick', 'data-code', 'class', 'style', 'aria-hidden'],
     });
   }, [content]);
 

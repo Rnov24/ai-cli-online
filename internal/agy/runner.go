@@ -72,8 +72,10 @@ func RunPromptStream(
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	resolvedPrompt := BuildPromptWithPersona(workingDir, prompt, conversationId)
+
 	args := []string{
-		"-p", prompt,
+		"-p", resolvedPrompt,
 		"--output-format", "stream-json",
 		"--dangerously-skip-permissions",
 	}

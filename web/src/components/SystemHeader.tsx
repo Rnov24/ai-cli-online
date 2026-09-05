@@ -1,15 +1,20 @@
 import React from 'react';
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
+import { WorkspaceSelector } from './WorkspaceSelector';
 
 interface SystemHeaderProps {
   systemStatus: SystemStatus | null;
   onOpenCommandPalette: () => void;
+  onOpenHelp?: () => void;
   onToggleContextPanel: () => void;
   contextPanelOpen: boolean;
   onToggleMobileNav: () => void;
   activeSessionName?: string;
   cwd?: string | null;
+  token?: string;
+  activeSessionId?: string;
+  onWorkspaceSwitched?: (newCwd: string, isHome: boolean, mode: 'agentic-assistant' | 'coding-agent') => void;
 }
 
 const SIGNAL_BARS = [1, 2, 3, 4] as const;
@@ -17,11 +22,15 @@ const SIGNAL_BARS = [1, 2, 3, 4] as const;
 export const SystemHeader = React.memo(function SystemHeader({
   systemStatus,
   onOpenCommandPalette,
+  onOpenHelp,
   onToggleContextPanel,
   contextPanelOpen,
   onToggleMobileNav,
   activeSessionName,
   cwd,
+  token,
+  activeSessionId,
+  onWorkspaceSwitched,
 }: SystemHeaderProps) {
   const latency = useStore((s) => s.latency);
   const theme = useStore((s) => s.theme);
@@ -156,7 +165,14 @@ export const SystemHeader = React.memo(function SystemHeader({
             </span>
           </div>
         )}
-        {cwd && (
+        {token && activeSessionId ? (
+          <WorkspaceSelector
+            token={token}
+            sessionId={activeSessionId}
+            cwd={cwd}
+            onWorkspaceSwitched={onWorkspaceSwitched}
+          />
+        ) : cwd ? (
           <span
             className="desktop-only"
             title={cwd}
@@ -171,15 +187,28 @@ export const SystemHeader = React.memo(function SystemHeader({
           >
             {cwd}
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* Right: Telemetry & Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-        {/* Model Badge */}
-        <div className="desktop-only tech-badge tech-badge--cyan" style={{ fontSize: '9px', padding: '2px 6px' }}>
+        {/* Model Badge (Clickable to switch model) */}
+        <button
+          className="desktop-only tech-badge tech-badge--cyan"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('agy:insert-command', { detail: { cmd: '/model ' } }));
+          }}
+          title="Active Model: Gemini 3.8 — Click to switch model (/model)"
+          style={{
+            fontSize: '9px',
+            padding: '2px 6px',
+            cursor: 'pointer',
+            background: 'none',
+            outline: 'none',
+          }}
+        >
           <span>◈ GEMINI 3.8</span>
-        </div>
+        </button>
 
         {/* Network latency bars */}
         <div
@@ -213,13 +242,41 @@ export const SystemHeader = React.memo(function SystemHeader({
           </span>
         </div>
 
+        {/* Interactive Help & Feature Guide Trigger */}
+        <button
+          className="mecha-btn"
+          onClick={() => {
+            if (onOpenHelp) {
+              onOpenHelp();
+            } else {
+              window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'quickstart' } }));
+            }
+          }}
+          title="Interactive Feature Guide & Keyboard Shortcuts (?)"
+          aria-label="Open feature guide and shortcuts"
+          style={{
+            padding: '2px 8px',
+            fontSize: '10px',
+            color: 'var(--accent-amber-bright)',
+            borderColor: 'var(--border-subtle)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+          }}
+        >
+          <span style={{ fontWeight: 700 }}>?</span>
+          <span className="desktop-only" style={{ fontSize: '9px' }}>HELP</span>
+        </button>
+
         {/* Command Palette Trigger */}
         <button
           className="mecha-btn desktop-only"
           onClick={onOpenCommandPalette}
           title="Open Command Palette (⌘K / Ctrl+K)"
-          style={{ padding: '2px 8px', fontSize: '10px' }}
+          aria-label="Open command palette"
+          style={{ padding: '2px 8px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
         >
+          <span style={{ fontSize: '9px' }}>🔍</span>
           <span>⌘K</span>
         </button>
 

@@ -149,6 +149,12 @@ func KillSession(name string) error {
 	return err
 }
 
+func SendKeys(name string, keys ...string) error {
+	args := append([]string{"send-keys", "-t", "=" + name}, keys...)
+	_, err := ExecTimeout(3*time.Second, args...)
+	return err
+}
+
 func ListSessions(token string) ([]SessionInfo, error) {
 	prefix := ""
 	if token != "" {

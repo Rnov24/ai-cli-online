@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 
 // Mock zustand store
 vi.mock('../store', () => ({
@@ -13,14 +13,25 @@ vi.mock('../api/git', () => ({
   fetchGitBranches: vi.fn().mockResolvedValue({ current: 'master', branches: ['master'] }),
 }));
 
+vi.mock('../api/workspaces', () => ({
+  fetchWorkspaceMode: vi.fn().mockResolvedValue({ isHome: false, mode: 'coding-agent', cwd: '/work/proj', workspaceName: 'proj' }),
+}));
+
 import { GitHistoryPanel } from './GitHistoryPanel';
 import { fetchGitLog } from '../api/git';
+import { fetchWorkspaceMode } from '../api/workspaces';
 
 const mockFetchGitLog = vi.mocked(fetchGitLog);
+const mockFetchWorkspaceMode = vi.mocked(fetchWorkspaceMode);
 
 describe('GitHistoryPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchWorkspaceMode.mockResolvedValue({ isHome: false, mode: 'coding-agent', cwd: '/work/proj', workspaceName: 'proj' });
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('renders loading state', () => {
@@ -93,5 +104,26 @@ describe('GitHistoryPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('Not a git repository')).toBeInTheDocument();
     });
+  });
+
+  it('renders Home directory graceful guard when in home', async () => {
+    mockFetchWorkspaceMode.mockResolvedValueOnce({
+      isHome: true,
+      mode: 'agentic-assistant',
+      cwd: '/home/user',
+      workspaceName: '~',
+    });
+    mockFetchGitLog.mockResolvedValue({
+      commits: [],
+      hasMore: false,
+    });
+
+    render(<GitHistoryPanel sessionId="t1" token="test-token" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Home Directory — Personal Space')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Agentic Assistant/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Switch to a Project Workspace/i })).toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@ interface NavigationRailProps {
   onSelectPanel: (panel: 'chat' | 'agent' | 'tasks' | 'files' | 'git') => void;
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
+  onOpenHelp?: () => void;
 }
 
 export function NavigationRail({
@@ -20,6 +21,7 @@ export function NavigationRail({
   onSelectPanel,
   onOpenSettings,
   onOpenShortcuts,
+  onOpenHelp,
 }: NavigationRailProps) {
   const tabs = useStore((s) => s.tabs);
   const activeTabId = useStore((s) => s.activeTabId);
@@ -344,8 +346,13 @@ export function NavigationRail({
         </button>
 
         <button
-          onClick={onOpenShortcuts}
-          title="Keyboard Shortcuts (?)"
+          onClick={() => {
+            if (onOpenHelp) onOpenHelp();
+            else onOpenShortcuts();
+            if (mobileOpen) onCloseMobile();
+          }}
+          title="Interactive Feature Guide & Keyboard Shortcuts (?)"
+          aria-label="Open help and guide"
           style={{
             width: '100%',
             display: 'flex',
@@ -357,14 +364,14 @@ export function NavigationRail({
             borderRadius: '2px',
             border: 'none',
             background: 'transparent',
-            color: 'var(--text-secondary)',
+            color: 'var(--accent-amber-bright)',
             cursor: 'pointer',
             marginBottom: '2px',
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{ fontSize: '12px' }}>⌘</span>
-          {isExpanded && <span style={{ fontSize: '11px' }}>SHORTCUTS</span>}
+          <span style={{ fontSize: '13px', fontWeight: 700 }}>?</span>
+          {isExpanded && <span style={{ fontSize: '11px', fontWeight: 600 }}>HELP &amp; GUIDE</span>}
         </button>
 
         <button

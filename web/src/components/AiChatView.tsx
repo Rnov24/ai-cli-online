@@ -4,6 +4,13 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { ToolCallCard } from './ToolCallCard';
 import { useStore } from '../store';
 import type { ChatMessage, ToolCall } from 'ai-cli-online-shared';
+import {
+  fetchWorkspaceMode,
+  fetchWorkspaces,
+  switchSessionWorkspace,
+  createWorkspace,
+  WorkspaceModePayload,
+} from '../api/workspaces';
 
 interface AiChatViewProps {
   sessionId: string;
@@ -12,22 +19,48 @@ interface AiChatViewProps {
   onStatsChange?: (stats: { messageCount: number; toolCallCount: number; totalTokens: number }) => void;
 }
 
-const SLASH_COMMANDS = [
-  { cmd: '/goal', desc: 'Autonomous long-running goal loop until achieved' },
-  { cmd: '/auto', desc: 'Autonomous 13-skill task lifecycle loop' },
-  { cmd: '/plan', desc: 'Step-by-step implementation planning' },
-  { cmd: '/check', desc: 'Feasibility check (post-plan / mid / post-exec)' },
-  { cmd: '/verify', desc: 'Run domain-adapted verification tests' },
-  { cmd: '/exec', desc: 'Execute approved implementation plan' },
-  { cmd: '/merge', desc: 'Merge task branch into main with validation' },
-  { cmd: '/report', desc: 'Generate structured task completion report' },
-  { cmd: '/research', desc: 'Collect and index external references & docs' },
-  { cmd: '/grill-me', desc: 'Interactive alignment interview to refine plan' },
-  { cmd: '/model', desc: 'Select model for current session' },
-  { cmd: '/clear', desc: 'Purge conversation timeline and reset session' },
+interface SlashCommandItem {
+  cmd: string;
+  desc: string;
+  category: 'assistant' | 'coding' | 'common';
+}
+
+const SLASH_COMMANDS: SlashCommandItem[] = [
+  // Common & Discovery
+  { cmd: '/help', desc: 'Open Interactive Feature Guide & Help Hub', category: 'common' },
+  { cmd: '/goal', desc: 'Autonomous long-running goal loop until achieved', category: 'common' },
+  { cmd: '/workspace', desc: 'List, inspect, or switch project workspaces', category: 'common' },
+  { cmd: '/model', desc: 'Select model for current session', category: 'common' },
+  { cmd: '/clear', desc: 'Purge conversation timeline and reset session', category: 'common' },
+  { cmd: '/compress', desc: 'Prune and compress conversation context', category: 'common' },
+  { cmd: '/mcp', desc: 'Inspect MCP server status and tools', category: 'common' },
+  { cmd: '/plugins', desc: 'Manage Antigravity CLI plugins', category: 'common' },
+
+  // Assistant & System (High Priority in Home)
+  { cmd: '/schedule', desc: 'Set a timer or recurring cron schedule', category: 'assistant' },
+  { cmd: '/learn', desc: 'Save behavioral learning or persistent memory', category: 'assistant' },
+  { cmd: '/doctor', desc: 'Run system diagnostics and health check', category: 'assistant' },
+  { cmd: '/browser', desc: 'Browser automation and web search', category: 'assistant' },
+  { cmd: '/agents', desc: 'List and switch available agents & personas', category: 'assistant' },
+
+  // Coding & Lifecycle (High Priority in Project Workspaces)
+  { cmd: '/plan', desc: 'Step-by-step implementation planning', category: 'coding' },
+  { cmd: '/verify', desc: 'Run domain-adapted verification tests', category: 'coding' },
+  { cmd: '/exec', desc: 'Execute approved implementation plan', category: 'coding' },
+  { cmd: '/review', desc: 'Review code changes and diffs', category: 'coding' },
+  { cmd: '/auto', desc: 'Autonomous 13-skill task lifecycle loop', category: 'coding' },
+  { cmd: '/check', desc: 'Feasibility check (post-plan / mid / post-exec)', category: 'coding' },
+  { cmd: '/merge', desc: 'Merge task branch into main with validation', category: 'coding' },
+  { cmd: '/report', desc: 'Generate structured task completion report', category: 'coding' },
+  { cmd: '/research', desc: 'Collect and index external references & docs', category: 'coding' },
+  { cmd: '/grill-me', desc: 'Interactive alignment interview to refine plan', category: 'coding' },
+  { cmd: '/skills', desc: 'Inspect active task skills and tools', category: 'coding' },
+  { cmd: '/init', desc: 'Initialize task module and worktree branch', category: 'coding' },
+  { cmd: '/summarize', desc: 'Regenerate context summary for module', category: 'coding' },
+  { cmd: '/teamwork-preview', desc: 'Autonomous multi-agent coordination', category: 'coding' },
 ];
 
-const STARTER_OPERATIONS = [
+const PROJECT_STARTER_OPERATIONS = [
   {
     code: 'OP-01',
     cmd: '/goal ',
@@ -55,6 +88,37 @@ const STARTER_OPERATIONS = [
     label: 'DOMAIN VERIFICATION',
     desc: 'Execute unit, integration, and security verification tests',
     accent: 'var(--accent-yellow)',
+  },
+];
+
+const HOME_STARTER_OPERATIONS = [
+  {
+    code: 'OP-01',
+    cmd: '/goal ',
+    label: 'AUTONOMOUS OBJECTIVE',
+    desc: 'Run persistent autonomous execution loop for personal workflows or tasks',
+    accent: '#c084fc',
+  },
+  {
+    code: 'OP-02',
+    cmd: '/schedule ',
+    label: 'TASK SCHEDULER',
+    desc: 'Set up timers or recurring cron triggers for system automation',
+    accent: 'var(--accent-cyan-bright)',
+  },
+  {
+    code: 'OP-03',
+    cmd: '/doctor ',
+    label: 'SYSTEM HEALTH CHECK',
+    desc: 'Inspect environment diagnostics, network tools, and running services',
+    accent: 'var(--accent-green-bright)',
+  },
+  {
+    code: 'OP-04',
+    cmd: '/workspace ',
+    label: 'SWITCH WORKSPACE',
+    desc: 'Switch active session to a registered project repository',
+    accent: 'var(--accent-amber-bright)',
   },
 ];
 
@@ -93,6 +157,22 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const [historyPointer, setHistoryPointer] = useState<number>(-1);
   const [totalTokens, setTotalTokens] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceModePayload | null>(null);
+
+  const refreshWorkspaceMode = useCallback(async () => {
+    if (!token || !sessionId) return;
+    try {
+      const modeData = await fetchWorkspaceMode(token, sessionId);
+      setWorkspaceMode(modeData);
+    } catch {
+      // ignore
+    }
+  }, [token, sessionId]);
+
+  useEffect(() => {
+    refreshWorkspaceMode();
+  }, [refreshWorkspaceMode]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -228,9 +308,43 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     }
   };
 
-  const filteredCommands = SLASH_COMMANDS.filter(
-    (sc) => sc.cmd.toLowerCase().includes(slashFilter) || sc.desc.toLowerCase().includes(slashFilter),
-  );
+  const isHome = workspaceMode?.isHome ?? false;
+
+  const filteredCommands = useMemo(() => {
+    const matched = SLASH_COMMANDS.filter(
+      (sc) =>
+        sc.cmd.toLowerCase().includes(slashFilter) ||
+        sc.desc.toLowerCase().includes(slashFilter),
+    );
+
+    return matched.sort((a, b) => {
+      const aWeight = isHome
+        ? a.category === 'assistant'
+          ? 3
+          : a.category === 'common'
+            ? 2
+            : 1
+        : a.category === 'coding'
+          ? 3
+          : a.category === 'common'
+            ? 2
+            : 1;
+
+      const bWeight = isHome
+        ? b.category === 'assistant'
+          ? 3
+          : b.category === 'common'
+            ? 2
+            : 1
+        : b.category === 'coding'
+          ? 3
+          : b.category === 'common'
+            ? 2
+            : 1;
+
+      return bWeight - aWeight;
+    });
+  }, [slashFilter, isHome]);
 
   const selectSlashCommand = (cmd: string) => {
     setInputText(cmd + ' ');
@@ -283,6 +397,182 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         updateTabSessionMeta(curTab.id, { messageCount: 0, sessionStatus: 'IDLE', updatedAt: Date.now() });
       }
       return;
+    }
+
+    // Interactive Help & Feature Guide
+    if (text === '/help' || text === '/guide') {
+      window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'quickstart' } }));
+      const helpText = [
+        '### 💡 AGY Online — Help & Feature Guide',
+        '',
+        'The interactive **Help & Feature Guide** modal has been opened. You can also press **`?`** or click **`[? HELP]`** in the header anytime.',
+        '',
+        '#### ⚡ Dual Persona Operational Modes:',
+        '- **🏠 Personal Home (`~`)**: *🤖 Agentic Assistant* — Runs daily assistant tasks, timers, diagnostics, and workspace routing (`/goal`, `/schedule`, `/learn`, `/doctor`, `/workspace`).',
+        '- **💻 Project Workspaces**: *⚡ Coding Agent* — Full software engineering lifecycle with the 13-skill task pipeline (`/plan`, `/verify`, `/exec`, `/review`, `/auto`, `/merge`, `/report`).',
+        '',
+        '#### ⌨️ Essential Keyboard Shortcuts:',
+        '- `⌘K` / `Ctrl+K`: Global Command Palette with category filters (`SKILLS`, `WORKSPACES`, `PANELS`, `SYSTEM`)',
+        '- `Alt+1` .. `Alt+5`: Rapidly switch between active sessions',
+        '- `Alt+C`: Toggle Context Panel (tasks, files, git graph)',
+        '- `?`: Open Help & Feature Guide Hub',
+        '',
+        '*Type `/` in the console below to filter and trigger any of the 24 Antigravity slash commands.*',
+      ].join('\n');
+
+      const sysMsg: ChatMessage = {
+        id: `cmd_sys_${Date.now()}`,
+        role: 'assistant',
+        content: helpText,
+        timestamp: Date.now(),
+        status: 'done',
+      };
+      setMessages((prev) => [...prev, sysMsg]);
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    // Active Skills Reference
+    if (text === '/skills') {
+      window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'skills' } }));
+      const skillsText = [
+        '### ⚡ Active `ai-cli-task` Lifecycle Skills & Autonomous Tools',
+        '',
+        '1. **/auto `<module>`**: Autonomous 13-skill loop (plan → research → check → verify → exec → merge → report)',
+        '2. **/plan `<module>`**: Architecture and step-by-step implementation plan',
+        '3. **/research `<module>`**: External references and dependency gathering',
+        '4. **/check `<module>`**: Feasibility validation before code modifications',
+        '5. **/verify `<module>`**: Execute domain-adapted tests (unit, build, integration)',
+        '6. **/exec `<module>`**: Execute approved implementation plan',
+        '7. **/review `<module>`**: Review diffs, security, and changes',
+        '8. **/merge `<module>`**: Merge isolated worktree branch to main',
+        '9. **/report `<module>`**: Generate formal task completion report',
+        '10. **/init `<module>`**: Initialize task module and branch',
+        '11. **/cancel `<module>`**: Cancel task & clean worktree',
+        '12. **/list**: Query status of all task modules',
+        '13. **/annotate `<file>` `<ann>`**: Process Plan panel annotations',
+        '14. **/summarize `<module>`**: Regenerate context summary',
+        '',
+        '*Click **[? HELP]** in header to inspect the complete Skills & Tools reference.*',
+      ].join('\n');
+
+      const sysMsg: ChatMessage = {
+        id: `cmd_sys_${Date.now()}`,
+        role: 'assistant',
+        content: skillsText,
+        timestamp: Date.now(),
+        status: 'done',
+      };
+      setMessages((prev) => [...prev, sysMsg]);
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    // Ticket CHAT-002: /workspace slash command
+    if (text === '/workspace' || text === '/workspace list') {
+      try {
+        const wsData = await fetchWorkspaces(token);
+        const listText = [
+          '### 📁 Workspace Registry & Agent Mode',
+          '',
+          `**Personal Home (\`~\`)**: \`${wsData.home}\` — *🤖 Agentic Assistant*`,
+          '',
+          '**Registered Project Workspaces**:',
+          ...wsData.workspaces
+            .filter((w) => !w.isHome)
+            .map((w) => `- **${w.name}**: \`${w.path}\` ${w.id === wsData.activeWorkspaceId ? '*(Active)*' : ''}`),
+          '',
+          '---',
+          '*To switch workspace, type `/workspace <name|path>` or select from the header dropdown.*',
+        ].join('\n');
+
+        const sysMsg: ChatMessage = {
+          id: `cmd_sys_${Date.now()}`,
+          role: 'assistant',
+          content: listText,
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, sysMsg]);
+        setInputText('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        return;
+      } catch (err: unknown) {
+        const errMsg: ChatMessage = {
+          id: `cmd_err_${Date.now()}`,
+          role: 'assistant',
+          content: `> [!WARNING]\n> Failed to query workspaces: ${err instanceof Error ? err.message : String(err)}`,
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, errMsg]);
+        setInputText('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        return;
+      }
+    }
+
+    if (text.startsWith('/workspace ')) {
+      const target = text.slice(11).trim();
+      if (target) {
+        try {
+          const wsData = await fetchWorkspaces(token);
+          let match = wsData.workspaces.find(
+            (w) =>
+              w.name.toLowerCase() === target.toLowerCase() ||
+              w.id.toLowerCase() === target.toLowerCase() ||
+              w.path.toLowerCase() === target.toLowerCase(),
+          );
+          if (target.toLowerCase() === 'home' || target === '~') {
+            match = wsData.workspaces.find((w) => w.isHome);
+          }
+
+          if (match) {
+            const res = await switchSessionWorkspace(token, sessionId, match.id, match.path);
+            setWorkspaceMode(res);
+            const sysMsg: ChatMessage = {
+              id: `cmd_sys_${Date.now()}`,
+              role: 'assistant',
+              content: `Switched workspace to **${match.name}** (\`${res.cwd}\`). Active Agent Mode: **${res.mode === 'agentic-assistant' ? '🤖 Agentic Assistant' : '💻 Coding Agent'}**.`,
+              timestamp: Date.now(),
+              status: 'done',
+            };
+            setMessages((prev) => [...prev, sysMsg]);
+            setInputText('');
+            if (textareaRef.current) textareaRef.current.style.height = 'auto';
+            return;
+          } else {
+            const created = await createWorkspace(token, target);
+            const res = await switchSessionWorkspace(token, sessionId, created.id, created.path);
+            setWorkspaceMode(res);
+            const sysMsg: ChatMessage = {
+              id: `cmd_sys_${Date.now()}`,
+              role: 'assistant',
+              content: `Created and switched to workspace **${created.name}** (\`${res.cwd}\`). Active Agent Mode: **${res.mode === 'agentic-assistant' ? '🤖 Agentic Assistant' : '💻 Coding Agent'}**.`,
+              timestamp: Date.now(),
+              status: 'done',
+            };
+            setMessages((prev) => [...prev, sysMsg]);
+            setInputText('');
+            if (textareaRef.current) textareaRef.current.style.height = 'auto';
+            return;
+          }
+        } catch (err: unknown) {
+          const errMsg: ChatMessage = {
+            id: `cmd_err_${Date.now()}`,
+            role: 'assistant',
+            content: `> [!WARNING]\n> Failed to switch workspace: ${err instanceof Error ? err.message : String(err)}`,
+            timestamp: Date.now(),
+            status: 'done',
+          };
+          setMessages((prev) => [...prev, errMsg]);
+          setInputText('');
+          if (textareaRef.current) textareaRef.current.style.height = 'auto';
+          return;
+        }
+      }
     }
 
     // Save to command history
@@ -491,6 +781,25 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     }
   };
 
+  // Listen for global command injection (from HelpGuideModal, CommandPalette, SystemHeader, etc.)
+  useEffect(() => {
+    const handleInsert = (e: Event) => {
+      const custom = e as CustomEvent<{ cmd: string; autoSend?: boolean }>;
+      if (!custom.detail?.cmd) return;
+      if (custom.detail.autoSend) {
+        handleSendMessage(custom.detail.cmd);
+      } else {
+        setInputText(custom.detail.cmd);
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.focus();
+        }
+      }
+    };
+    window.addEventListener('agy:insert-command', handleInsert);
+    return () => window.removeEventListener('agy:insert-command', handleInsert);
+  }, [handleSendMessage]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showSlashMenu && filteredCommands.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -569,6 +878,25 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
           <span style={{ color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
             COMMAND STREAM //
+          </span>
+          <span
+            style={{
+              fontSize: '9px',
+              fontWeight: 700,
+              padding: '2px 6px',
+              borderRadius: '2px',
+              letterSpacing: '0.5px',
+              backgroundColor: isHome ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+              color: isHome ? '#c084fc' : '#60a5fa',
+              border: `1px solid ${isHome ? 'rgba(168, 85, 247, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              flexShrink: 0,
+            }}
+            title={isHome ? 'Home Persona: General Agentic Assistant' : 'Workspace Persona: Autonomous Coding Agent'}
+          >
+            {isHome ? '🤖 ASSISTANT' : '💻 CODING AGENT'}
           </span>
           <span className={`tech-badge ${
             agentState === 'EXECUTING'
@@ -663,10 +991,10 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               <span style={{
                 fontSize: '10px',
                 fontWeight: 700,
-                color: 'var(--accent-amber-bright)',
+                color: isHome ? '#c084fc' : 'var(--accent-amber-bright)',
                 letterSpacing: '1px',
               }}>
-                AUTONOMOUS SYSTEM READY
+                {isHome ? 'PERSONAL ASSISTANT READY' : 'AUTONOMOUS SYSTEM READY'}
               </span>
             </div>
 
@@ -677,7 +1005,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               fontWeight: 700,
               letterSpacing: '1px',
             }}>
-              AGY // COMMAND CONSOLE
+              {isHome ? 'AGY // ASSISTANT CONSOLE' : 'AGY // COMMAND CONSOLE'}
             </h1>
             <p style={{
               fontSize: '12px',
@@ -686,7 +1014,9 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               lineHeight: 1.6,
               maxWidth: '520px',
             }}>
-              Autonomous agent command terminal for Google Antigravity. Initialize a task lifecycle, execute long-running goals, or inspect codebase architecture.
+              {isHome
+                ? 'Personal agentic assistant for Google Antigravity. Manage personal workflows, schedule automations, query tools, or switch to a coding project.'
+                : 'Autonomous agent command terminal for Google Antigravity. Initialize a task lifecycle, execute long-running goals, or inspect codebase architecture.'}
             </p>
 
             {/* Quick Operational Triggers Grid */}
@@ -698,7 +1028,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               textAlign: 'left',
               boxSizing: 'border-box',
             }}>
-              {STARTER_OPERATIONS.map((op) => (
+              {(isHome ? HOME_STARTER_OPERATIONS : PROJECT_STARTER_OPERATIONS).map((op) => (
                 <div
                   key={op.code}
                   onClick={() => {
@@ -1114,12 +1444,15 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border-active)',
             borderRadius: '3px',
-            maxHeight: 'min(200px, 35vh)',
+            maxHeight: 'min(240px, 40vh)',
             overflowY: 'auto',
             boxShadow: '0 -8px 24px rgba(0,0,0,0.6), 0 0 10px var(--accent-amber-glow)',
             zIndex: 100,
           }}>
             <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               padding: '4px 8px',
               backgroundColor: 'var(--bg-primary)',
               borderBottom: '1px solid var(--border)',
@@ -1128,7 +1461,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               fontWeight: 700,
               letterSpacing: '0.8px',
             }}>
-              // AVAILABLE SLASH COMMANDS
+              <span>// AVAILABLE SLASH COMMANDS ({filteredCommands.length})</span>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Mode: {isHome ? 'Agentic Assistant' : 'Coding Agent'}</span>
             </div>
             {filteredCommands.map((sc, i) => (
               <div
@@ -1144,19 +1478,43 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   borderBottom: '1px solid var(--border-subtle)',
                 }}
               >
-                <span style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontWeight: 700,
-                  color: 'var(--accent-amber-bright)',
-                  fontSize: '12px',
-                }}>
-                  {sc.cmd}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '8px',
+                    fontFamily: 'var(--font-mono)',
+                    padding: '1px 4px',
+                    borderRadius: '2px',
+                    backgroundColor: 'var(--bg-primary)',
+                    border: '1px solid var(--border)',
+                    color: sc.category === 'coding' ? 'var(--accent-cyan-bright)' : sc.category === 'assistant' ? '#c084fc' : 'var(--accent-amber-bright)',
+                    fontWeight: 700,
+                  }}>
+                    {sc.category.toUpperCase()}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 700,
+                    color: 'var(--accent-amber-bright)',
+                    fontSize: '12px',
+                  }}>
+                    {sc.cmd}
+                  </span>
+                </div>
                 <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
                   {sc.desc}
                 </span>
               </div>
             ))}
+            <div style={{
+              padding: '3px 8px',
+              backgroundColor: 'var(--bg-primary)',
+              fontSize: '9px',
+              color: 'var(--text-muted)',
+              borderTop: '1px solid var(--border-subtle)',
+              textAlign: 'right',
+            }}>
+              ↑↓ navigate · Tab/Enter choose · Esc dismiss
+            </div>
           </div>
         )}
 
@@ -1221,12 +1579,57 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             color: 'var(--text-muted)',
             gap: '8px',
           }}>
-            <div className="desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>/commands</span>
-              <span>·</span>
-              <span>↑↓ history</span>
-              <span>·</span>
-              <span>Shift+⏎ newline</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText('/');
+                  setShowSlashMenu(true);
+                  setSlashFilter('');
+                  setSelectedSlashIndex(0);
+                  textareaRef.current?.focus();
+                }}
+                title="Browse slash commands (/)"
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--border)',
+                  borderRadius: '2px',
+                  color: 'var(--accent-amber-bright)',
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono)',
+                  padding: '1px 5px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                [/] COMMANDS
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'quickstart' } }));
+                }}
+                title="Open Interactive Help & Feature Guide (?)"
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--border)',
+                  borderRadius: '2px',
+                  color: 'var(--accent-cyan-bright)',
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono)',
+                  padding: '1px 5px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                ? GUIDE
+              </button>
+              <span className="desktop-only" style={{ color: 'var(--text-muted)' }}>·</span>
+              <span className="desktop-only">↑↓ history</span>
+              <span className="desktop-only">·</span>
+              <span className="desktop-only">Shift+⏎ newline</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>

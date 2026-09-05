@@ -7,6 +7,7 @@ import { registerFileStreamHandler, unregisterFileStreamHandler } from '../fileS
 import { fetchFiles } from '../api/files';
 import type { FileEntry } from '../api/files';
 import { fetchFileContent } from '../api/docs';
+import { fetchWorkspaceMode } from '../api/workspaces';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface PlanPanelProps {
@@ -70,7 +71,22 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   const [planLoading, setPlanLoading] = useState(false);
   // When AiTasks/ directory is not found, show init guidance
   const [showInitGuide, setShowInitGuide] = useState(false);
+  const [isHome, setIsHome] = useState(false);
   const planAnnotationRef = useRef<PlanAnnotationRendererHandle>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchWorkspaceMode(token, sessionId)
+      .then((wm) => {
+        if (!cancelled && wm) {
+          setIsHome(Boolean(wm.isHome));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token, sessionId]);
 
   // Persist selected file to localStorage (global key — sessionId omitted so it persists across terminals)
   const planFileKey = 'plan-selected-file';
@@ -506,11 +522,55 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
             {planLoading ? (
               <CenteredLoading label="Loading AiTasks/..." />
             ) : showInitGuide ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: '0 20px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>AiTasks/ directory not found</span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12, textAlign: 'center' }}>
-                  Run <code style={{ color: 'var(--accent-blue)', backgroundColor: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 3 }}>/init &lt;name&gt;</code> in the terminal to create a task
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: '0 20px', textAlign: 'center' }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  marginBottom: '2px',
+                }}>
+                  📋
+                </div>
+                <span style={{ color: 'var(--text-bright)', fontSize: 14, fontWeight: 700 }}>
+                  {isHome ? 'AiTasks/ Not Found in Home Directory' : 'AiTasks/ directory not found'}
                 </span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12, maxWidth: '420px', lineHeight: 1.5 }}>
+                  {isHome ? (
+                    <>
+                      The Plan Panel is designed for module task lifecycles in project workspaces. In Home directory (Personal Assistant mode), task lifecycle tracking is inactive.
+                    </>
+                  ) : (
+                    <>
+                      Run <code style={{ color: 'var(--accent-blue)', backgroundColor: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 3 }}>/init &lt;name&gt;</code> in the terminal to create a task
+                    </>
+                  )}
+                </span>
+                {isHome && (
+                  <button
+                    className="mecha-btn mecha-btn--primary"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('agy:open-workspace-selector'));
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      padding: '6px 14px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    Switch to a Project Workspace
+                  </button>
+                )}
               </div>
             ) : planSelectedFile && (!planMarkdown && (fileStream.state.status === 'streaming' || fileStream.state.status === 'idle')) ? (
               <CenteredLoading label={`Loading ${planSelectedFile.split('/').pop()}...`} percent={fileStream.state.totalSize > 0 ? Math.round((fileStream.state.receivedBytes / fileStream.state.totalSize) * 100) : undefined} />

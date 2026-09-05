@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useStore } from '../store';
 import { fetchGitLog, fetchGitDiff, fetchGitBranches } from '../api/git';
+import { fetchWorkspaceMode } from '../api/workspaces';
 import type { CommitInfo, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
 import type { LaneNode, Connection } from '../utils/gitGraph';
@@ -535,8 +536,24 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
+  const [isHome, setIsHome] = useState(false);
   const debounceRef = useRef<number>(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Check workspace mode (home vs project)
+  useEffect(() => {
+    let cancelled = false;
+    fetchWorkspaceMode(token, sessionId)
+      .then((wm) => {
+        if (!cancelled && wm) {
+          setIsHome(Boolean(wm.isHome));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, token]);
 
   // Fetch branch list
   useEffect(() => {
@@ -689,56 +706,127 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
         />
       </div>
 
-      {/* Error */}
-      {error && (
-        <div style={{ padding: '4px 8px', fontSize: smSize, color: 'var(--accent-red)', backgroundColor: 'var(--bg-secondary)' }}>
-          {error}
+      {/* Home / Non-Git Graceful Guard Card */}
+      {(isHome || (error && error.toLowerCase().includes('not a git repository'))) && !loading && commits.length === 0 ? (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          padding: '32px 20px',
+          textAlign: 'center',
+          backgroundColor: 'var(--bg-primary)',
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            backgroundColor: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '22px',
+            marginBottom: '14px',
+          }}>
+            {isHome ? '🏠' : '🌿'}
+          </div>
+
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 700,
+            color: 'var(--text-bright)',
+            marginBottom: '8px',
+            letterSpacing: '0.5px',
+          }}>
+            {isHome ? 'Home Directory — Personal Space' : (error || 'Not a git repository')}
+          </div>
+
+          <p style={{
+            fontSize: '12px',
+            color: 'var(--text-secondary)',
+            maxWidth: '380px',
+            lineHeight: 1.5,
+            marginBottom: '20px',
+          }}>
+            {isHome
+              ? 'You are currently in your personal Home directory running in Agentic Assistant mode. Git version control is not initialized here.'
+              : 'The current working directory is not managed by Git version control. Version control features and commit history are unavailable.'}
+          </p>
+
+          <button
+            className="mecha-btn mecha-btn--primary"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('agy:open-workspace-selector'));
+            }}
+            style={{
+              padding: '8px 16px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            Switch to a Project Workspace
+          </button>
         </div>
+      ) : (
+        <>
+          {/* Error */}
+          {error && (
+            <div style={{ padding: '4px 8px', fontSize: smSize, color: 'var(--accent-red)', backgroundColor: 'var(--bg-secondary)' }}>
+              {error}
+            </div>
+          )}
+
+          {/* Commit list */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}
+          >
+            {commits.map((c) => (
+              <CommitItem
+                key={c.hash}
+                commit={c}
+                sessionId={sessionId}
+                token={token}
+                fontSize={fontSize}
+                laneNode={laneMap.get(c.hash)}
+                maxLanes={maxLanes}
+                isMobile={isMobile}
+              />
+            ))}
+
+            {loading && (
+              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-secondary)', fontSize }}>
+                Loading...
+              </div>
+            )}
+
+            {!loading && commits.length === 0 && !error && (
+              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-secondary)', fontSize }}>
+                No commits found
+              </div>
+            )}
+
+            {!loading && hasMore && (
+              <div style={{ padding: 8, textAlign: 'center' }}>
+                <button
+                  className="pane-btn"
+                  onClick={handleLoadMore}
+                  style={{ fontSize: smSize }}
+                >
+                  Load more
+                </button>
+              </div>
+            )}
+          </div>
+        </>
       )}
-
-      {/* Commit list */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}
-      >
-        {commits.map((c) => (
-          <CommitItem
-            key={c.hash}
-            commit={c}
-            sessionId={sessionId}
-            token={token}
-            fontSize={fontSize}
-            laneNode={laneMap.get(c.hash)}
-            maxLanes={maxLanes}
-            isMobile={isMobile}
-          />
-        ))}
-
-        {loading && (
-          <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-secondary)', fontSize }}>
-            Loading...
-          </div>
-        )}
-
-        {!loading && commits.length === 0 && !error && (
-          <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-secondary)', fontSize }}>
-            No commits found
-          </div>
-        )}
-
-        {!loading && hasMore && (
-          <div style={{ padding: 8, textAlign: 'center' }}>
-            <button
-              className="pane-btn"
-              onClick={handleLoadMore}
-              style={{ fontSize: smSize }}
-            >
-              Load more
-            </button>
-          </div>
-        )}
-      </div>
     </div>
   );
 });

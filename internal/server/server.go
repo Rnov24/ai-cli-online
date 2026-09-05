@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -42,7 +44,11 @@ func (s *Server) Start() error {
 	gitH := routes.NewGitHandler(auth)
 	setH := routes.NewSettingsHandler(auth, s.db)
 	chatH := routes.NewChatHandler(auth)
+	wsH := routes.NewWorkspaceHandler(auth, s.db)
 	hub := ws.InitHub(s.cfg)
+
+	// Auto-seed default Home and project workspaces
+	s.seedDefaultWorkspaces()
 
 	// Chat & Headless AI Execution
 	mux.HandleFunc("POST /api/sessions/{sessionId}/chat", chatH.HandleChat)
@@ -90,6 +96,13 @@ func (s *Server) Start() error {
 	mux.HandleFunc("GET /api/settings/{key}", setH.GetSetting)
 	mux.HandleFunc("PUT /api/settings/{key}", setH.SaveSetting)
 
+	// Workspaces
+	mux.HandleFunc("GET /api/workspaces", wsH.ListWorkspaces)
+	mux.HandleFunc("POST /api/workspaces", wsH.CreateWorkspace)
+	mux.HandleFunc("DELETE /api/workspaces/{id}", wsH.DeleteWorkspace)
+	mux.HandleFunc("POST /api/sessions/{sessionId}/switch-workspace", wsH.SwitchSessionWorkspace)
+	mux.HandleFunc("GET /api/sessions/{sessionId}/workspace-mode", wsH.GetSessionWorkspaceMode)
+
 	// WebSocket
 	mux.HandleFunc("/ws", hub.HandleWebSocket)
 
@@ -110,7 +123,7 @@ func (s *Server) Start() error {
 			return
 		}
 
-		cleanPath := strings.TrimPrefix(filepath.Clean(r.URL.Path), "/")
+		cleanPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 		if cleanPath == "." || cleanPath == "" {
 			cleanPath = "index.html"
 		}
@@ -124,6 +137,19 @@ func (s *Server) Start() error {
 				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 				w.Header().Set("Pragma", "no-cache")
 				w.Header().Set("Expires", "0")
+			}
+			if strings.HasSuffix(cleanPath, ".js") {
+				w.Header().Set("Content-Type", "application/javascript")
+			} else if strings.HasSuffix(cleanPath, ".css") {
+				w.Header().Set("Content-Type", "text/css; charset=utf-8")
+			} else if strings.HasSuffix(cleanPath, ".svg") {
+				w.Header().Set("Content-Type", "image/svg+xml")
+			} else if strings.HasSuffix(cleanPath, ".woff2") {
+				w.Header().Set("Content-Type", "font/woff2")
+			} else if strings.HasSuffix(cleanPath, ".woff") {
+				w.Header().Set("Content-Type", "font/woff")
+			} else if strings.HasSuffix(cleanPath, ".ttf") {
+				w.Header().Set("Content-Type", "font/ttf")
 			}
 			fileServer.ServeHTTP(w, r)
 			return
@@ -174,4 +200,25 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		return s.httpSrv.Shutdown(ctx)
 	}
 	return nil
+}
+
+func (s *Server) seedDefaultWorkspaces() {
+	home, err := os.UserHomeDir()
+	if err == nil && home != "" {
+		home = filepath.Clean(home)
+		_, _ = s.db.AddWorkspace("home", "Home (~)", home, true)
+	}
+
+	defaultCwd := s.cfg.DefaultWorkingDir
+	if defaultCwd != "" {
+		cleanDefault := filepath.Clean(defaultCwd)
+		if !strings.EqualFold(cleanDefault, home) {
+			name := filepath.Base(cleanDefault)
+			if name == "." || name == "/" || name == "\\" || name == "" {
+				name = "Default Project"
+			}
+			id := "ws-default"
+			_, _ = s.db.AddWorkspace(id, name, cleanDefault, false)
+		}
+	}
 }

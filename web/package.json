@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@types/dompurify": "^3.0.5",
+    "@types/katex": "^0.16.8",
     "ai-cli-online-shared": "*",
     "dompurify": "^3.3.1",
+    "katex": "^0.18.5",
     "marked": "^17.0.1",
     "pdfjs-dist": "^5.4.624",
     "prismjs": "^1.30.0",

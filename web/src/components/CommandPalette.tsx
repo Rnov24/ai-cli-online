@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
 
 interface CommandPaletteProps {
@@ -10,18 +10,21 @@ interface CommandPaletteProps {
   onOpenGit?: () => void;
   onOpenSettings?: () => void;
   onOpenShortcuts?: () => void;
+  onOpenHelp?: () => void;
 }
 
 interface CommandItem {
   id: string;
-  category: string;
+  category: 'SESSION' | 'SKILLS' | 'WORKSPACES' | 'PANELS' | 'SYSTEM';
   title: string;
   desc?: string;
   shortcut?: string;
   action: () => void;
 }
 
-export function CommandPalette({
+type CategoryFilter = 'ALL' | 'SKILLS' | 'WORKSPACES' | 'PANELS' | 'SYSTEM';
+
+export const CommandPalette = React.memo(function CommandPalette({
   isOpen,
   onClose,
   onExecuteCommand,
@@ -30,8 +33,10 @@ export function CommandPalette({
   onOpenGit,
   onOpenSettings,
   onOpenShortcuts,
+  onOpenHelp,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>('ALL');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,20 +51,44 @@ export function CommandPalette({
   useEffect(() => {
     if (isOpen) {
       setQuery('');
+      setActiveCategory('ALL');
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 20);
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const runCommand = (cmd: string) => {
+    if (onExecuteCommand) {
+      onExecuteCommand(cmd);
+    } else {
+      window.dispatchEvent(new CustomEvent('agy:insert-command', { detail: { cmd } }));
+    }
+    onClose();
+  };
 
   const openTabs = tabs.filter((t) => t.status === 'open');
 
-  const items: CommandItem[] = [
+  const items: CommandItem[] = useMemo(() => [
+    // Help & Guide
+    {
+      id: 'open-help-guide',
+      category: 'SYSTEM',
+      title: 'Interactive Feature Guide & Help Hub',
+      desc: 'Quick start guide, dual personas, slash command catalog, and keybindings',
+      shortcut: '?',
+      action: () => {
+        if (onOpenHelp) onOpenHelp();
+        else if (onOpenShortcuts) onOpenShortcuts();
+        else window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'quickstart' } }));
+        onClose();
+      },
+    },
+
+    // Session Management
     {
       id: 'new-session',
       category: 'SESSION',
-      title: 'Initialize New Session',
+      title: 'Initialize New Mission Session',
       desc: 'Create new active terminal & agent tab',
       shortcut: '⌘N',
       action: () => {
@@ -69,7 +98,7 @@ export function CommandPalette({
     },
     ...openTabs.map((t) => ({
       id: `switch-session-${t.id}`,
-      category: 'NAVIGATION',
+      category: 'SESSION' as const,
       title: `Switch to Session: ${t.name}`,
       desc: `${t.terminalIds.length} active process${t.terminalIds.length !== 1 ? 'es' : ''}`,
       action: () => {
@@ -77,66 +106,145 @@ export function CommandPalette({
         onClose();
       },
     })),
+
+    // Workspaces & Personas
+    {
+      id: 'cmd-ws-list',
+      category: 'WORKSPACES',
+      title: '/workspace — Inspect Registered Workspaces',
+      desc: 'Show personal home (~) and registered project workspaces',
+      action: () => runCommand('/workspace'),
+    },
+    {
+      id: 'cmd-ws-home',
+      category: 'WORKSPACES',
+      title: '/workspace home — Switch to Agentic Assistant',
+      desc: 'Switch active session to Personal Home (~)',
+      action: () => runCommand('/workspace home'),
+    },
+
+    // Assistant & System Operations
     {
       id: 'cmd-goal',
-      category: 'AGENT SKILL',
+      category: 'SKILLS',
       title: '/goal — Autonomous Long-Running Goal',
-      desc: 'Execute autonomous loop until goal is achieved',
-      action: () => {
-        onExecuteCommand?.('/goal ');
-        onClose();
-      },
+      desc: 'Execute persistent autonomous loop until objective is completed',
+      action: () => runCommand('/goal '),
     },
     {
       id: 'cmd-auto',
-      category: 'AGENT SKILL',
+      category: 'SKILLS',
       title: '/auto — Full 13-Skill Task Lifecycle Loop',
-      desc: 'Autonomous task initialization, planning, execution and verification',
-      action: () => {
-        onExecuteCommand?.('/auto ');
-        onClose();
-      },
+      desc: 'Autonomous task initialization, planning, execution, and verification',
+      action: () => runCommand('/auto '),
     },
     {
       id: 'cmd-plan',
-      category: 'AGENT SKILL',
-      title: '/plan — Generate Implementation Plan',
-      desc: 'Step-by-step implementation planning for current module',
-      action: () => {
-        onExecuteCommand?.('/plan ');
-        onClose();
-      },
+      category: 'SKILLS',
+      title: '/plan — Implementation Planning',
+      desc: 'Inspect codebase and draft structured implementation plan',
+      action: () => runCommand('/plan '),
     },
     {
       id: 'cmd-verify',
-      category: 'AGENT SKILL',
+      category: 'SKILLS',
       title: '/verify — Domain Verification & Testing',
-      desc: 'Run domain-adapted verification procedures and tests',
-      action: () => {
-        onExecuteCommand?.('/verify ');
-        onClose();
-      },
+      desc: 'Run domain-adapted verification test suite',
+      action: () => runCommand('/verify '),
+    },
+    {
+      id: 'cmd-exec',
+      category: 'SKILLS',
+      title: '/exec — Execute Approved Plan',
+      desc: 'Autonomous code editing and implementation',
+      action: () => runCommand('/exec '),
     },
     {
       id: 'cmd-check',
-      category: 'AGENT SKILL',
+      category: 'SKILLS',
       title: '/check — Feasibility Checkpoint',
       desc: 'Inspect plan feasibility or post-exec acceptance',
-      action: () => {
-        onExecuteCommand?.('/check ');
-        onClose();
-      },
+      action: () => runCommand('/check '),
+    },
+    {
+      id: 'cmd-review',
+      category: 'SKILLS',
+      title: '/review — Code Review & Diff Inspection',
+      desc: 'Analyze changes, git diffs, and code security',
+      action: () => runCommand('/review '),
     },
     {
       id: 'cmd-merge',
-      category: 'AGENT SKILL',
+      category: 'SKILLS',
       title: '/merge — Merge Task Branch',
       desc: 'Merge completed task branch to main with validation',
-      action: () => {
-        onExecuteCommand?.('/merge ');
-        onClose();
-      },
+      action: () => runCommand('/merge '),
     },
+    {
+      id: 'cmd-report',
+      category: 'SKILLS',
+      title: '/report — Task Completion Report',
+      desc: 'Generate formal walkthrough and completion summary',
+      action: () => runCommand('/report '),
+    },
+    {
+      id: 'cmd-research',
+      category: 'SKILLS',
+      title: '/research — Research & Reference Gathering',
+      desc: 'Collect external documentation, patterns, and web sources',
+      action: () => runCommand('/research '),
+    },
+    {
+      id: 'cmd-schedule',
+      category: 'SKILLS',
+      title: '/schedule — Schedule Task or Recurring Cron',
+      desc: 'Set timers or recurring background tasks',
+      action: () => runCommand('/schedule '),
+    },
+    {
+      id: 'cmd-learn',
+      category: 'SKILLS',
+      title: '/learn — Save Behavioral Learning',
+      desc: 'Save persistent instructions or agent patterns',
+      action: () => runCommand('/learn '),
+    },
+    {
+      id: 'cmd-doctor',
+      category: 'SKILLS',
+      title: '/doctor — Diagnostics & Health Check',
+      desc: 'Inspect system dependencies, CLI environment, and services',
+      action: () => runCommand('/doctor'),
+    },
+    {
+      id: 'cmd-browser',
+      category: 'SKILLS',
+      title: '/browser — Browser Automation & Web Search',
+      desc: 'Perform autonomous web scraping and research',
+      action: () => runCommand('/browser '),
+    },
+    {
+      id: 'cmd-model',
+      category: 'SKILLS',
+      title: '/model — Switch Active AI Model',
+      desc: 'Select Gemini 3.8 or alternative language models',
+      action: () => runCommand('/model '),
+    },
+    {
+      id: 'cmd-mcp',
+      category: 'SKILLS',
+      title: '/mcp — Inspect MCP Server Status',
+      desc: 'List connected tools and model context protocol servers',
+      action: () => runCommand('/mcp'),
+    },
+    {
+      id: 'cmd-clear',
+      category: 'SKILLS',
+      title: '/clear — Clear Conversation Timeline',
+      desc: 'Purge local chat history and reset context',
+      action: () => runCommand('/clear'),
+    },
+
+    // Panels
     {
       id: 'toggle-tasks',
       category: 'PANELS',
@@ -170,6 +278,8 @@ export function CommandPalette({
         onClose();
       },
     },
+
+    // System
     {
       id: 'toggle-theme',
       category: 'SYSTEM',
@@ -221,14 +331,36 @@ export function CommandPalette({
         onClose();
       },
     },
-  ];
+  ], [
+    openTabs,
+    theme,
+    fontSize,
+    addTab,
+    switchTab,
+    toggleTheme,
+    setFontSize,
+    onOpenHelp,
+    onOpenShortcuts,
+    onOpenTasks,
+    onOpenFiles,
+    onOpenGit,
+    onOpenSettings,
+  ]);
 
-  const filtered = items.filter(
-    (item) =>
-      item.title.toLowerCase().includes(query.toLowerCase()) ||
-      item.category.toLowerCase().includes(query.toLowerCase()) ||
-      (item.desc && item.desc.toLowerCase().includes(query.toLowerCase())),
-  );
+  const filtered = useMemo(() => {
+    return items.filter((item) => {
+      if (activeCategory !== 'ALL' && item.category !== activeCategory) {
+        return false;
+      }
+      if (!query.trim()) return true;
+      const q = query.toLowerCase();
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        (item.desc && item.desc.toLowerCase().includes(q))
+      );
+    });
+  }, [items, activeCategory, query]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -247,6 +379,10 @@ export function CommandPalette({
       onClose();
     }
   };
+
+  if (!isOpen) return null;
+
+  const categories: CategoryFilter[] = ['ALL', 'SKILLS', 'WORKSPACES', 'PANELS', 'SYSTEM'];
 
   return (
     <div className="cmd-palette-backdrop" onClick={onClose}>
@@ -277,7 +413,7 @@ export function CommandPalette({
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Search commands, sessions, skills, panels..."
+            placeholder="Type a command, session, skill (/goal, /plan), or panel..."
             style={{
               flex: 1,
               background: 'none',
@@ -306,9 +442,47 @@ export function CommandPalette({
           </span>
         </div>
 
+        {/* Category Filter Pills */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '6px 12px',
+          backgroundColor: 'var(--bg-tertiary)',
+          borderBottom: '1px solid var(--border-subtle)',
+          overflowX: 'auto',
+        }}>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginRight: '4px' }}>
+            FILTER:
+          </span>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => {
+                setActiveCategory(cat);
+                setSelectedIndex(0);
+              }}
+              style={{
+                background: activeCategory === cat ? 'var(--accent-amber)' : 'var(--bg-primary)',
+                color: activeCategory === cat ? '#000' : 'var(--text-secondary)',
+                border: `1px solid ${activeCategory === cat ? 'var(--accent-amber)' : 'var(--border)'}`,
+                borderRadius: '2px',
+                padding: '2px 7px',
+                fontSize: '9px',
+                fontWeight: activeCategory === cat ? 700 : 500,
+                fontFamily: 'var(--font-mono)',
+                cursor: 'pointer',
+                transition: 'all 0.1s ease',
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
         {/* Results List */}
         <div style={{
-          maxHeight: 'min(380px, calc(100dvh - 160px))',
+          maxHeight: 'min(380px, calc(100dvh - 180px))',
           overflowY: 'auto',
           padding: '6px',
           backgroundColor: 'var(--bg-secondary)',
@@ -321,7 +495,7 @@ export function CommandPalette({
               fontSize: '11px',
               color: 'var(--text-muted)',
             }}>
-              NO MATCHING COMMANDS FOUND
+              NO MATCHING COMMANDS FOUND IN &quot;{activeCategory}&quot;
             </div>
           ) : (
             filtered.map((item, idx) => {
@@ -348,7 +522,13 @@ export function CommandPalette({
                       <span style={{
                         fontSize: '9px',
                         fontFamily: 'var(--font-mono)',
-                        color: 'var(--accent-cyan-bright)',
+                        color: item.category === 'SKILLS'
+                          ? 'var(--accent-cyan-bright)'
+                          : item.category === 'WORKSPACES'
+                            ? '#c084fc'
+                            : item.category === 'PANELS'
+                              ? 'var(--accent-green-bright)'
+                              : 'var(--text-muted)',
                         letterSpacing: '0.5px',
                         fontWeight: 700,
                       }}>
@@ -405,10 +585,10 @@ export function CommandPalette({
           fontFamily: 'var(--font-mono)',
           color: 'var(--text-muted)',
         }}>
-          <span>Navigate: ↑ ↓ · Execute: ⏎</span>
+          <span>Navigate: ↑ ↓ · Execute: ⏎ · Filter: Click category</span>
           <span>AGY // COMMAND PALETTE</span>
         </div>
       </div>
     </div>
   );
-}
+});

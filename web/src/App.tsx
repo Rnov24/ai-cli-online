@@ -8,7 +8,7 @@ import { SystemHeader } from './components/SystemHeader';
 import { NavigationRail } from './components/NavigationRail';
 import { ContextPanel } from './components/ContextPanel';
 import { CommandPalette } from './components/CommandPalette';
-import { ShortcutsModal } from './components/ShortcutsModal';
+import { ShortcutsModal, HelpGuideTab } from './components/ShortcutsModal';
 import { SettingsModal } from './components/SettingsModal';
 import { fetchSystemStatus } from './api/system';
 import { fetchCwd } from './api/files';
@@ -42,6 +42,21 @@ function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [helpGuideTab, setHelpGuideTab] = useState<HelpGuideTab>('quickstart');
+
+  const handleOpenHelp = useCallback((tab: HelpGuideTab = 'quickstart') => {
+    setHelpGuideTab(tab);
+    setShortcutsModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const onHelpEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ tab?: HelpGuideTab }>;
+      handleOpenHelp(custom.detail?.tab || 'quickstart');
+    };
+    window.addEventListener('agy:open-help-guide', onHelpEvent);
+    return () => window.removeEventListener('agy:open-help-guide', onHelpEvent);
+  }, [handleOpenHelp]);
 
   // Active session details
   const activeTab = useMemo(() => tabs.find((t) => t.id === activeTabId), [tabs, activeTabId]);
@@ -184,7 +199,7 @@ function App() {
       // Question mark: Open Shortcuts (when not typing)
       if (e.key === '?' && !isInput && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        setShortcutsModalOpen(true);
+        handleOpenHelp('shortcuts');
         return;
       }
 
@@ -217,6 +232,7 @@ function App() {
     settingsModalOpen,
     mobileNavOpen,
     addTab,
+    handleOpenHelp,
   ]);
 
   const handleSelectPanel = (panel: 'chat' | 'agent' | 'tasks' | 'files' | 'git') => {
@@ -253,11 +269,15 @@ function App() {
       <SystemHeader
         systemStatus={systemStatus}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onOpenHelp={() => handleOpenHelp('quickstart')}
         onToggleContextPanel={() => setContextPanelOpen(!contextPanelOpen)}
         contextPanelOpen={contextPanelOpen}
         onToggleMobileNav={() => setMobileNavOpen(true)}
         activeSessionName={activeTab ? activeTab.name : undefined}
         cwd={cwd}
+        token={token || undefined}
+        activeSessionId={primaryTerminalId}
+        onWorkspaceSwitched={(newCwd) => setCwd(newCwd)}
       />
 
       {/* Main Workspace Frame: Navigation Rail + Central Split Workspace + Context Panel */}
@@ -271,7 +291,8 @@ function App() {
           activePanel={contextPanelOpen ? contextTab : 'chat'}
           onSelectPanel={handleSelectPanel}
           onOpenSettings={() => setSettingsModalOpen(true)}
-          onOpenShortcuts={() => setShortcutsModalOpen(true)}
+          onOpenShortcuts={() => handleOpenHelp('shortcuts')}
+          onOpenHelp={() => handleOpenHelp('quickstart')}
         />
 
         {/* Central Command Stream / Terminal Split Container */}
@@ -318,13 +339,18 @@ function App() {
           setContextPanelOpen(true);
         }}
         onOpenSettings={() => setSettingsModalOpen(true)}
-        onOpenShortcuts={() => setShortcutsModalOpen(true)}
+        onOpenShortcuts={() => handleOpenHelp('shortcuts')}
+        onOpenHelp={() => handleOpenHelp('quickstart')}
       />
 
-      {/* Keyboard Shortcuts Reference Modal (?) */}
+      {/* Interactive Feature Guide & Keyboard Shortcuts Modal (?) */}
       <ShortcutsModal
         isOpen={shortcutsModalOpen}
         onClose={() => setShortcutsModalOpen(false)}
+        initialTab={helpGuideTab}
+        onInsertCommand={(cmd) => {
+          window.dispatchEvent(new CustomEvent('agy:insert-command', { detail: { cmd } }));
+        }}
       />
 
       {/* System Settings Modal (⚙) */}
