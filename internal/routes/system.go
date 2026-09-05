@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/huacheng/ai-cli-online/internal/idle"
@@ -122,3 +123,80 @@ func HandleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
 }
+
+type SystemLogEntry struct {
+	Timestamp int64  `json:"timestamp"`
+	Level     string `json:"level"`
+	Message   string `json:"message"`
+}
+
+var (
+	logMu      sync.RWMutex
+	logRing    = make([]SystemLogEntry, 0, 100)
+	maxLogSize = 100
+)
+
+func AppendSystemLog(level, message string) {
+	logMu.Lock()
+	defer logMu.Unlock()
+	entry := SystemLogEntry{
+		Timestamp: time.Now().UnixMilli(),
+		Level:     level,
+		Message:   message,
+	}
+	if len(logRing) >= maxLogSize {
+		logRing = append(logRing[1:], entry)
+	} else {
+		logRing = append(logRing, entry)
+	}
+}
+
+func HandleSystemLogs(w http.ResponseWriter, r *http.Request) {
+	logMu.RLock()
+	defer logMu.RUnlock()
+
+	entries := make([]SystemLogEntry, len(logRing))
+	copy(entries, logRing)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok":   true,
+		"logs": entries,
+	})
+}
+
+type ProcessItem struct {
+	SessionName string `json:"sessionName"`
+	Mode        string `json:"mode"`
+	Cwd         string `json:"cwd"`
+	Connected   bool   `json:"connected"`
+}
+
+func HandleProcessList(w http.ResponseWriter, r *http.Request) {
+	sessions, err := terminal.List("", nil, "")
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"failed to list processes: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	var items []ProcessItem
+	for _, s := range sessions {
+		mode := "tmux"
+		if !terminal.IsTmuxAvailable() {
+			mode = "direct"
+		}
+		items = append(items, ProcessItem{
+			SessionName: s.SessionName,
+			Mode:        mode,
+			Cwd:         s.Cwd,
+			Connected:   s.Connected,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok":        true,
+		"processes": items,
+	})
+}
+

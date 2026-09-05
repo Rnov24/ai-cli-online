@@ -2,10 +2,14 @@ package terminal
 
 import (
 	"bytes"
+	"errors"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/creack/pty"
 )
 
 func TestSessionNameHelpers(t *testing.T) {
@@ -71,6 +75,9 @@ func TestDirectSessionLifecycle(t *testing.T) {
 
 	sess, err := startDirect(sessName, tempDir, 80, 24, "")
 	if err != nil {
+		if errors.Is(err, pty.ErrUnsupported) || runtime.GOOS == "windows" {
+			t.Skipf("skipping direct pty test on unsupported platform (%s): %v", runtime.GOOS, err)
+		}
 		t.Fatalf("startDirect failed: %v", err)
 	}
 	defer sess.Close()
@@ -162,6 +169,9 @@ func TestListSessionsWithDirectRegistry(t *testing.T) {
 
 	sess, err := startDirect(sessName, tempDir, 80, 24, "")
 	if err != nil {
+		if errors.Is(err, pty.ErrUnsupported) || runtime.GOOS == "windows" {
+			t.Skipf("skipping direct pty test on unsupported platform (%s): %v", runtime.GOOS, err)
+		}
 		t.Fatalf("startDirect failed: %v", err)
 	}
 	defer sess.Close()

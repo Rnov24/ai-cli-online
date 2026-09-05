@@ -92,4 +92,55 @@ func TestRoutes(t *testing.T) {
 	if getResp["value"] != "light" {
 		t.Errorf("Expected theme 'light', got %v", getResp["value"])
 	}
+
+	// 6. Turn Journal Endpoints
+	chatH := NewChatHandler(auth, database)
+
+	// Pre-populate an interrupted turn in DB
+	sessId := "tab-1"
+	sessName := auth.ResolveSession(httptest.NewRecorder(), req, sessId)
+	_ = database.CreateTurnJournal(db.TurnJournalEntry{
+		Id:             "test-turn-1",
+		SessionName:    sessName,
+		ConversationId: "conv-1",
+		Prompt:         "Hello Antigravity",
+		Status:         "running",
+	})
+
+	// Recover endpoint
+	req = httptest.NewRequest(http.MethodPost, "/api/sessions/tab-1/journal/recover", nil)
+	req.SetPathValue("sessionId", "tab-1")
+	req.Header.Set("Authorization", "Bearer test-secret")
+	w = httptest.NewRecorder()
+	chatH.RecoverSessionJournal(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200 recovering journal, got %d", w.Code)
+	}
+	var recResp map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &recResp)
+	if recResp["recovered"].(float64) < 1 {
+		t.Errorf("Expected at least 1 recovered turn, got %v", recResp["recovered"])
+	}
+
+	// Get journal endpoint
+	req = httptest.NewRequest(http.MethodGet, "/api/sessions/tab-1/journal", nil)
+	req.SetPathValue("sessionId", "tab-1")
+	req.Header.Set("Authorization", "Bearer test-secret")
+	w = httptest.NewRecorder()
+	chatH.GetSessionJournal(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200 getting journal, got %d", w.Code)
+	}
+	var journalResp struct {
+		Ok    bool                 `json:"ok"`
+		Turns []db.TurnJournalEntry `json:"turns"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &journalResp)
+	if !journalResp.Ok || len(journalResp.Turns) != 1 {
+		t.Fatalf("Expected 1 turn in journal, got %+v", journalResp)
+	}
+	if journalResp.Turns[0].Status != "interrupted" {
+		t.Errorf("Expected turn status to be 'interrupted', got %s", journalResp.Turns[0].Status)
+	}
 }
+

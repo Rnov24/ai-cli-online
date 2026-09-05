@@ -15,6 +15,7 @@ import (
 
 type StreamEvent struct {
 	Event        string          `json:"event"`
+	TurnId       string          `json:"turn_id,omitempty"`
 	Error        string          `json:"error,omitempty"`
 	StepIndex    int             `json:"step_index,omitempty"`
 	Delta        string          `json:"delta,omitempty"`

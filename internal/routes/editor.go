@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/huacheng/ai-cli-online/internal/db"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 type EditorHandler struct {
@@ -184,12 +185,20 @@ func (e *EditorHandler) WriteFileContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !filepath.IsAbs(req.Path) || !strings.Contains(req.Path, "/AiTasks/") {
-		http.Error(w, `{"error":"path must be absolute and under AiTasks/"}`, http.StatusBadRequest)
+	cwd := terminal.GetCwd(sessionName, e.auth.cfg.DefaultWorkingDir)
+	var resolved string
+	if filepath.IsAbs(req.Path) {
+		resolved = filepath.Clean(req.Path)
+	} else {
+		resolved = filepath.Clean(filepath.Join(cwd, req.Path))
+	}
+
+	// Security: prevent path traversal outside of cwd or allow if under AiTasks
+	if !strings.HasPrefix(resolved, cwd) && !strings.Contains(resolved, "/AiTasks/") && !strings.Contains(resolved, "\\AiTasks\\") {
+		http.Error(w, `{"error":"access denied: path outside workspace"}`, http.StatusForbidden)
 		return
 	}
 
-	resolved := filepath.Clean(req.Path)
 	fi, err := os.Stat(resolved)
 	if err != nil || fi.IsDir() {
 		http.Error(w, `{"error":"File not found"}`, http.StatusNotFound)

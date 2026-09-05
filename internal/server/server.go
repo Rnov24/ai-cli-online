@@ -43,9 +43,16 @@ func (s *Server) Start() error {
 	editH := routes.NewEditorHandler(auth, s.db)
 	gitH := routes.NewGitHandler(auth)
 	setH := routes.NewSettingsHandler(auth, s.db)
-	chatH := routes.NewChatHandler(auth)
+	chatH := routes.NewChatHandler(auth, s.db)
 	wsH := routes.NewWorkspaceHandler(auth, s.db)
 	hub := ws.InitHub(s.cfg)
+
+	// Cleanly mark any orphaned active turns as interrupted on server start
+	if s.db != nil {
+		if recovered, err := s.db.MarkAllActiveTurnsInterrupted(); err == nil && recovered > 0 {
+			log.Printf("[server] Recovered %d uncompleted turns from previous session to interrupted state", recovered)
+		}
+	}
 
 	// Auto-seed default Home and project workspaces
 	s.seedDefaultWorkspaces()
@@ -54,10 +61,14 @@ func (s *Server) Start() error {
 	mux.HandleFunc("POST /api/sessions/{sessionId}/chat", chatH.HandleChat)
 	mux.HandleFunc("POST /api/sessions/{sessionId}/chat/stream", chatH.HandleChatStream)
 	mux.HandleFunc("POST /api/sessions/{sessionId}/chat/stop", chatH.HandleStop)
+	mux.HandleFunc("GET /api/sessions/{sessionId}/journal", chatH.GetSessionJournal)
+	mux.HandleFunc("POST /api/sessions/{sessionId}/journal/recover", chatH.RecoverSessionJournal)
 
 	// System & Health
 	mux.HandleFunc("GET /api/health", routes.HandleHealth)
 	mux.HandleFunc("GET /api/system/status", routes.HandleSystemStatus)
+	mux.HandleFunc("GET /api/system/processes", routes.HandleProcessList)
+	mux.HandleFunc("GET /api/system/logs", routes.HandleSystemLogs)
 
 	// Auth
 	mux.HandleFunc("POST /api/auth/login", auth.HandleLogin)

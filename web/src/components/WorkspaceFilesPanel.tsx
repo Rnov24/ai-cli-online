@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchFiles, downloadFile, deleteItem, touchFile, mkdirPath } from '../api/files';
 import type { FileEntry } from '../api/files';
-import { fetchFileContent } from '../api/docs';
+import { fetchFileContent, saveFileContent } from '../api/docs';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface WorkspaceFilesPanelProps {
@@ -22,6 +22,10 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
 
@@ -59,14 +63,36 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
       const fullFilePath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
       setSelectedFile(fullFilePath);
       setContentLoading(true);
+      setIsEditing(false);
       try {
         const res = await fetchFileContent(token, sessionId, fullFilePath);
-        setFileContent(res ? res.content : '');
+        const content = res ? res.content : '';
+        setFileContent(content);
+        setEditContent(content);
       } catch (err) {
-        setFileContent(`// Error reading file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        const errContent = `// Error reading file: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        setFileContent(errContent);
+        setEditContent(errContent);
       } finally {
         setContentLoading(false);
       }
+    }
+  };
+
+  const handleSaveFile = async () => {
+    if (!selectedFile) return;
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      await saveFileContent(token, sessionId, selectedFile, editContent);
+      setFileContent(editContent);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+      setIsEditing(false);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to save file');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -359,17 +385,83 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 📄 {selectedFile.split('/').pop()}
               </span>
-              <button
-                className="mecha-btn"
-                onClick={() => { setSelectedFile(null); setFileContent(null); }}
-                style={{ padding: '2px 8px', fontSize: '10px' }}
-              >
-                {isMobile ? '← Back to list' : '✕ Close'}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {isEditing ? (
+                  <>
+                    <button
+                      className="mecha-btn"
+                      onClick={handleSaveFile}
+                      disabled={isSaving}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '10px',
+                        backgroundColor: 'var(--accent-green-bright, #10b981)',
+                        color: '#000',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {isSaving ? 'Saving...' : '💾 Save'}
+                    </button>
+                    <button
+                      className="mecha-btn"
+                      onClick={() => { setEditContent(fileContent || ''); setIsEditing(false); }}
+                      style={{ padding: '2px 8px', fontSize: '10px' }}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {saveSuccess && (
+                      <span style={{ color: 'var(--accent-green-bright)', fontSize: '10px' }}>✓ Saved</span>
+                    )}
+                    <button
+                      className="mecha-btn"
+                      onClick={() => setIsEditing(true)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '10px',
+                        color: 'var(--accent-cyan-bright)',
+                      }}
+                    >
+                      ✏️ Edit
+                    </button>
+                  </>
+                )}
+                <button
+                  className="mecha-btn"
+                  onClick={() => { setSelectedFile(null); setFileContent(null); setIsEditing(false); }}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  {isMobile ? '← Back' : '✕ Close'}
+                </button>
+              </div>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px', height: 'calc(100% - 40px)' }}>
               {contentLoading ? (
                 <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Loading content...</div>
+              ) : isEditing ? (
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: '280px',
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-bright)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                    lineHeight: '1.5',
+                    padding: '8px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    resize: 'none',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
               ) : fileContent != null ? (
                 selectedFile.endsWith('.md') ? (
                   <MarkdownRenderer content={fileContent} />

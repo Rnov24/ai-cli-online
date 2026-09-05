@@ -111,3 +111,101 @@ func TestDBOperations(t *testing.T) {
 	database.Checkpoint()
 }
 
+func TestTurnJournalOperations(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ai-cli-turn-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	database, err := Open(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	sess := "session-test-journal"
+
+	// 1. Create turn entry
+	entry := TurnJournalEntry{
+		Id:             "turn-1",
+		SessionName:    sess,
+		ConversationId: "conv-1",
+		Prompt:         "Analyze repository architecture",
+		Status:         "submitted",
+	}
+	if err := database.CreateTurnJournal(entry); err != nil {
+		t.Fatalf("CreateTurnJournal failed: %v", err)
+	}
+
+	// 2. Query active turn
+	active, err := database.GetActiveTurn(sess)
+	if err != nil || active == nil {
+		t.Fatalf("GetActiveTurn failed: %v, active=%+v", err, active)
+	}
+	if active.Id != "turn-1" || active.Status != "submitted" {
+		t.Errorf("Unexpected active turn: %+v", active)
+	}
+
+	// 3. Update turn to running and completed
+	if err := database.UpdateTurnJournal("turn-1", "running", "", "", "", 0, 0); err != nil {
+		t.Fatalf("UpdateTurnJournal to running failed: %v", err)
+	}
+
+	toolCalls := `[{"id":"tool_1","name":"view_file","status":"success"}]`
+	fullResp := "Here is the repository overview."
+	if err := database.UpdateTurnJournal("turn-1", "completed", fullResp, toolCalls, "", 3.5, 120); err != nil {
+		t.Fatalf("UpdateTurnJournal to completed failed: %v", err)
+	}
+
+	// 4. Verify no active turn remains
+	activeAfterComplete, err := database.GetActiveTurn(sess)
+	if err != nil || activeAfterComplete != nil {
+		t.Errorf("Expected nil active turn, got %+v", activeAfterComplete)
+	}
+
+	// 5. Test crash / interrupted recovery
+	entry2 := TurnJournalEntry{
+		Id:             "turn-2",
+		SessionName:    sess,
+		ConversationId: "conv-1",
+		Prompt:         "Long running compilation",
+		Status:         "running",
+	}
+	if err := database.CreateTurnJournal(entry2); err != nil {
+		t.Fatalf("CreateTurnJournal 2 failed: %v", err)
+	}
+
+	aff, err := database.MarkInterruptedTurns(sess)
+	if err != nil || aff != 1 {
+		t.Fatalf("MarkInterruptedTurns failed: aff=%d, err=%v", aff, err)
+	}
+
+	// Check that turn-2 is now interrupted
+	journal, err := database.GetSessionJournal(sess)
+	if err != nil || len(journal) != 2 {
+		t.Fatalf("GetSessionJournal failed: len=%d, err=%v", len(journal), err)
+	}
+	if journal[0].Id != "turn-1" || journal[0].Status != "completed" {
+		t.Errorf("Unexpected turn 1 in journal: %+v", journal[0])
+	}
+	if journal[1].Id != "turn-2" || journal[1].Status != "interrupted" {
+		t.Errorf("Unexpected turn 2 in journal: %+v", journal[1])
+	}
+
+	// Global mark all active
+	entry3 := TurnJournalEntry{
+		Id:             "turn-3",
+		SessionName:    "other-sess",
+		ConversationId: "conv-2",
+		Prompt:         "Test restart",
+		Status:         "submitted",
+	}
+	_ = database.CreateTurnJournal(entry3)
+	allAff, err := database.MarkAllActiveTurnsInterrupted()
+	if err != nil || allAff != 1 {
+		t.Errorf("MarkAllActiveTurnsInterrupted failed: aff=%d, err=%v", allAff, err)
+	}
+}
+
+

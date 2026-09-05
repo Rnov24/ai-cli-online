@@ -29,6 +29,21 @@ type Workspace struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
+type TurnJournalEntry struct {
+	Id              string  `json:"id"`
+	SessionName     string  `json:"sessionName"`
+	ConversationId  string  `json:"conversationId"`
+	Prompt          string  `json:"prompt"`
+	Status          string  `json:"status"` // "submitted" | "running" | "completed" | "interrupted" | "error"
+	FullResponse    string  `json:"fullResponse"`
+	ToolCalls       string  `json:"toolCalls"`
+	ErrorMessage    string  `json:"errorMessage"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	TotalTokens     int     `json:"totalTokens"`
+	CreatedAt       int64   `json:"createdAt"`
+	UpdatedAt       int64   `json:"updatedAt"`
+}
+
 func Open(dataDir string) (*DB, error) {
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create data dir: %w", err)
@@ -86,10 +101,27 @@ func Open(dataDir string) (*DB, error) {
 		updated_at INTEGER NOT NULL
 	);
 
+	CREATE TABLE IF NOT EXISTS turn_journal (
+		id TEXT PRIMARY KEY,
+		session_name TEXT NOT NULL,
+		conversation_id TEXT NOT NULL DEFAULT '',
+		prompt TEXT NOT NULL,
+		status TEXT NOT NULL,
+		full_response TEXT NOT NULL DEFAULT '',
+		tool_calls TEXT NOT NULL DEFAULT '[]',
+		error_message TEXT NOT NULL DEFAULT '',
+		duration_seconds REAL NOT NULL DEFAULT 0,
+		total_tokens INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_drafts_updated_at ON drafts(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_annotations_updated_at ON annotations(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_workspaces_updated_at ON workspaces(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_workspaces_is_home ON workspaces(is_home);
+	CREATE INDEX IF NOT EXISTS idx_turn_journal_session ON turn_journal(session_name, created_at);
+	CREATE INDEX IF NOT EXISTS idx_turn_journal_status ON turn_journal(session_name, status);
 	`
 	if _, err := sqlDb.Exec(schema); err != nil {
 		sqlDb.Close()
@@ -281,3 +313,129 @@ func (d *DB) GetWorkspaceById(id string) (*Workspace, error) {
 	w.IsHome = isHomeInt == 1
 	return &w, nil
 }
+
+// --- Turn Journal Methods ---
+
+func (d *DB) CreateTurnJournal(entry TurnJournalEntry) error {
+	now := time.Now().UnixMilli()
+	if entry.CreatedAt <= 0 {
+		entry.CreatedAt = now
+	}
+	if entry.UpdatedAt <= 0 {
+		entry.UpdatedAt = now
+	}
+	if entry.ToolCalls == "" {
+		entry.ToolCalls = "[]"
+	}
+	query := `
+	INSERT INTO turn_journal (
+		id, session_name, conversation_id, prompt, status, full_response,
+		tool_calls, error_message, duration_seconds, total_tokens, created_at, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	_, err := d.db.Exec(query,
+		entry.Id, entry.SessionName, entry.ConversationId, entry.Prompt, entry.Status,
+		entry.FullResponse, entry.ToolCalls, entry.ErrorMessage, entry.DurationSeconds,
+		entry.TotalTokens, entry.CreatedAt, entry.UpdatedAt,
+	)
+	return err
+}
+
+func (d *DB) UpdateTurnJournal(id string, status string, response string, toolCalls string, errorMsg string, duration float64, tokens int) error {
+	now := time.Now().UnixMilli()
+	query := `
+	UPDATE turn_journal SET
+		status = ?,
+		full_response = CASE WHEN ? != '' THEN ? ELSE full_response END,
+		tool_calls = CASE WHEN ? != '' THEN ? ELSE tool_calls END,
+		error_message = CASE WHEN ? != '' THEN ? ELSE error_message END,
+		duration_seconds = CASE WHEN ? > 0 THEN ? ELSE duration_seconds END,
+		total_tokens = CASE WHEN ? > 0 THEN ? ELSE total_tokens END,
+		updated_at = ?
+	WHERE id = ?
+	`
+	_, err := d.db.Exec(query, status, response, response, toolCalls, toolCalls, errorMsg, errorMsg, duration, duration, tokens, tokens, now, id)
+	return err
+}
+
+func (d *DB) GetSessionJournal(sessionName string) ([]TurnJournalEntry, error) {
+	query := `
+	SELECT id, session_name, conversation_id, prompt, status, full_response,
+	       tool_calls, error_message, duration_seconds, total_tokens, created_at, updated_at
+	FROM turn_journal
+	WHERE session_name = ?
+	ORDER BY created_at ASC
+	`
+	rows, err := d.db.Query(query, sessionName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []TurnJournalEntry
+	for rows.Next() {
+		var e TurnJournalEntry
+		if err := rows.Scan(
+			&e.Id, &e.SessionName, &e.ConversationId, &e.Prompt, &e.Status,
+			&e.FullResponse, &e.ToolCalls, &e.ErrorMessage, &e.DurationSeconds,
+			&e.TotalTokens, &e.CreatedAt, &e.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+func (d *DB) GetActiveTurn(sessionName string) (*TurnJournalEntry, error) {
+	query := `
+	SELECT id, session_name, conversation_id, prompt, status, full_response,
+	       tool_calls, error_message, duration_seconds, total_tokens, created_at, updated_at
+	FROM turn_journal
+	WHERE session_name = ? AND status IN ('submitted', 'running')
+	ORDER BY created_at DESC
+	LIMIT 1
+	`
+	var e TurnJournalEntry
+	err := d.db.QueryRow(query, sessionName).Scan(
+		&e.Id, &e.SessionName, &e.ConversationId, &e.Prompt, &e.Status,
+		&e.FullResponse, &e.ToolCalls, &e.ErrorMessage, &e.DurationSeconds,
+		&e.TotalTokens, &e.CreatedAt, &e.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+func (d *DB) MarkInterruptedTurns(sessionName string) (int64, error) {
+	now := time.Now().UnixMilli()
+	query := `
+	UPDATE turn_journal
+	SET status = 'interrupted', updated_at = ?
+	WHERE session_name = ? AND status IN ('submitted', 'running')
+	`
+	res, err := d.db.Exec(query, now, sessionName)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (d *DB) MarkAllActiveTurnsInterrupted() (int64, error) {
+	now := time.Now().UnixMilli()
+	query := `
+	UPDATE turn_journal
+	SET status = 'interrupted', updated_at = ?
+	WHERE status IN ('submitted', 'running')
+	`
+	res, err := d.db.Exec(query, now)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+

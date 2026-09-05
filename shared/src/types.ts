@@ -75,10 +75,13 @@ export interface ToolCall {
 
 export interface ChatMessage {
   id: string;
+  turnId?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
   thinking?: string;
   toolCalls?: ToolCall[];
   status?: 'sending' | 'streaming' | 'done' | 'error';
+  turnStatus?: 'submitted' | 'running' | 'completed' | 'interrupted' | 'error';
+  presentationMode?: 'worklog' | 'transparent' | 'final';
 }

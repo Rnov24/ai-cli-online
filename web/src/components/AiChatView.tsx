@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { MarkdownRenderer } from './MarkdownRenderer';
-import { ThinkingBlock } from './ThinkingBlock';
-import { ToolCallCard } from './ToolCallCard';
+import { TurnAnchor, PresentationMode } from './TurnAnchor';
+import { InteractiveClarifyModal } from './InteractiveClarifyModal';
+import { SystemDiagnosticsModal } from './SystemDiagnosticsModal';
+import { fetchSessionJournal, TurnJournalItem } from '../api/journal';
+import { exportSessionToHtml } from '../utils/exportHtml';
 import { useStore } from '../store';
 import type { ChatMessage, ToolCall } from 'ai-cli-online-shared';
 import {
@@ -33,6 +35,7 @@ const SLASH_COMMANDS: SlashCommandItem[] = [
   { cmd: '/model', desc: 'Select model for current session', category: 'common' },
   { cmd: '/clear', desc: 'Purge conversation timeline and reset session', category: 'common' },
   { cmd: '/compress', desc: 'Prune and compress conversation context', category: 'common' },
+  { cmd: '/export', desc: 'Export full session to standalone offline HTML', category: 'common' },
   { cmd: '/mcp', desc: 'Inspect MCP server status and tools', category: 'common' },
   { cmd: '/plugins', desc: 'Manage Antigravity CLI plugins', category: 'common' },
 
@@ -40,6 +43,7 @@ const SLASH_COMMANDS: SlashCommandItem[] = [
   { cmd: '/schedule', desc: 'Set a timer or recurring cron schedule', category: 'assistant' },
   { cmd: '/learn', desc: 'Save behavioral learning or persistent memory', category: 'assistant' },
   { cmd: '/doctor', desc: 'Run system diagnostics and health check', category: 'assistant' },
+  { cmd: '/diagnostics', desc: 'Open System Health & Process Supervision Modal', category: 'assistant' },
   { cmd: '/browser', desc: 'Browser automation and web search', category: 'assistant' },
   { cmd: '/agents', desc: 'List and switch available agents & personas', category: 'assistant' },
 
@@ -129,6 +133,14 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const activeTabId = useStore((s) => s.activeTabId);
   const renameTab = useStore((s) => s.renameTab);
   const updateTabSessionMeta = useStore((s) => s.updateTabSessionMeta);
+  const addTab = useStore((s) => s.addTab);
+  const switchTab = useStore((s) => s.switchTab);
+
+  const [globalPresentationMode, setGlobalPresentationMode] = useState<PresentationMode>('transparent');
+  const [interruptedTurn, setInterruptedTurn] = useState<TurnJournalItem | null>(null);
+  const [activeClarifyToolCall, setActiveClarifyToolCall] = useState<ToolCall | null>(null);
+  const [pendingQueue, setPendingQueue] = useState<string[]>([]);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem(`chat-messages-${sessionId}`);
@@ -212,6 +224,60 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
     const savedConv = localStorage.getItem(`chat-conversation-${sessionId}`) || '';
     setConversationId(savedConv);
+    setInterruptedTurn(null);
+    setActiveClarifyToolCall(null);
+    const savedQueue = localStorage.getItem(`chat-pending-queue-${sessionId}`);
+    if (savedQueue) {
+      try {
+        setPendingQueue(JSON.parse(savedQueue));
+      } catch {
+        setPendingQueue([]);
+      }
+    } else {
+      setPendingQueue([]);
+    }
+
+    // Check server turn journal for crash recovery / interrupted turns
+    if (token && sessionId) {
+      fetchSessionJournal(token, sessionId)
+        .then((res) => {
+          if (res.ok && res.turns) {
+            const interrupted = res.turns.find((t) => t.status === 'interrupted');
+            if (interrupted) {
+              setInterruptedTurn(interrupted);
+            }
+            // Restore from journal if local storage is empty
+            if (!saved && res.turns.length > 0) {
+              const restored: ChatMessage[] = [];
+              res.turns.forEach((turn) => {
+                restored.push({
+                  id: `usr_${turn.id}`,
+                  role: 'user',
+                  content: turn.prompt,
+                  timestamp: turn.createdAt,
+                  status: 'done',
+                });
+                let parsedTools: ToolCall[] = [];
+                try {
+                  parsedTools = JSON.parse(turn.toolCalls);
+                } catch {}
+                restored.push({
+                  id: turn.id,
+                  turnId: turn.id,
+                  role: 'assistant',
+                  content: turn.fullResponse || (turn.status === 'interrupted' ? '> [!WARNING]\n> Turn interrupted unexpectedly.' : ''),
+                  timestamp: turn.updatedAt || turn.createdAt,
+                  status: turn.status === 'completed' ? 'done' : turn.status === 'interrupted' ? 'done' : 'error',
+                  turnStatus: turn.status,
+                  toolCalls: parsedTools,
+                });
+              });
+              setMessages(restored);
+            }
+          }
+        })
+        .catch(() => {});
+    }
 
     // Initial scroll to bottom on session load
     const timer = setTimeout(() => {
@@ -223,7 +289,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       }
     }, 40);
     return () => clearTimeout(timer);
-  }, [sessionId]);
+  }, [sessionId, token]);
 
   const scrollToBottom = useCallback((smooth = false) => {
     if (messagesEndRef.current) {
@@ -361,6 +427,84 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     setTimeout(() => setCopiedMessageId(null), 2000);
   };
 
+  const handleForkTurn = (turnMessage: ChatMessage) => {
+    const turnIdx = messages.findIndex((m) => m.id === turnMessage.id);
+    if (turnIdx < 0) return;
+    const forkedHistory = messages.slice(0, turnIdx + 1);
+    const curTab = tabs.find((t) => t.id === activeTabId || t.terminalIds.includes(sessionId));
+    const newTabName = `${curTab ? curTab.name : 'Session'} (Fork)`;
+    const newTabId = addTab(newTabName);
+    const newTab = useStore.getState().tabs.find((t) => t.id === newTabId);
+    const newSessId = newTab?.terminalIds[0] || newTabId;
+    try {
+      localStorage.setItem(`chat-messages-${newSessId}`, JSON.stringify(forkedHistory));
+    } catch {}
+    switchTab(newTabId);
+  };
+
+  const handleExportSession = () => {
+    const curTab = tabs.find((t) => t.id === activeTabId || t.terminalIds.includes(sessionId));
+    exportSessionToHtml(curTab?.name || sessionId, messages);
+  };
+
+  const handleQueue = () => {
+    const text = inputText.trim();
+    if (!text) return;
+    setPendingQueue((prev) => {
+      const next = [...prev, text];
+      try {
+        localStorage.setItem(`chat-pending-queue-${sessionId}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setInputText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.focus();
+    }
+  };
+
+  const handleRemoveQueued = (index: number) => {
+    setPendingQueue((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      try {
+        localStorage.setItem(`chat-pending-queue-${sessionId}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleClearQueue = () => {
+    setPendingQueue([]);
+    try {
+      localStorage.removeItem(`chat-pending-queue-${sessionId}`);
+    } catch {}
+  };
+
+  const handleSteer = async () => {
+    const text = inputText.trim();
+    if (!text) return;
+    setInputText('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+
+    try {
+      await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/chat/stop`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {}
+
+    setTimeout(() => {
+      handleSendMessage(`[STEER]: ${text}`);
+    }, 150);
+  };
+
   const handleStop = async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -396,6 +540,20 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       if (curTab) {
         updateTabSessionMeta(curTab.id, { messageCount: 0, sessionStatus: 'IDLE', updatedAt: Date.now() });
       }
+      return;
+    }
+
+    if (text === '/export') {
+      handleExportSession();
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    if (text === '/diagnostics' || text === '/health') {
+      setShowDiagnosticsModal(true);
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
       return;
     }
 
@@ -692,11 +850,19 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
             if (currentSessionIdRef.current !== sessionAtStart) return;
 
-            if (data.event === 'chunk' && data.delta) {
+            if (data.event === 'turn_init' && data.turn_id) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, turnId: data.turn_id, turnStatus: 'submitted' } : m,
+                ),
+              );
+            } else if (data.event === 'chunk' && data.delta) {
               setAgentState('EXECUTING');
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantId ? { ...m, content: m.content + data.delta } : m,
+                  m.id === assistantId
+                    ? { ...m, content: m.content + data.delta, turnStatus: 'running' }
+                    : m,
                 ),
               );
             } else if (data.event === 'thinking' && data.thinking) {
@@ -704,7 +870,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
-                    ? { ...m, thinking: (m.thinking || '') + data.thinking }
+                    ? { ...m, thinking: (m.thinking || '') + data.thinking, turnStatus: 'running' }
                     : m,
                 ),
               );
@@ -717,6 +883,15 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 output: data.tool_call.output,
                 status: data.tool_call.status || 'running',
               };
+
+              // Intercept clarify or approval requests
+              if (
+                (tc.name === 'ask_question' || tc.name === 'ask_permission' || tc.name.includes('permission')) &&
+                tc.status === 'running'
+              ) {
+                setActiveClarifyToolCall(tc);
+              }
+
               setMessages((prev) =>
                 prev.map((m) => {
                   if (m.id !== assistantId) return m;
@@ -725,13 +900,14 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   if (existingIndex >= 0) {
                     const updated = [...currentTools];
                     updated[existingIndex] = tc;
-                    return { ...m, toolCalls: updated };
+                    return { ...m, toolCalls: updated, turnStatus: 'running' };
                   }
-                  return { ...m, toolCalls: [...currentTools, tc] };
+                  return { ...m, toolCalls: [...currentTools, tc], turnStatus: 'running' };
                 }),
               );
             } else if (data.event === 'error') {
               setAgentState('ERROR');
+              setActiveClarifyToolCall(null);
               const errContent =
                 data.error ||
                 data.full_response ||
@@ -745,6 +921,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                           ? `${m.content}\n\n> [!CAUTION]\n> **Execution Error**: ${errContent}`
                           : `> [!CAUTION]\n> **Execution Error**: ${errContent}`,
                         status: 'done',
+                        turnStatus: 'error',
                       }
                     : m,
                 ),
@@ -757,6 +934,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               }
             } else if (data.event === 'done') {
               setAgentState('COMPLETED');
+              setActiveClarifyToolCall(null);
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
@@ -764,6 +942,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                         ...m,
                         content: data.full_response || m.content || 'Completed.',
                         status: 'done',
+                        turnStatus: 'completed',
                       }
                     : m,
                 ),
@@ -775,6 +954,21 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   updatedAt: Date.now(),
                 });
               }
+
+              // Auto-dispatch next prompt from pending queue if present
+              setPendingQueue((curQueue) => {
+                if (curQueue.length > 0) {
+                  const [nextPrompt, ...rest] = curQueue;
+                  try {
+                    localStorage.setItem(`chat-pending-queue-${sessionId}`, JSON.stringify(rest));
+                  } catch {}
+                  setTimeout(() => {
+                    handleSendMessage(nextPrompt);
+                  }, 250);
+                  return rest;
+                }
+                return curQueue;
+              });
             }
           } catch {
             // parse error on incomplete SSE chunk
@@ -950,6 +1144,59 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', flexShrink: 0 }}>
+          {/* Tri-Mode Presentation Selector */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+            {(['worklog', 'transparent', 'final'] as PresentationMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setGlobalPresentationMode(mode)}
+                title={`Switch presentation mode to ${mode}`}
+                style={{
+                  background: globalPresentationMode === mode ? 'var(--bg-tertiary)' : 'transparent',
+                  color: globalPresentationMode === mode ? 'var(--accent-cyan-bright)' : 'var(--text-muted)',
+                  border: 'none',
+                  padding: '2px 6px',
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer',
+                  fontWeight: globalPresentationMode === mode ? 700 : 400,
+                }}
+              >
+                {mode === 'worklog' ? 'LOG' : mode === 'transparent' ? 'STREAM' : 'FINAL'}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setShowDiagnosticsModal(true)}
+            title="Open System Diagnostics & Process Supervision"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            [DIAG]
+          </button>
+
+          <button
+            onClick={handleExportSession}
+            title="Export session to standalone HTML"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            [EXPORT]
+          </button>
+
           <span>EVENTS: {messages.length}</span>
           <span className="desktop-only">TOOLS: {totalToolCalls}</span>
           {totalTokens > 0 && <span className="desktop-only">TOKENS: {(totalTokens / 1000).toFixed(1)}k</span>}
@@ -1104,70 +1351,141 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             </div>
           </div>
         ) : (
-          messages.map((msg) => {
-            const isUser = msg.role === 'user';
-            const timeStr = new Date(msg.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            });
-
-            return (
+          <>
+            {/* Ticket 01: Crash Recovery Interrupted Turn Banner */}
+            {interruptedTurn && (
               <div
-                key={msg.id}
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
                   width: '100%',
                   maxWidth: 'min(100%, 960px)',
-                  margin: '0 auto',
-                  minWidth: 0,
-                  boxSizing: 'border-box',
-                  border: '1px solid var(--border)',
-                  borderRadius: '3px',
-                  backgroundColor: isUser ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
-                  overflow: 'hidden',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                }}
-              >
-                {/* Event Header Banner */}
-                <div style={{
+                  margin: '0 auto 12px auto',
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '6px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '5px 12px',
-                  backgroundColor: 'var(--bg-primary)',
-                  borderBottom: '1px solid var(--border)',
-                  fontSize: '10px',
-                  gap: '8px',
-                  minWidth: 0,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                    {isUser ? (
+                  gap: '12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ color: 'var(--accent-red, #ef4444)', fontWeight: 700 }}>⚠️ TURN INTERRUPTED</span>
+                  <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    "{interruptedTurn.prompt}"
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  <button
+                    onClick={() => {
+                      setInputText(interruptedTurn.prompt);
+                      setInterruptedTurn(null);
+                      textareaRef.current?.focus();
+                    }}
+                    style={{
+                      background: 'var(--accent-amber-bright, #f59e0b)',
+                      color: '#000',
+                      border: 'none',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '10px',
+                    }}
+                  >
+                    RETRY PROMPT
+                  </button>
+                  <button
+                    onClick={() => setInterruptedTurn(null)}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border)',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                    }}
+                  >
+                    DISMISS
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg, idx) => {
+              const isUser = msg.role === 'user';
+              if (!isUser) {
+                const turnIndex = messages.slice(0, idx + 1).filter((m) => m.role === 'assistant').length - 1;
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      width: '100%',
+                      maxWidth: 'min(100%, 960px)',
+                      margin: '0 auto 12px auto',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <TurnAnchor
+                      message={msg}
+                      turnIndex={turnIndex >= 0 ? turnIndex : 0}
+                      isStreaming={isStreaming && msg.status === 'streaming'}
+                      globalMode={globalPresentationMode}
+                      onForkTurn={handleForkTurn}
+                      onCopyContent={copyMessageContent}
+                      isCopied={copiedMessageId === msg.id}
+                    />
+                  </div>
+                );
+              }
+
+              const timeStr = new Date(msg.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              });
+
+              return (
+                <div
+                  key={msg.id}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    width: '100%',
+                    maxWidth: 'min(100%, 960px)',
+                    margin: '0 auto 12px auto',
+                    minWidth: 0,
+                    boxSizing: 'border-box',
+                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--bg-secondary)',
+                    overflow: 'hidden',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '5px 12px',
+                    backgroundColor: 'var(--bg-primary)',
+                    borderBottom: '1px solid var(--border)',
+                    fontSize: '10px',
+                    gap: '8px',
+                    minWidth: 0,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                       <span style={{ fontWeight: 700, color: 'var(--accent-amber-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         COMMAND // OPERATOR
                       </span>
-                    ) : (
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontWeight: 700,
-                        color: 'var(--accent-cyan-bright)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}>
-                        <span className="pulse-dot pulse-dot--online" style={{ flexShrink: 0 }} />
-                        AGY // AUTONOMOUS AGENT
-                      </span>
-                    )}
-                    <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>//</span>
-                    <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{timeStr}</span>
-                  </div>
+                      <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>//</span>
+                      <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{timeStr}</span>
+                    </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                    {isUser ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                       <button
                         onClick={() => {
                           setInputText(msg.content);
@@ -1185,91 +1503,28 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                       >
                         [EDIT]
                       </button>
-                    ) : (
-                      msg.content && (
-                        <button
-                          onClick={() => copyMessageContent(msg.id, msg.content)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: copiedMessageId === msg.id ? 'var(--accent-green-bright)' : 'var(--text-muted)',
-                            cursor: 'pointer',
-                            fontSize: '9px',
-                            fontFamily: 'var(--font-mono)',
-                          }}
-                        >
-                          {copiedMessageId === msg.id ? '✓ COPIED' : '[COPY]'}
-                        </button>
-                      )
-                    )}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: isMobile ? '8px 10px' : '12px 16px',
+                    fontSize: '13px',
+                    lineHeight: '1.5',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--text-bright)',
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word',
+                  }}>
+                    <span style={{ color: 'var(--accent-amber-bright)', marginRight: '6px', fontWeight: 700 }}>
+                      &gt;
+                    </span>
+                    {msg.content}
                   </div>
                 </div>
-
-                {/* Event Body Content */}
-                <div style={{
-                  padding: isMobile ? '8px 10px' : '12px 16px',
-                  fontSize: '12px',
-                  lineHeight: '1.6',
-                  color: 'var(--text-primary)',
-                  minWidth: 0,
-                  maxWidth: '100%',
-                  overflowWrap: 'anywhere',
-                  wordBreak: 'break-word',
-                  boxSizing: 'border-box',
-                }}>
-                  {/* Thinking block if available */}
-                  {msg.thinking && (
-                    <ThinkingBlock
-                      thinking={msg.thinking}
-                      isStreaming={msg.status === 'streaming'}
-                    />
-                  )}
-
-                  {/* Tool execution cards if any */}
-                  {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div style={{ margin: '6px 0 10px 0', minWidth: 0, maxWidth: '100%' }}>
-                      {msg.toolCalls.map((tc) => (
-                        <ToolCallCard key={tc.id} toolCall={tc} />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Markdown or Plain Text Content */}
-                  {isUser ? (
-                    <div style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '13px',
-                      color: 'var(--text-bright)',
-                      whiteSpace: 'pre-wrap',
-                      overflowWrap: 'anywhere',
-                      wordBreak: 'break-word',
-                      minWidth: 0,
-                    }}>
-                      <span style={{ color: 'var(--accent-amber-bright)', marginRight: '6px', fontWeight: 700 }}>
-                        &gt;
-                      </span>
-                      {msg.content}
-                    </div>
-                  ) : msg.content ? (
-                    <div style={{ minWidth: 0, maxWidth: '100%', overflowWrap: 'anywhere' }}>
-                      <MarkdownRenderer content={msg.content} />
-                    </div>
-                  ) : msg.status === 'streaming' ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      color: 'var(--accent-amber-bright)',
-                      fontSize: '11px',
-                    }}>
-                      <span className="pulse-dot pulse-dot--executing" />
-                      <span>Synthesizing response...</span>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </>
         )}
         <div ref={messagesEndRef} style={{ height: '1px', flexShrink: 0 }} />
         </div>
@@ -1551,13 +1806,118 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
           </div>
         )}
 
+        {/* Pending Intent Queue Drawer */}
+        {pendingQueue.length > 0 && (
+          <div
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderBottom: 'none',
+              borderRadius: '4px 4px 0 0',
+              padding: '6px 10px',
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--accent-amber-bright)', fontWeight: 700 }}>PENDING QUEUE</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                  ({pendingQueue.length} {pendingQueue.length === 1 ? 'prompt' : 'prompts'} queued to dispatch)
+                </span>
+              </div>
+              <button
+                onClick={handleClearQueue}
+                title="Clear all queued prompts"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '9px',
+                }}
+              >
+                [CLEAR ALL]
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '100px', overflowY: 'auto' }}>
+              {pendingQueue.map((prompt, qIdx) => (
+                <div
+                  key={qIdx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    padding: '3px 6px',
+                    backgroundColor: 'var(--bg-primary)',
+                    borderRadius: '3px',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <span style={{ color: 'var(--accent-cyan-bright)', fontSize: '10px', flexShrink: 0 }}>
+                    #{qIdx + 1}
+                  </span>
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: 'var(--text-primary)',
+                      fontSize: '11px',
+                    }}
+                  >
+                    {prompt}
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                    <button
+                      onClick={() => {
+                        setInputText(prompt);
+                        handleRemoveQueued(qIdx);
+                        textareaRef.current?.focus();
+                      }}
+                      title="Edit this prompt"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontSize: '9px',
+                      }}
+                    >
+                      [EDIT]
+                    </button>
+                    <button
+                      onClick={() => handleRemoveQueued(qIdx)}
+                      title="Remove from queue"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent-red)',
+                        cursor: 'pointer',
+                        fontSize: '10px',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Command Console Dock Box */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: 'var(--bg-primary)',
           border: '1px solid var(--border)',
-          borderRadius: '3px',
+          borderRadius: pendingQueue.length > 0 ? '0 0 3px 3px' : '3px',
           padding: '8px 10px',
           paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
           maxWidth: '100%',
@@ -1667,22 +2027,64 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
               {isStreaming ? (
-                <button
-                  className="mecha-btn mecha-btn--danger"
-                  onClick={handleStop}
-                  style={{
-                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                    borderColor: 'var(--accent-red)',
-                    color: 'var(--accent-red)',
-                    padding: '5px 12px',
-                    minHeight: '30px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    fontSize: '11px',
-                  }}
-                >
-                  ■ ABORT
-                </button>
+                <>
+                  {inputText.trim() && (
+                    <>
+                      <button
+                        type="button"
+                        className="mecha-btn"
+                        onClick={handleQueue}
+                        title="Add prompt to pending queue"
+                        style={{
+                          backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                          borderColor: 'var(--accent-amber)',
+                          color: 'var(--accent-amber-bright)',
+                          padding: '5px 10px',
+                          minHeight: '30px',
+                          fontSize: '11px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        + QUEUE
+                      </button>
+                      <button
+                        type="button"
+                        className="mecha-btn"
+                        onClick={handleSteer}
+                        title="Steer agent mid-flight with this guidance"
+                        style={{
+                          backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                          borderColor: 'var(--accent-cyan)',
+                          color: 'var(--accent-cyan-bright)',
+                          padding: '5px 10px',
+                          minHeight: '30px',
+                          fontSize: '11px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        ⚡ STEER
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="mecha-btn mecha-btn--danger"
+                    onClick={handleStop}
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                      borderColor: 'var(--accent-red)',
+                      color: 'var(--accent-red)',
+                      padding: '5px 12px',
+                      minHeight: '30px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      fontSize: '11px',
+                    }}
+                  >
+                    ■ ABORT
+                  </button>
+                </>
               ) : (
                 <button
                   className="mecha-btn mecha-btn--primary"
@@ -1705,6 +2107,25 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
           </div>
         </div>
       </div>
+
+      {/* Interactive Tool Clarify / Approval Dialog */}
+      {activeClarifyToolCall && (
+        <InteractiveClarifyModal
+          toolCall={activeClarifyToolCall}
+          onSubmit={(response) => {
+            setActiveClarifyToolCall(null);
+            handleSendMessage(response);
+          }}
+          onDismiss={() => setActiveClarifyToolCall(null)}
+        />
+      )}
+
+      {/* System Health Diagnostics & Process Supervision Modal */}
+      <SystemDiagnosticsModal
+        token={token}
+        isOpen={showDiagnosticsModal}
+        onClose={() => setShowDiagnosticsModal(false)}
+      />
     </div>
   );
 }
