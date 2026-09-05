@@ -1,4 +1,13 @@
 import { useStore } from '../store';
+import {
+  TaskPulseIcon,
+  FolderIcon,
+  GitBranchIcon,
+  SettingsIcon,
+  HelpIcon,
+  LogoutIcon,
+  CloseIcon,
+} from './icons';
 
 interface NavigationRailProps {
   expanded: boolean;
@@ -98,7 +107,7 @@ export function NavigationRail({
                 justifyContent: 'center',
               }}
             >
-              ✕
+              <CloseIcon size={14} />
             </button>
           ) : (
             <button
@@ -241,7 +250,7 @@ export function NavigationRail({
               transition: 'all 0.15s ease',
             }}
           >
-            <span style={{ fontSize: '13px' }}>⌁</span>
+            <TaskPulseIcon size={14} />
             {isExpanded && (
               <span style={{ fontSize: '11px', fontWeight: 600 }}>TASKS &amp; PLAN</span>
             )}
@@ -268,7 +277,7 @@ export function NavigationRail({
               transition: 'all 0.15s ease',
             }}
           >
-            <span style={{ fontSize: '13px' }}>◇</span>
+            <FolderIcon size={14} />
             {isExpanded && (
               <span style={{ fontSize: '11px', fontWeight: 600 }}>FILES</span>
             )}
@@ -295,7 +304,7 @@ export function NavigationRail({
               transition: 'all 0.15s ease',
             }}
           >
-            <span style={{ fontSize: '13px' }}>🌿</span>
+            <GitBranchIcon size={14} />
             {isExpanded && (
               <span style={{ fontSize: '11px', fontWeight: 600 }}>GIT GRAPH</span>
             )}
@@ -341,7 +350,7 @@ export function NavigationRail({
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{ fontSize: '12px' }}>⚙</span>
+          <SettingsIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px' }}>SETTINGS</span>}
         </button>
 
@@ -370,7 +379,7 @@ export function NavigationRail({
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{ fontSize: '13px', fontWeight: 700 }}>?</span>
+          <HelpIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px', fontWeight: 600 }}>HELP &amp; GUIDE</span>}
         </button>
 
@@ -397,7 +406,7 @@ export function NavigationRail({
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{ fontSize: '12px' }}>⎋</span>
+          <LogoutIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px' }}>LOGOUT</span>}
         </button>
       </div>
