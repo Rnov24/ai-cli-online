@@ -45,7 +45,11 @@ func (c *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		http.Error(w, `{"error":"Execution failed"}`, http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"error": err.Error(),
+		})
 		return
 	}
 
@@ -87,7 +91,7 @@ func (c *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 
 	cwd := tmux.GetCwd(sessionName, c.auth.cfg.DefaultWorkingDir)
 
-	_, _, _ = agy.RunPromptStream(
+	_, _, err := agy.RunPromptStream(
 		r.Context(),
 		sessionName,
 		cwd,
@@ -101,6 +105,18 @@ func (c *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 			}
 		},
 	)
+	if err != nil {
+		errEvt := agy.StreamEvent{
+			Event:        "error",
+			Status:       "error",
+			Error:        err.Error(),
+			FullResponse: fmt.Sprintf("AGY execution error: %v", err),
+		}
+		if b, mErr := json.Marshal(errEvt); mErr == nil {
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", b)
+			flusher.Flush()
+		}
+	}
 }
 
 func (c *ChatHandler) HandleStop(w http.ResponseWriter, r *http.Request) {

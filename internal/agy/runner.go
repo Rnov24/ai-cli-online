@@ -2,15 +2,20 @@ package agy
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
 type StreamEvent struct {
 	Event        string          `json:"event"`
+	Error        string          `json:"error,omitempty"`
 	StepIndex    int             `json:"step_index,omitempty"`
 	Delta        string          `json:"delta,omitempty"`
 	Thinking     string          `json:"thinking,omitempty"`
@@ -61,6 +66,34 @@ func StopSession(sessionId string) {
 	}
 }
 
+// ResolveAgyBinary locates the agy executable across PATH and known user install paths.
+func ResolveAgyBinary() string {
+	if p, err := exec.LookPath("agy"); err == nil {
+		return p
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates := []string{
+			filepath.Join(home, "AppData", "Local", "agy", "bin", "agy.exe"),
+			filepath.Join(home, ".local", "bin", "agy"),
+			filepath.Join(home, "bin", "agy"),
+			filepath.Join(home, "go", "bin", "agy"),
+			filepath.Join(home, "go", "bin", "agy.exe"),
+		}
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				return c
+			}
+		}
+	}
+	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {
+		p := filepath.Join(localApp, "agy", "bin", "agy.exe")
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "agy"
+}
+
 func RunPromptStream(
 	ctx context.Context,
 	sessionId string,
@@ -82,14 +115,18 @@ func RunPromptStream(
 
 	if conversationId != "" {
 		args = append(args, "--conversation", conversationId)
-	} else {
-		args = append(args, "-c")
 	}
 
-	cmd := exec.CommandContext(runCtx, "agy", args...)
+	agyBin := ResolveAgyBinary()
+	cmd := exec.CommandContext(runCtx, agyBin, args...)
 	if workingDir != "" {
 		cmd.Dir = workingDir
 	}
+
+	cmd.Stdin = strings.NewReader("")
+
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -97,7 +134,7 @@ func RunPromptStream(
 	}
 
 	if err := cmd.Start(); err != nil {
-		return "", "", fmt.Errorf("failed to start agy: %w", err)
+		return "", "", fmt.Errorf("failed to start agy (%s): %w", agyBin, err)
 	}
 
 	activeMu.Lock()
@@ -250,7 +287,24 @@ func RunPromptStream(
 		}
 	}
 
-	_ = cmd.Wait()
+	waitErr := cmd.Wait()
+	if waitErr != nil {
+		stderrStr := strings.TrimSpace(stderrBuf.String())
+		errMsg := waitErr.Error()
+		if stderrStr != "" {
+			errMsg = fmt.Sprintf("%s: %s", errMsg, stderrStr)
+		}
+		if fullResponse == "" {
+			onEvent(StreamEvent{
+				Event:        "error",
+				Status:       "error",
+				Error:        errMsg,
+				FullResponse: errMsg,
+				Conversation: finalConvId,
+			})
+			return "", finalConvId, fmt.Errorf("agy execution failed: %s", errMsg)
+		}
+	}
 
 	if fullResponse == "" {
 		fullResponse = "Completed."

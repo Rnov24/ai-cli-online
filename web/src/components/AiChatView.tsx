@@ -645,7 +645,14 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       });
 
       if (!res.ok || !res.body) {
-        throw new Error(`HTTP ${res.status}`);
+        let errDetail = `HTTP ${res.status}`;
+        try {
+          const errJson = await res.json();
+          if (errJson.error) errDetail = `${errDetail}: ${errJson.error}`;
+        } catch {
+          // ignore json parse error
+        }
+        throw new Error(errDetail);
       }
 
       const reader = res.body.getReader();
@@ -723,6 +730,31 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   return { ...m, toolCalls: [...currentTools, tc] };
                 }),
               );
+            } else if (data.event === 'error') {
+              setAgentState('ERROR');
+              const errContent =
+                data.error ||
+                data.full_response ||
+                'An error occurred during AGY execution.';
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        content: m.content
+                          ? `${m.content}\n\n> [!CAUTION]\n> **Execution Error**: ${errContent}`
+                          : `> [!CAUTION]\n> **Execution Error**: ${errContent}`,
+                        status: 'done',
+                      }
+                    : m,
+                ),
+              );
+              if (curTab) {
+                updateTabSessionMeta(curTab.id, {
+                  sessionStatus: 'ERROR',
+                  updatedAt: Date.now(),
+                });
+              }
             } else if (data.event === 'done') {
               setAgentState('COMPLETED');
               setMessages((prev) =>
@@ -751,6 +783,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       }
     } catch (err: unknown) {
       if ((err as Error).name !== 'AbortError') {
+        const errorMsg = (err as Error).message || 'Failed to connect to AGY service.';
         setAgentState('ERROR');
         setMessages((prev) =>
           prev.map((m) =>
@@ -759,7 +792,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   ...m,
                   content:
                     m.content ||
-                    `> [!WARNING]\n> Request dispatched to session. Monitor Plan and Git timeline for background updates.`,
+                    `> [!CAUTION]\n> **Chat Stream Error**: ${errorMsg}\n>\n> Unable to stream response from AGY CLI. Please verify that the server is running and \`agy\` is accessible.`,
                   status: 'done',
                 }
               : m,
