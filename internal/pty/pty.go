@@ -61,6 +61,47 @@ func Start(sessionName string, cols, rows int) (*Session, error) {
 	}, nil
 }
 
+func resolveDefaultShell() string {
+	if shell := os.Getenv("SHELL"); shell != "" {
+		if _, err := exec.LookPath(shell); err == nil {
+			return shell
+		}
+	}
+	for _, candidate := range []string{"/system/bin/sh", "/bin/bash", "/bin/sh", "sh"} {
+		if p, err := exec.LookPath(candidate); err == nil {
+			return p
+		}
+	}
+	return "sh"
+}
+
+func StartDirect(cwd string, cols, rows int, customCmd string) (*Session, error) {
+	shell := resolveDefaultShell()
+	var c *exec.Cmd
+	if customCmd != "" {
+		c = exec.Command(shell, "-c", customCmd)
+	} else {
+		c = exec.Command(shell)
+	}
+	if cwd != "" {
+		c.Dir = cwd
+	}
+	c.Env = sanitizedEnv()
+
+	ptmx, err := pty.StartWithSize(c, &pty.Winsize{
+		Rows: uint16(rows),
+		Cols: uint16(cols),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start direct pty: %w", err)
+	}
+
+	return &Session{
+		ptmx: ptmx,
+		cmd:  c,
+	}, nil
+}
+
 func (s *Session) Read(p []byte) (int, error) {
 	return s.ptmx.Read(p)
 }

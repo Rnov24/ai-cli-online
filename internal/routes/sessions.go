@@ -3,6 +3,8 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/huacheng/ai-cli-online/internal/db"
 	"github.com/huacheng/ai-cli-online/internal/tmux"
@@ -29,6 +31,33 @@ func (s *SessionHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	token := s.auth.ExtractToken(r)
 	if token == "" {
 		token = "default"
+	}
+
+	if !tmux.IsTmuxAvailable() {
+		activeNames := ws.GetHub().ActiveSessionNames()
+		prefix := tmux.TokenToSessionName(token) + "-"
+		sessions := make([]tmux.SessionInfo, 0, len(activeNames))
+		for sName := range activeNames {
+			if prefix != "" && !strings.HasPrefix(sName, prefix) {
+				continue
+			}
+			sId := sName
+			if prefix != "" {
+				sId = strings.TrimPrefix(sName, prefix)
+			}
+			sessions = append(sessions, tmux.SessionInfo{
+				SessionName: sName,
+				SessionId:   sId,
+				Connected:   true,
+				Cwd:         s.auth.cfg.DefaultWorkingDir,
+			})
+		}
+		sort.Slice(sessions, func(i, j int) bool {
+			return sessions[i].SessionId < sessions[j].SessionId
+		})
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(sessions)
+		return
 	}
 
 	sessions, err := tmux.ListSessions(token)

@@ -189,36 +189,54 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			_ = old.Close(websocket.StatusCode(4002), "Replaced by new connection")
 		}
 
-		resumed := tmux.HasSession(sessionName)
 		cwd := clientCwd
 		if cwd == "" {
 			cwd = h.cfg.DefaultWorkingDir
 		}
 
-		if !resumed {
-			if err := tmux.CreateSession(sessionName, cols, rows, cwd, h.cfg.StartCommand); err != nil {
-				log.Printf("[ws] Failed to create tmux session %s: %v", sessionName, err)
-				_ = conn.Close(websocket.StatusCode(4003), "Failed to create session")
+		var ps *pty.Session
+		hasTmux := tmux.IsTmuxAvailable()
+		if hasTmux {
+			resumed := tmux.HasSession(sessionName)
+			if !resumed {
+				if err := tmux.CreateSession(sessionName, cols, rows, cwd, h.cfg.StartCommand); err != nil {
+					log.Printf("[ws] Failed to create tmux session %s: %v", sessionName, err)
+					_ = conn.Close(websocket.StatusCode(4003), "Failed to create session")
+					return err
+				}
+			} else {
+				tmux.ResizeSession(sessionName, cols, rows)
+				scrollback := tmux.CaptureScrollback(sessionName)
+				tmux.ConfigureSession(sessionName)
+				if scrollback != "" {
+					_ = sendBinary(BinTypeScrollback, []byte(scrollback))
+				}
+			}
+
+			sendJSON(serverMessage{Type: "connected", Resumed: resumed})
+
+			// Spawn PTY attached to tmux
+			var err error
+			ps, err = pty.Start(sessionName, cols, rows)
+			if err != nil {
+				log.Printf("[ws] Failed to start pty for session %s: %v", sessionName, err)
+				sendJSON(serverMessage{Type: "error", Error: "Failed to attach terminal"})
+				_ = conn.Close(websocket.StatusCode(4003), "PTY attach failed")
 				return err
 			}
 		} else {
-			tmux.ResizeSession(sessionName, cols, rows)
-			scrollback := tmux.CaptureScrollback(sessionName)
-			tmux.ConfigureSession(sessionName)
-			if scrollback != "" {
-				_ = sendBinary(BinTypeScrollback, []byte(scrollback))
+			sendJSON(serverMessage{Type: "connected", Resumed: false})
+
+			var err error
+			ps, err = pty.StartDirect(cwd, cols, rows, h.cfg.StartCommand)
+			if err != nil {
+				log.Printf("[ws] Failed to start direct pty for session %s: %v", sessionName, err)
+				sendJSON(serverMessage{Type: "error", Error: "Failed to attach terminal"})
+				_ = conn.Close(websocket.StatusCode(4003), "PTY attach failed")
+				return err
 			}
-		}
 
-		sendJSON(serverMessage{Type: "connected", Resumed: resumed})
-
-		// Spawn PTY attached to tmux
-		ps, err := pty.Start(sessionName, cols, rows)
-		if err != nil {
-			log.Printf("[ws] Failed to start pty for session %s: %v", sessionName, err)
-			sendJSON(serverMessage{Type: "error", Error: "Failed to attach terminal"})
-			_ = conn.Close(websocket.StatusCode(4003), "PTY attach failed")
-			return err
+			_ = sendBinary(BinTypeOutput, []byte("\r\n[AGY Online] Running in direct PTY mode (tmux not installed)\r\n\r\n"))
 		}
 
 		ptyMu.Lock()
