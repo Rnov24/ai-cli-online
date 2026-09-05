@@ -30,8 +30,11 @@ LOG_DIR="${HOME}/.ai-cli-online/logs"
 RUN_DIR="${HOME}/.ai-cli-online/run"
 mkdir -p "$LOG_DIR" "$RUN_DIR"
 
-NODE_BIN="$(which node 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/node")"
-CLI_BIN="${ROOT_DIR}/bin/ai-cli-online.mjs"
+CLI_BIN="${ROOT_DIR}/bin/ai-cli-online"
+if [[ ! -x "${CLI_BIN}" ]]; then
+  echo "Building AGY Online Go binary..."
+  (cd "$ROOT_DIR" && go build -o bin/ai-cli-online ./cmd/ai-cli-online)
+fi
 
 echo "Configuring boot script at: ${BOOT_SCRIPT}"
 
@@ -50,7 +53,6 @@ fi
 export PREFIX="/data/data/com.termux/files/usr"
 export HOME="/data/data/com.termux/files/home"
 export PATH="${HOME}/.gemini/antigravity-cli/bin:${PREFIX}/bin:${PATH}"
-export NODE_OPTIONS="--expose-gc --max-old-space-size=256"
 
 ROOT_DIR="__ROOT_DIR__"
 BOOT_LOG="${HOME}/.ai-cli-online/logs/boot.log"
@@ -62,7 +64,12 @@ sleep 3
 
 # 4. Start AGY Online in background daemon mode
 cd "$ROOT_DIR"
-./bin/ai-cli-online start -d >> "$BOOT_LOG" 2>&1
+if [[ -x "./bin/ai-cli-online" ]]; then
+  ./bin/ai-cli-online start -d >> "$BOOT_LOG" 2>&1
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ./bin/ai-cli-online not found or not executable" >> "$BOOT_LOG"
+  exit 1
+fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] AGY Online boot script finished." >> "$BOOT_LOG"
 BOOT_EOF
@@ -79,6 +86,24 @@ echo " 1. Install 'Termux:Boot' APK (from F-Droid or GitHub releases)."
 echo " 2. Open the Termux:Boot app ONCE to allow it to receive boot permissions."
 echo " 3. Disable battery optimization for both Termux and Termux:Boot in Android settings."
 echo ""
+echo "Note: Termux:Boot runs completely headlessly in the background without launching the Termux terminal UI."
+echo ""
+
+# Android 12+ Phantom Process Killer Notice
+if command -v getprop >/dev/null 2>&1; then
+  ANDROID_VER="$(getprop ro.build.version.release 2>/dev/null || true)"
+  ANDROID_MAJOR="${ANDROID_VER%%.*}"
+  if [[ -n "$ANDROID_MAJOR" ]] && [[ "$ANDROID_MAJOR" =~ ^[0-9]+$ ]] && [[ "$ANDROID_MAJOR" -ge 12 ]]; then
+    echo "Android 12+ Phantom Process Killer Notice (Detected Android ${ANDROID_VER}):"
+    echo "  Android 12+ limits background child processes to 32 and may terminate AGY Online / tmux."
+    echo "  To disable the Phantom Process Killer, run via ADB from your PC/Mac:"
+    echo '    adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"'
+    echo "  Or:"
+    echo '    adb shell "settings put global settings_enable_monitor_phantom_procs false"'
+    echo ""
+  fi
+fi
+
 echo "Test now manually by running:"
 echo "  bash $BOOT_SCRIPT"
 echo "Or check status with:"

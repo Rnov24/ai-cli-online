@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -293,10 +294,16 @@ func runInstallBoot() {
 
 	self, _ := os.Executable()
 	content := fmt.Sprintf(`#!/data/data/com.termux/files/usr/bin/bash
+# ==============================================================================
+# AGY Online Auto-Start on Android Boot (Termux:Boot)
+# ==============================================================================
+
+# 1. Acquire wake-lock to prevent CPU sleep when screen is off
 if command -v termux-wake-lock >/dev/null 2>&1; then
   termux-wake-lock
 fi
 
+# 2. Environment paths
 export PREFIX="/data/data/com.termux/files/usr"
 export HOME="/data/data/com.termux/files/home"
 export PATH="${HOME}/.gemini/antigravity-cli/bin:${PREFIX}/bin:${PATH}"
@@ -305,8 +312,18 @@ BOOT_LOG="${HOME}/.ai-cli-online/logs/boot.log"
 mkdir -p "${HOME}/.ai-cli-online/logs"
 echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] Device booted. Starting AGY Online..." >> "$BOOT_LOG"
 
+# 3. Validate executable
+CLI_BIN="%s"
+if [[ ! -x "$CLI_BIN" ]]; then
+  echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] ERROR: $CLI_BIN is not executable" >> "$BOOT_LOG"
+  exit 1
+fi
+
+# 4. Wait 3 seconds for network interfaces to initialize
 sleep 3
-%s start -d >> "$BOOT_LOG" 2>&1
+
+# 5. Start AGY Online in background daemon mode
+"$CLI_BIN" start -d >> "$BOOT_LOG" 2>&1
 echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] AGY Online boot script finished." >> "$BOOT_LOG"
 `, self)
 
@@ -316,5 +333,35 @@ echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] AGY Online boot script finished." >> 
 	}
 
 	fmt.Println("✔ Termux:Boot script successfully installed to:", bootScript)
-	fmt.Println("Requires 'Termux:Boot' APK installed and opened once.")
+	fmt.Println()
+	fmt.Println("Requirements for automatic startup on Android boot:")
+	fmt.Println(" 1. Install 'Termux:Boot' APK (from F-Droid or GitHub releases).")
+	fmt.Println(" 2. Open the Termux:Boot app ONCE to allow it to receive boot permissions.")
+	fmt.Println(" 3. Disable battery optimization for both Termux and Termux:Boot in Android settings.")
+	fmt.Println()
+	fmt.Println("Note: Termux:Boot runs completely headlessly in the background without launching the Termux terminal UI.")
+	fmt.Println()
+
+	// Android 12+ Phantom Process Killer Notice
+	androidVer := ""
+	if out, err := exec.Command("getprop", "ro.build.version.release").Output(); err == nil {
+		androidVer = strings.TrimSpace(string(out))
+	}
+	major := 0
+	if androidVer != "" {
+		parts := strings.Split(androidVer, ".")
+		major, _ = strconv.Atoi(parts[0])
+	}
+	if major >= 12 || androidVer == "" {
+		fmt.Println("Android 12+ Phantom Process Killer Notice:")
+		if androidVer != "" {
+			fmt.Printf("  Detected Android %s.\n", androidVer)
+		}
+		fmt.Println("  Android 12+ limits background child processes to 32 and may terminate AGY Online / tmux.")
+		fmt.Println("  To disable the Phantom Process Killer, run via ADB from your PC/Mac:")
+		fmt.Println(`    adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`)
+		fmt.Println("  Or:")
+		fmt.Println(`    adb shell "settings put global settings_enable_monitor_phantom_procs false"`)
+		fmt.Println()
+	}
 }
