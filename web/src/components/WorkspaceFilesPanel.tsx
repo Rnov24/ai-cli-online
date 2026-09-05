@@ -3,6 +3,7 @@ import { fetchFiles, downloadFile, deleteItem, touchFile, mkdirPath } from '../a
 import type { FileEntry } from '../api/files';
 import { fetchFileContent, saveFileContent } from '../api/docs';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { FolderIcon, FileIcon, SaveIcon, CheckIcon, EditIcon, CloseIcon } from './icons';
 
 interface WorkspaceFilesPanelProps {
   sessionId: string;
@@ -198,8 +199,11 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
           }}>
-            📁 /{currentPath}
+            <FolderIcon size={13} color="var(--accent-blue)" /> /{currentPath}
           </span>
         </div>
 
@@ -297,7 +301,7 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                    <span>{entry.type === 'directory' ? '📁' : '📄'}</span>
+                    <span>{entry.type === 'directory' ? <FolderIcon size={13} color="var(--accent-blue)" /> : <FileIcon size={13} />}</span>
                     <span style={{
                       color: entry.type === 'directory' ? 'var(--accent-blue)' : 'var(--text-bright)',
                       fontWeight: entry.type === 'directory' ? 600 : 400,
@@ -400,7 +404,7 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                         fontWeight: 700,
                       }}
                     >
-                      {isSaving ? 'Saving...' : '💾 Save'}
+                      {isSaving ? 'Saving...' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><SaveIcon size={11} /> Save</span>}
                     </button>
                     <button
                       className="mecha-btn"
@@ -413,7 +417,9 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                 ) : (
                   <>
                     {saveSuccess && (
-                      <span style={{ color: 'var(--accent-green-bright)', fontSize: '10px' }}>✓ Saved</span>
+                      <span style={{ color: 'var(--accent-green-bright)', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <CheckIcon size={11} /> Saved
+                      </span>
                     )}
                     <button
                       className="mecha-btn"
@@ -424,7 +430,9 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                         color: 'var(--accent-cyan-bright)',
                       }}
                     >
-                      ✏️ Edit
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <EditIcon size={11} /> Edit
+                      </span>
                     </button>
                   </>
                 )}
@@ -433,7 +441,7 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                   onClick={() => { setSelectedFile(null); setFileContent(null); setIsEditing(false); }}
                   style={{ padding: '2px 8px', fontSize: '10px' }}
                 >
-                  {isMobile ? '← Back' : '✕ Close'}
+                  {isMobile ? '← Back' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><CloseIcon size={11} /> Close</span>}
                 </button>
               </div>
             </div>

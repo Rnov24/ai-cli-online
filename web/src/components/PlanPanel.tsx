@@ -9,6 +9,7 @@ import type { FileEntry } from '../api/files';
 import { fetchFileContent } from '../api/docs';
 import { fetchWorkspaceMode } from '../api/workspaces';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
+import { FolderIcon, EditIcon, ClipboardIcon } from './icons';
 
 interface PlanPanelProps {
   sessionId: string;
@@ -462,7 +463,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
               borderColor: mobileView === 'browser' ? 'var(--accent-amber)' : 'transparent',
             }}
           >
-            📁 Files {planSelectedFile ? `(${planSelectedFile.split('/').pop()})` : ''}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <FolderIcon size={12} /> Files {planSelectedFile ? `(${planSelectedFile.split('/').pop()})` : ''}
+            </span>
           </button>
           <button
             className="mecha-btn"
@@ -478,7 +481,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
               opacity: planSelectedFile ? 1 : 0.4,
             }}
           >
-            ✏️ Document
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <EditIcon size={12} /> Document
+            </span>
           </button>
         </div>
       )}
@@ -535,7 +540,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
                   fontSize: '20px',
                   marginBottom: '2px',
                 }}>
-                  📋
+                  <ClipboardIcon size={24} color="var(--accent-amber-bright)" />
                 </div>
                 <span style={{ color: 'var(--text-bright)', fontSize: 14, fontWeight: 700 }}>
                   {isHome ? 'AiTasks/ Not Found in Home Directory' : 'AiTasks/ directory not found'}
@@ -597,7 +602,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
                     onClick={() => setMobileView('browser')}
                     style={{ padding: '6px 14px', fontSize: '11px', marginTop: '8px' }}
                   >
-                    📁 Browse Files
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <FolderIcon size={12} /> Browse Files
+                    </span>
                   </button>
                 )}
               </div>

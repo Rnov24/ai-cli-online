@@ -9,6 +9,7 @@ import { usePanelResize } from '../hooks/usePanelResize';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 import { TaskPipelineBar } from './TaskPipelineBar';
 import { WorkspaceFilesPanel } from './WorkspaceFilesPanel';
+import { FolderIcon, TaskPulseIcon, GitBranchIcon, CloseIcon } from './icons';
 
 import type { TerminalInstance } from '../types';
 
@@ -16,6 +17,41 @@ interface TerminalPaneProps {
   terminal: TerminalInstance;
   canClose: boolean;
 }
+
+// Ensure localStorage has a working fallback in test/jsdom/opaque-origin environments under Node 22+
+try {
+  let hasWorkingStorage = false;
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+      localStorage.getItem('__test__');
+      hasWorkingStorage = true;
+    }
+  } catch {
+    hasWorkingStorage = false;
+  }
+
+  if (!hasWorkingStorage) {
+    const map = new Map<string, string>();
+    const memStorage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, val: string) => { map.set(key, String(val)); },
+      removeItem: (key: string) => { map.delete(key); },
+      clear: () => { map.clear(); },
+      get length() { return map.size; },
+      key: (i: number) => Array.from(map.keys())[i] ?? null,
+    };
+    if (typeof globalThis !== 'undefined') {
+      try {
+        Object.defineProperty(globalThis, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        Object.defineProperty(window, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+  }
+} catch {}
 
 export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: TerminalPaneProps) {
   const splitTerminal = useStore((s) => s.splitTerminal);
@@ -27,6 +63,10 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+  const [containerWidth, setContainerWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') return window.innerWidth;
+    return 1024;
+  });
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -37,6 +77,44 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
   const outerRef = useRef<HTMLDivElement>(null);
   const topRowRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const container = topRowRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      if (topRowRef.current) {
+        const measured = topRowRef.current.clientWidth;
+        if (measured > 0) {
+          setContainerWidth(measured);
+        } else if (typeof window !== 'undefined' && window.innerWidth > 0) {
+          setContainerWidth(window.innerWidth);
+        }
+      }
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.contentRect && typeof entry.contentRect.width === 'number') {
+            setContainerWidth(entry.contentRect.width);
+          } else if (entry.target) {
+            const w = (entry.target as HTMLElement).clientWidth;
+            if (w > 0) setContainerWidth(w);
+          }
+        }
+      });
+      observer.observe(container);
+      return () => observer.disconnect();
+    } else {
+      window.addEventListener('resize', updateWidth);
+      return () => window.removeEventListener('resize', updateWidth);
+    }
+  }, []);
+
+  const isStackedOverlay = isMobile || (containerWidth > 0 && containerWidth < 560);
 
   // Panel resize hook
   const [planWidthPercent, handlePlanDividerMouseDown] = usePanelResize(
@@ -175,7 +253,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
             aria-label="Toggle Files Explorer"
             style={{ padding: '2px 6px', fontSize: '10px' }}
           >
-            <span>◇</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Files</span>
+            <FolderIcon size={12} /><span className="desktop-only" style={{ marginLeft: '3px' }}>Files</span>
           </button>
           <button
             className={`mecha-btn${planOpen ? ' mecha-btn--active' : ''}`}
@@ -184,7 +262,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
             aria-label="Toggle Task annotation panel"
             style={{ padding: '2px 6px', fontSize: '10px' }}
           >
-            <span>⌁</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Tasks</span>
+            <TaskPulseIcon size={12} /><span className="desktop-only" style={{ marginLeft: '3px' }}>Tasks</span>
           </button>
           <button
             className={`mecha-btn${gitHistoryOpen ? ' mecha-btn--active' : ''}`}
@@ -193,7 +271,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
             aria-label="Toggle Git history panel"
             style={{ padding: '2px 6px', fontSize: '10px' }}
           >
-            <span>🌿</span><span className="desktop-only" style={{ marginLeft: '3px' }}>Git</span>
+            <GitBranchIcon size={12} /><span className="desktop-only" style={{ marginLeft: '3px' }}>Git</span>
           </button>
           <button
             className="mecha-btn desktop-only"
@@ -221,7 +299,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
               aria-label="Close pane"
               style={{ padding: '2px 5px', fontSize: '10px' }}
             >
-              ✕
+              <CloseIcon size={12} />
             </button>
           )}
         </div>
@@ -229,8 +307,8 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
 
       {/* Main area: Files/Plan/Git (left/overlay) | Native AI Command Stream (center/right) */}
       <div ref={topRowRef} style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden', minHeight: 0, position: 'relative' }}>
-        {/* Mobile Overlay for Secondary Panels */}
-        {isMobile && (filesOpen || planOpen || gitHistoryOpen) && (
+        {/* Mobile / Narrow Container Overlay for Secondary Panels */}
+        {isStackedOverlay && (filesOpen || planOpen || gitHistoryOpen) && (
           <div style={{
             position: 'absolute',
             inset: 0,
@@ -264,7 +342,9 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
                 style={{ padding: '4px 10px', fontSize: '11px', minHeight: '28px' }}
                 aria-label="Close panel"
               >
-                ✕ CLOSE
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                  <CloseIcon size={12} /> CLOSE
+                </span>
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -293,7 +373,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
         )}
 
         {/* Desktop Split for Secondary Panels */}
-        {!isMobile && (filesOpen || planOpen || gitHistoryOpen) && (
+        {!isStackedOverlay && (filesOpen || planOpen || gitHistoryOpen) && (
           <>
             <div style={{ width: `${planWidthPercent}%`, minWidth: 220, flexShrink: 0, overflow: 'hidden' }}>
               {filesOpen && (
