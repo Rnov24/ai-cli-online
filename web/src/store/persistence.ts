@@ -5,7 +5,7 @@ import type {
   PersistedTabsState,
   ServerSession,
 } from '../types';
-import { API_BASE, authHeaders } from '../api/client';
+import { sessionsApi } from '../api/apiClient';
 import { fetchTabsLayout, saveTabsLayout, saveTabsLayoutBeacon } from '../api/tabs';
 import type { AppState, PersistableFields } from './types';
 import { removeLeafFromTree } from './helpers';
@@ -238,9 +238,7 @@ export async function restoreFromServer(
   try {
     const [serverLayout, sessionsRes] = await Promise.all([
       fetchTabsLayout(token),
-      fetch(`${API_BASE}/api/sessions`, { headers: authHeaders(token) })
-        .then((r) => (r.ok ? (r.json() as Promise<ServerSession[]>) : []))
-        .catch(() => [] as ServerSession[]),
+      sessionsApi.list<ServerSession[]>(token).catch(() => [] as ServerSession[]),
     ]);
 
     if (getState().token !== token) return;

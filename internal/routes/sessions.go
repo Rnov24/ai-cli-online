@@ -3,11 +3,9 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
-	"strings"
 
 	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 	"github.com/huacheng/ai-cli-online/internal/ws"
 )
 
@@ -33,42 +31,11 @@ func (s *SessionHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		token = "default"
 	}
 
-	if !tmux.IsTmuxAvailable() {
-		activeNames := ws.GetHub().ActiveSessionNames()
-		prefix := tmux.TokenToSessionName(token) + "-"
-		sessions := make([]tmux.SessionInfo, 0, len(activeNames))
-		for sName := range activeNames {
-			if prefix != "" && !strings.HasPrefix(sName, prefix) {
-				continue
-			}
-			sId := sName
-			if prefix != "" {
-				sId = strings.TrimPrefix(sName, prefix)
-			}
-			sessions = append(sessions, tmux.SessionInfo{
-				SessionName: sName,
-				SessionId:   sId,
-				Connected:   true,
-				Cwd:         s.auth.cfg.DefaultWorkingDir,
-			})
-		}
-		sort.Slice(sessions, func(i, j int) bool {
-			return sessions[i].SessionId < sessions[j].SessionId
-		})
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(sessions)
-		return
-	}
-
-	sessions, err := tmux.ListSessions(token)
+	activeNames := ws.GetHub().ActiveSessionNames()
+	sessions, err := terminal.List(token, activeNames, s.auth.cfg.DefaultWorkingDir)
 	if err != nil {
 		http.Error(w, `{"error":"Failed to list sessions"}`, http.StatusInternalServerError)
 		return
-	}
-
-	activeNames := ws.GetHub().ActiveSessionNames()
-	for i := range sessions {
-		sessions[i].Connected = activeNames[sessions[i].SessionName]
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -82,7 +49,7 @@ func (s *SessionHandler) KillSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = tmux.KillSession(sessionName)
+	_ = terminal.Kill(sessionName)
 	_ = s.db.DeleteDraft(sessionName)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -96,7 +63,7 @@ func (s *SessionHandler) GetCwd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, s.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, s.auth.cfg.DefaultWorkingDir)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"cwd": cwd})
 }
@@ -108,7 +75,7 @@ func (s *SessionHandler) GetPaneCommand(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	cmd := tmux.GetPaneCommand(sessionName)
+	cmd := terminal.GetPaneCommand(sessionName)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"command": cmd})
 }

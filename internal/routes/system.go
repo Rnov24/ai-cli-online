@@ -13,7 +13,7 @@ import (
 
 	"github.com/huacheng/ai-cli-online/internal/idle"
 	"github.com/huacheng/ai-cli-online/internal/pid"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 var startTime = time.Now()
@@ -83,7 +83,7 @@ func HandleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	heapUsedMb := math.Round((float64(ms.HeapAlloc)/(1024*1024))*10) / 10
 	heapTotalMb := math.Round((float64(ms.HeapSys)/(1024*1024))*10) / 10
 
-	sessions, _ := tmux.ListSessions("")
+	sessions, _ := terminal.List("", nil, "")
 	sessionsCount := len(sessions)
 
 	resp := SystemStatusResponse{
@@ -99,12 +99,12 @@ func HandleSystemStatus(w http.ResponseWriter, r *http.Request) {
 			ActiveConnections: idleMgr.ActiveConnections(),
 		},
 		Tmux: TmuxStatus{
-			Available:     tmux.IsTmuxAvailable(),
-			Pid:           pid.GetTmuxPid(tmux.SocketPath),
+			Available:     terminal.IsTmuxAvailable(),
+			Pid:           pid.GetTmuxPid(terminal.SocketPath),
 			SessionsCount: sessionsCount,
 		},
 		Agy: AgyStatus{
-			Available: tmux.IsAgyAvailable(),
+			Available: terminal.IsAgyAvailable(),
 		},
 		Platform: PlatformStatus{
 			IsTermux:    pid.IsTermux(),

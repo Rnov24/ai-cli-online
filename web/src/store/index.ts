@@ -4,7 +4,7 @@ import type {
   LayoutNode,
   TabState,
 } from '../types';
-import { API_BASE, authHeaders } from '../api/client';
+import { sessionsApi } from '../api/apiClient';
 import { fetchFontSize } from '../api/settings';
 import type { AppState } from './types';
 import { createSettingsSlice } from './settingsSlice';
@@ -309,12 +309,7 @@ export const useStore = create<AppState>((...args) => {
       const token = state.token;
       if (token) {
         await Promise.all(
-          tab.terminalIds.map((tid) =>
-            fetch(`${API_BASE}/api/sessions/${encodeURIComponent(tid)}`, {
-              method: 'DELETE',
-              headers: authHeaders(token),
-            }).catch(() => {}),
-          ),
+          tab.terminalIds.map((tid) => sessionsApi.del(token, tid).catch(() => {})),
         );
       }
 
@@ -639,10 +634,7 @@ export const useStore = create<AppState>((...args) => {
       const token = get().token;
       if (!token) return;
       try {
-        await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}`, {
-          method: 'DELETE',
-          headers: authHeaders(token),
-        });
+        await sessionsApi.del(token, sessionId);
       } catch {
         // ignore
       }

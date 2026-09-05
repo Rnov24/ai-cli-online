@@ -17,8 +17,7 @@ import (
 	"github.com/huacheng/ai-cli-online/internal/config"
 	"github.com/huacheng/ai-cli-online/internal/files"
 	"github.com/huacheng/ai-cli-online/internal/idle"
-	"github.com/huacheng/ai-cli-online/internal/pty"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 const (
@@ -137,7 +136,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if sessionId == "" {
 		sessionId = "default"
 	}
-	if !tmux.IsValidSessionId(sessionId) {
+	if !terminal.IsValidSessionId(sessionId) {
 		_ = conn.Close(websocket.StatusCode(4000), "Invalid sessionId")
 		return
 	}
@@ -158,7 +157,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	authenticated := (h.cfg.AuthToken == "")
 	var sessionName string
-	var ptySession *pty.Session
+	var termSession terminal.Session
 	var ptyMu sync.Mutex
 
 	// Helper to send JSON message
@@ -176,8 +175,8 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	initSession := func(token string) error {
-		sessionName = tmux.BuildSessionName(token, sessionId)
-		tokenPrefix := tmux.TokenToSessionName(token) + "-"
+		sessionName = terminal.BuildSessionName(token, sessionId)
+		tokenPrefix := terminal.TokenToSessionName(token) + "-"
 		if h.CountForTokenPrefix(tokenPrefix) >= h.cfg.MaxConnections {
 			_ = conn.Close(websocket.StatusCode(4005), "Too many connections")
 			return errors.New("connection limit reached")
@@ -194,60 +193,32 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			cwd = h.cfg.DefaultWorkingDir
 		}
 
-		var ps *pty.Session
-		hasTmux := tmux.IsTmuxAvailable()
-		if hasTmux {
-			resumed := tmux.HasSession(sessionName)
-			if !resumed {
-				if err := tmux.CreateSession(sessionName, cols, rows, cwd, h.cfg.StartCommand); err != nil {
-					log.Printf("[ws] Failed to create tmux session %s: %v", sessionName, err)
-					_ = conn.Close(websocket.StatusCode(4003), "Failed to create session")
-					return err
-				}
-			} else {
-				tmux.ResizeSession(sessionName, cols, rows)
-				scrollback := tmux.CaptureScrollback(sessionName)
-				tmux.ConfigureSession(sessionName)
-				if scrollback != "" {
-					_ = sendBinary(BinTypeScrollback, []byte(scrollback))
-				}
-			}
+		sess, resumed, err := terminal.Open(sessionName, cwd, cols, rows, h.cfg.StartCommand)
+		if err != nil {
+			log.Printf("[ws] Failed to open terminal session %s: %v", sessionName, err)
+			sendJSON(serverMessage{Type: "error", Error: "Failed to attach terminal"})
+			_ = conn.Close(websocket.StatusCode(4003), "PTY attach failed")
+			return err
+		}
 
-			sendJSON(serverMessage{Type: "connected", Resumed: resumed})
+		sendJSON(serverMessage{Type: "connected", Resumed: resumed})
 
-			// Spawn PTY attached to tmux
-			var err error
-			ps, err = pty.Start(sessionName, cols, rows)
-			if err != nil {
-				log.Printf("[ws] Failed to start pty for session %s: %v", sessionName, err)
-				sendJSON(serverMessage{Type: "error", Error: "Failed to attach terminal"})
-				_ = conn.Close(websocket.StatusCode(4003), "PTY attach failed")
-				return err
-			}
-		} else {
-			sendJSON(serverMessage{Type: "connected", Resumed: false})
-
-			var err error
-			ps, err = pty.StartDirect(cwd, cols, rows, h.cfg.StartCommand)
-			if err != nil {
-				log.Printf("[ws] Failed to start direct pty for session %s: %v", sessionName, err)
-				sendJSON(serverMessage{Type: "error", Error: "Failed to attach terminal"})
-				_ = conn.Close(websocket.StatusCode(4003), "PTY attach failed")
-				return err
-			}
-
+		if scrollback := sess.Scrollback(); scrollback != "" {
+			_ = sendBinary(BinTypeScrollback, []byte(scrollback))
+		}
+		if sess.Mode() == "direct" && !resumed {
 			_ = sendBinary(BinTypeOutput, []byte("\r\n[AGY Online] Running in direct PTY mode (tmux not installed)\r\n\r\n"))
 		}
 
 		ptyMu.Lock()
-		ptySession = ps
+		termSession = sess
 		ptyMu.Unlock()
 
 		// Read PTY output -> write to WS binary 0x01
 		go func() {
 			buf := make([]byte, 16384)
 			for {
-				n, rErr := ps.Read(buf)
+				n, rErr := sess.Read(buf)
 				if n > 0 {
 					if wErr := sendBinary(BinTypeOutput, buf[:n]); wErr != nil {
 						break
@@ -268,8 +239,8 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			h.removeConn(sessionName, conn)
 		}
 		ptyMu.Lock()
-		if ptySession != nil {
-			_ = ptySession.Close()
+		if termSession != nil {
+			_ = termSession.Close()
 		}
 		ptyMu.Unlock()
 	}()
@@ -311,10 +282,10 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			if prefixBuf[0] == BinTypeInput {
 				ptyMu.Lock()
-				ps := ptySession
+				ts := termSession
 				ptyMu.Unlock()
-				if ps != nil {
-					_, _ = io.Copy(ps, rdr)
+				if ts != nil {
+					_, _ = io.Copy(ts, rdr)
 				}
 			}
 			continue
@@ -350,10 +321,10 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		switch msg.Type {
 		case "input":
 			ptyMu.Lock()
-			ps := ptySession
+			ts := termSession
 			ptyMu.Unlock()
-			if ps != nil {
-				_, _ = ps.Write([]byte(msg.Data))
+			if ts != nil {
+				_, _ = ts.Write([]byte(msg.Data))
 			}
 		case "resize":
 			colsVal := msg.Cols
@@ -365,16 +336,21 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				rowsVal = 24
 			}
 			ptyMu.Lock()
-			ps := ptySession
+			ts := termSession
 			ptyMu.Unlock()
-			if ps != nil {
-				_ = ps.Resize(colsVal, rowsVal)
+			if ts != nil {
+				_ = ts.Resize(colsVal, rowsVal)
 			}
-			tmux.ResizeSession(sessionName, colsVal, rowsVal)
 		case "ping":
 			sendJSON(serverMessage{Type: "pong", Timestamp: time.Now().UnixMilli()})
 		case "capture-scrollback":
-			scroll := tmux.CaptureScrollback(sessionName)
+			ptyMu.Lock()
+			ts := termSession
+			ptyMu.Unlock()
+			scroll := ""
+			if ts != nil {
+				scroll = ts.Scrollback()
+			}
 			normalized := strings.ReplaceAll(scroll, "\n", "\r\n")
 			_ = sendBinary(BinTypeScrollbackContent, []byte(normalized))
 		case "stream-file":
@@ -387,7 +363,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			go func(filePath string) {
 				defer cancelFn()
-				cwd := tmux.GetCwd(sessionName, h.cfg.DefaultWorkingDir)
+				cwd := terminal.GetCwd(sessionName, h.cfg.DefaultWorkingDir)
 				resolved, err := files.ValidatePathNoSymlink(filePath, cwd)
 				if err != nil {
 					sendJSON(serverMessage{Type: "file-stream-error", Error: "Invalid path"})

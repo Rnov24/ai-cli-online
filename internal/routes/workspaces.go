@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/agy"
 	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/persona"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 type WorkspaceHandler struct {
@@ -66,15 +66,15 @@ func (h *WorkspaceHandler) ListWorkspaces(w http.ResponseWriter, r *http.Request
 	// Active workspace from settings
 	activeWsId, _, _ := h.db.GetSetting(tokenHash, "active_workspace")
 	activePath := home
-	activeMode := string(agy.ModeAgenticAssistant)
+	activeMode := string(persona.ModeAgenticAssistant)
 	isHome := true
 
 	if activeWsId != "" {
 		for _, ws := range workspaces {
 			if ws.Id == activeWsId {
 				activePath = ws.Path
-				isHome = ws.IsHome || agy.IsHomeDirectory(ws.Path)
-				activeMode = string(agy.ResolveAgentMode(ws.Path))
+				isHome = ws.IsHome || persona.IsHomeDirectory(ws.Path)
+				activeMode = string(persona.ResolveAgentMode(ws.Path))
 				break
 			}
 		}
@@ -85,7 +85,7 @@ func (h *WorkspaceHandler) ListWorkspaces(w http.ResponseWriter, r *http.Request
 				activeWsId = ws.Id
 				activePath = ws.Path
 				isHome = false
-				activeMode = string(agy.ModeCodingAgent)
+				activeMode = string(persona.ModeCodingAgent)
 				break
 			}
 		}
@@ -93,7 +93,7 @@ func (h *WorkspaceHandler) ListWorkspaces(w http.ResponseWriter, r *http.Request
 			activeWsId = workspaces[0].Id
 			activePath = workspaces[0].Path
 			isHome = workspaces[0].IsHome
-			activeMode = string(agy.ResolveAgentMode(activePath))
+			activeMode = string(persona.ResolveAgentMode(activePath))
 		}
 	}
 
@@ -138,7 +138,7 @@ func (h *WorkspaceHandler) CreateWorkspace(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	isHome := agy.IsHomeDirectory(cleanPath)
+	isHome := persona.IsHomeDirectory(cleanPath)
 	id := "ws-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 
 	ws, err := h.db.AddWorkspace(id, name, cleanPath, isHome)
@@ -228,13 +228,10 @@ func (h *WorkspaceHandler) SwitchSessionWorkspace(w http.ResponseWriter, r *http
 		targetName = filepath.Base(cleanPath)
 	}
 
-	// Change directory in active tmux session if present
-	if tmux.HasSession(sessionName) {
-		// Escape backslashes for shell
-		escapedPath := strings.ReplaceAll(cleanPath, `\`, `/`)
-		cmdStr := fmt.Sprintf("cd %q", escapedPath)
-		_ = tmux.SendKeys(sessionName, cmdStr, "Enter")
-	}
+	// Change directory in active session if present
+	escapedPath := strings.ReplaceAll(cleanPath, `\`, `/`)
+	cmdStr := fmt.Sprintf("cd %q", escapedPath)
+	_ = terminal.SendKeys(sessionName, cmdStr, "Enter")
 
 	// Persist active workspace in user settings
 	token := h.auth.ExtractToken(r)
@@ -246,8 +243,8 @@ func (h *WorkspaceHandler) SwitchSessionWorkspace(w http.ResponseWriter, r *http
 		_ = h.db.SaveSetting(tokenHash, "active_workspace", targetId)
 	}
 
-	isHome := agy.IsHomeDirectory(cleanPath)
-	mode := agy.ResolveAgentMode(cleanPath)
+	isHome := persona.IsHomeDirectory(cleanPath)
+	mode := persona.ResolveAgentMode(cleanPath)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -271,9 +268,9 @@ func (h *WorkspaceHandler) GetSessionWorkspaceMode(w http.ResponseWriter, r *htt
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, h.auth.cfg.DefaultWorkingDir)
-	isHome := agy.IsHomeDirectory(cwd)
-	mode := agy.ResolveAgentMode(cwd)
+	cwd := terminal.GetCwd(sessionName, h.auth.cfg.DefaultWorkingDir)
+	isHome := persona.IsHomeDirectory(cwd)
+	mode := persona.ResolveAgentMode(cwd)
 
 	name := filepath.Base(cwd)
 	if isHome {

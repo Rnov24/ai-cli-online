@@ -1,4 +1,4 @@
-package agy
+package persona
 
 import (
 	"os"
@@ -79,5 +79,5 @@ func BuildPromptWithPersona(workingDir, prompt, conversationId string) string {
 	if conversationId == "" {
 		return ProjectCodingDirective + "\n" + prompt
 	}
-	return prompt
+	return "[Context: Location=Project Workspace. Persona=Coding Agent]\n\n" + prompt
 }

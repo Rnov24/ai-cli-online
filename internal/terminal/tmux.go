@@ -1,24 +1,23 @@
-package tmux
+package terminal
 
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/creack/pty"
 )
 
 var (
 	SocketPath string
-	validIdRe  = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,32}$`)
 )
 
 func init() {
@@ -29,15 +28,6 @@ func init() {
 	dir := filepath.Join(home, ".tmux-sockets")
 	_ = os.MkdirAll(dir, 0700)
 	SocketPath = filepath.Join(dir, "ai-cli-online")
-}
-
-type SessionInfo struct {
-	SessionName string `json:"sessionName"`
-	SessionId   string `json:"sessionId"`
-	CreatedAt   int64  `json:"createdAt"`
-	Connected   bool   `json:"connected"`
-	Cwd         string `json:"cwd,omitempty"`
-	Command     string `json:"command,omitempty"`
 }
 
 func Exec(ctx context.Context, args ...string) (string, error) {
@@ -57,23 +47,6 @@ func ExecTimeout(timeout time.Duration, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return Exec(ctx, args...)
-}
-
-func TokenToSessionName(token string) string {
-	h := sha256.Sum256([]byte(token))
-	return fmt.Sprintf("ai-cli-online-%s", hex.EncodeToString(h[:])[:8])
-}
-
-func IsValidSessionId(id string) bool {
-	return validIdRe.MatchString(id)
-}
-
-func BuildSessionName(token, sessionId string) string {
-	base := TokenToSessionName(token)
-	if sessionId != "" {
-		return fmt.Sprintf("%s-%s", base, sessionId)
-	}
-	return base
 }
 
 func HasSession(name string) bool {
@@ -117,7 +90,7 @@ func CreateSession(name string, cols, rows int, cwd, startCmd string) error {
 	}
 
 	ConfigureSession(name)
-	log.Printf("[tmux] Created session: %s (%dx%d) in %s", name, cols, rows, cwd)
+	log.Printf("[terminal] Created tmux session: %s (%dx%d) in %s", name, cols, rows, cwd)
 	return nil
 }
 
@@ -144,18 +117,18 @@ func ResizeSession(name string, cols, rows int) {
 	)
 }
 
-func KillSession(name string) error {
+func KillTmuxSession(name string) error {
 	_, err := ExecTimeout(3*time.Second, "kill-session", "-t", "="+name)
 	return err
 }
 
-func SendKeys(name string, keys ...string) error {
+func SendTmuxKeys(name string, keys ...string) error {
 	args := append([]string{"send-keys", "-t", "=" + name}, keys...)
 	_, err := ExecTimeout(3*time.Second, args...)
 	return err
 }
 
-func ListSessions(token string) ([]SessionInfo, error) {
+func ListTmuxSessions(token string) ([]SessionInfo, error) {
 	prefix := ""
 	if token != "" {
 		prefix = TokenToSessionName(token) + "-"
@@ -197,7 +170,7 @@ func ListSessions(token string) ([]SessionInfo, error) {
 	return results, nil
 }
 
-func GetCwd(name, defaultCwd string) string {
+func GetTmuxCwd(name, defaultCwd string) string {
 	out, err := ExecTimeout(2*time.Second, "list-panes", "-t", "="+name, "-F", "#{pane_current_path}")
 	if err != nil {
 		return defaultCwd
@@ -213,7 +186,7 @@ func GetCwd(name, defaultCwd string) string {
 	return cwd
 }
 
-func GetPaneCommand(name string) string {
+func GetTmuxPaneCommand(name string) string {
 	out, err := ExecTimeout(2*time.Second, "list-panes", "-t", "="+name, "-F", "#{pane_current_command}")
 	if err != nil {
 		return ""
@@ -233,4 +206,89 @@ func IsTmuxAvailable() bool {
 func IsAgyAvailable() bool {
 	_, err := exec.LookPath("agy")
 	return err == nil
+}
+
+type tmuxSession struct {
+	mu          sync.Mutex
+	sessionName string
+	ptmx        *os.File
+	cmd         *exec.Cmd
+	closed      bool
+}
+
+func attachTmux(sessionName string, cols, rows int) (*tmuxSession, error) {
+	c := exec.Command("tmux", "-S", SocketPath, "attach-session", "-t", "="+sessionName)
+	c.Env = sanitizedEnv()
+
+	ptmx, err := pty.StartWithSize(c, &pty.Winsize{
+		Rows: uint16(rows),
+		Cols: uint16(cols),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to attach pty: %w", err)
+	}
+
+	return &tmuxSession{
+		sessionName: sessionName,
+		ptmx:        ptmx,
+		cmd:         c,
+	}, nil
+}
+
+func (s *tmuxSession) SessionName() string {
+	return s.sessionName
+}
+
+func (s *tmuxSession) Mode() string {
+	return "tmux"
+}
+
+func (s *tmuxSession) Read(p []byte) (int, error) {
+	return s.ptmx.Read(p)
+}
+
+func (s *tmuxSession) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return 0, os.ErrClosed
+	}
+	return s.ptmx.Write(p)
+}
+
+func (s *tmuxSession) Resize(cols, rows int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return os.ErrClosed
+	}
+	ResizeSession(s.sessionName, cols, rows)
+	return pty.Setsize(s.ptmx, &pty.Winsize{
+		Rows: uint16(rows),
+		Cols: uint16(cols),
+	})
+}
+
+func (s *tmuxSession) Scrollback() string {
+	return CaptureScrollback(s.sessionName)
+}
+
+func (s *tmuxSession) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	_ = s.ptmx.Close()
+	if s.cmd != nil && s.cmd.Process != nil {
+		_ = s.cmd.Process.Kill()
+	}
+	return nil
+}
+
+func (s *tmuxSession) IsAlive() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return !s.closed
 }

@@ -1,4 +1,4 @@
-package agy
+package persona
 
 import (
 	"os"
@@ -58,19 +58,19 @@ func TestBuildPromptWithPersona(t *testing.T) {
 	// Home resumption prompt
 	homeResumePrompt := BuildPromptWithPersona(home, testPrompt, "conv-123")
 	if !strings.Contains(homeResumePrompt, "Persona=Agentic Assistant") {
-		t.Errorf("Expected Home resumption prompt to include compact context reminder")
+		t.Errorf("Expected Home resume prompt to include Agentic Assistant tag, got: %s", homeResumePrompt)
 	}
 
 	// Project initial prompt
-	projDir := filepath.Join(home, "projects", "my-app")
-	projPrompt := BuildPromptWithPersona(projDir, testPrompt, "")
-	if !strings.Contains(projPrompt, "Persona=Coding Agent") {
-		t.Errorf("Expected project prompt to include Coding Agent directive")
+	projectDir := filepath.Join(home, "my-go-project")
+	projectPrompt := BuildPromptWithPersona(projectDir, testPrompt, "")
+	if !strings.Contains(projectPrompt, "Persona=Coding Agent") {
+		t.Errorf("Expected Project initial prompt to include Coding Agent directive, got: %s", projectPrompt)
 	}
 
 	// Project resumption prompt
-	projResumePrompt := BuildPromptWithPersona(projDir, testPrompt, "conv-123")
-	if projResumePrompt != testPrompt {
-		t.Errorf("Expected project resumption prompt to be unmodified, got: %s", projResumePrompt)
+	projectResumePrompt := BuildPromptWithPersona(projectDir, testPrompt, "conv-456")
+	if !strings.Contains(projectResumePrompt, "Persona=Coding Agent") {
+		t.Errorf("Expected Project resume prompt to include Coding Agent tag, got: %s", projectResumePrompt)
 	}
 }

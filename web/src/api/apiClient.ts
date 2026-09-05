@@ -18,7 +18,7 @@ function settingsUrl(path: string): string {
   return `${API_BASE}/api/settings/${path}`;
 }
 
-async function parseResponse<T>(res: Response): Promise<T> {
+export async function parseResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new ApiError(res.status, text);
@@ -121,3 +121,23 @@ export const settingsApi = {
     }
   },
 };
+
+/** Typed API client for sessions collection endpoints */
+export const sessionsApi = {
+  async list<T = unknown>(token: string): Promise<T> {
+    const res = await fetch(`${API_BASE}/api/sessions`, { headers: authHeaders(token) });
+    return parseResponse<T>(res);
+  },
+
+  async del(token: string, sessionId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      throw new ApiError(res.status, text);
+    }
+  },
+};
+

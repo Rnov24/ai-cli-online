@@ -20,7 +20,7 @@ import (
 	"github.com/huacheng/ai-cli-online/internal/idle"
 	"github.com/huacheng/ai-cli-online/internal/pid"
 	"github.com/huacheng/ai-cli-online/internal/server"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 const AppVersion = "3.1.0-go"
@@ -162,7 +162,7 @@ func runServer(registerPid bool, portOverride int) {
 		if _, err := pid.RegisterPid("server", cfg.Port); err != nil {
 			log.Printf("[pid] Warning: failed to register pid: %v", err)
 		}
-		if tPid := pid.GetTmuxPid(tmux.SocketPath); tPid > 0 {
+		if tPid := pid.GetTmuxPid(terminal.SocketPath); tPid > 0 {
 			_, _ = pid.RegisterSpecificPid("tmux", tPid, 0)
 		}
 		defer func() {
@@ -247,13 +247,13 @@ func runStatus() {
 	fmt.Printf("  Platform:    %s\n", plat)
 
 	tmuxAvail := "Not Found"
-	if tmux.IsTmuxAvailable() {
+	if terminal.IsTmuxAvailable() {
 		tmuxAvail = "Available"
 	}
 	fmt.Printf("  tmux:        %s\n", tmuxAvail)
 
 	agyAvail := "Not Found"
-	if tmux.IsAgyAvailable() {
+	if terminal.IsAgyAvailable() {
 		agyAvail = "Available"
 	}
 	fmt.Printf("  Antigravity: %s\n", agyAvail)
@@ -270,11 +270,11 @@ func runStatus() {
 		fmt.Println("  Web Server:  STOPPED")
 	}
 
-	tmuxPid := pid.GetTmuxPid(tmux.SocketPath)
+	tmuxPid := pid.GetTmuxPid(terminal.SocketPath)
 	if tmuxPid > 0 {
 		fmt.Printf("  tmux Server: RUNNING (PID: %d)\n", tmuxPid)
-		fmt.Printf("  tmux Socket: %s\n", tmux.SocketPath)
-	} else if tmux.IsTmuxAvailable() {
+		fmt.Printf("  tmux Socket: %s\n", terminal.SocketPath)
+	} else if terminal.IsTmuxAvailable() {
 		fmt.Println("  tmux Server: IDLE (will auto-spawn on terminal connect)")
 	}
 	fmt.Println("========================================")

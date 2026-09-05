@@ -1,16 +1,16 @@
 package agy
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/huacheng/ai-cli-online/internal/persona"
 )
 
 type StreamEvent struct {
@@ -105,7 +105,7 @@ func RunPromptStream(
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	resolvedPrompt := BuildPromptWithPersona(workingDir, prompt, conversationId)
+	resolvedPrompt := persona.BuildPromptWithPersona(workingDir, prompt, conversationId)
 
 	args := []string{
 		"-p", resolvedPrompt,
@@ -147,144 +147,11 @@ func RunPromptStream(
 		activeMu.Unlock()
 	}()
 
-	scanner := bufio.NewScanner(stdout)
-	buf := make([]byte, 64*1024)
-	scanner.Buffer(buf, 10*1024*1024)
-
-	var fullResponse string
-	var finalConvId string
-	var totalTokens int
-	var durationSec float64
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(line, &raw); err != nil {
-			continue
-		}
-
-		var evtType string
-		if e, ok := raw["event"]; ok {
-			_ = json.Unmarshal(e, &evtType)
-		}
-
-		if cId, ok := raw["conversation_id"]; ok {
-			_ = json.Unmarshal(cId, &finalConvId)
-		}
-
-		switch evtType {
-		case "init":
-			var initObj struct {
-				ConversationId string   `json:"conversation_id"`
-				Init           InitData `json:"init"`
-			}
-			_ = json.Unmarshal(line, &initObj)
-			if initObj.ConversationId != "" {
-				finalConvId = initObj.ConversationId
-			}
-			onEvent(StreamEvent{
-				Event:        "init",
-				Conversation: finalConvId,
-				Init:         &initObj.Init,
-			})
-
-		case "step_update":
-			var stepObj struct {
-				StepUpdate struct {
-					ConversationId  string  `json:"conversation_id"`
-					StepIndex       int     `json:"step_index"`
-					State           string  `json:"state"`
-					StepType        string  `json:"step_type"`
-					TextDelta       string  `json:"text_delta,omitempty"`
-					ToolName        string  `json:"tool_name,omitempty"`
-					DurationSeconds float64 `json:"duration_seconds,omitempty"`
-					ToolInfo        struct {
-						Name       string         `json:"name"`
-						Parameters map[string]any `json:"parameters"`
-						Output     string         `json:"output"`
-					} `json:"tool_info"`
-					Usage struct {
-						TotalTokens    int `json:"total_tokens"`
-						ThinkingTokens int `json:"thinking_tokens"`
-					} `json:"usage"`
-				} `json:"step_update"`
-			}
-			_ = json.Unmarshal(line, &stepObj)
-
-			su := stepObj.StepUpdate
-			if su.ConversationId != "" {
-				finalConvId = su.ConversationId
-			}
-
-			if su.StepType == "tool" {
-				toolStatus := "running"
-				if su.State == "DONE" {
-					toolStatus = "success"
-				}
-				onEvent(StreamEvent{
-					Event:        "tool",
-					StepIndex:    su.StepIndex,
-					Conversation: finalConvId,
-					ToolCall: &ToolCallData{
-						Id:       fmt.Sprintf("tool_%d", su.StepIndex),
-						Name:     su.ToolName,
-						Args:     su.ToolInfo.Parameters,
-						Output:   su.ToolInfo.Output,
-						Status:   toolStatus,
-						Duration: su.DurationSeconds,
-					},
-				})
-			} else if su.StepType == "agent_response" {
-				if su.TextDelta != "" {
-					fullResponse += su.TextDelta
-					onEvent(StreamEvent{
-						Event:        "chunk",
-						StepIndex:    su.StepIndex,
-						Delta:        su.TextDelta,
-						Conversation: finalConvId,
-					})
-				}
-			}
-
-			if su.Usage.TotalTokens > 0 {
-				totalTokens = su.Usage.TotalTokens
-			}
-
-		case "result":
-			var resObj struct {
-				Result struct {
-					Status          string  `json:"status"`
-					Response        string  `json:"response"`
-					DurationSeconds float64 `json:"duration_seconds"`
-					Usage           struct {
-						TotalTokens int `json:"total_tokens"`
-					} `json:"usage"`
-				} `json:"result"`
-			}
-			_ = json.Unmarshal(line, &resObj)
-			if resObj.Result.Response != "" {
-				fullResponse = resObj.Result.Response
-			}
-			if resObj.Result.DurationSeconds > 0 {
-				durationSec = resObj.Result.DurationSeconds
-			}
-			if resObj.Result.Usage.TotalTokens > 0 {
-				totalTokens = resObj.Result.Usage.TotalTokens
-			}
-
-			onEvent(StreamEvent{
-				Event:        "done",
-				Status:       resObj.Result.Status,
-				FullResponse: fullResponse,
-				Conversation: finalConvId,
-				DurationSec:  durationSec,
-				TokensTotal:  totalTokens,
-			})
-		}
+	parseRes, _ := ParseStream(stdout, onEvent)
+	fullResponse := parseRes.FullResponse
+	finalConvId := parseRes.ConversationId
+	if finalConvId == "" {
+		finalConvId = conversationId
 	}
 
 	waitErr := cmd.Wait()

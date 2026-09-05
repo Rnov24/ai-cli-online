@@ -1,4 +1,5 @@
-import { API_BASE } from './client';
+import { API_BASE, authHeaders } from './client';
+import { parseResponse, sessionApi } from './apiClient';
 
 export interface Workspace {
   id: string;
@@ -27,14 +28,9 @@ export interface WorkspaceModePayload {
 
 export async function fetchWorkspaces(token: string): Promise<WorkspacesPayload> {
   const res = await fetch(`${API_BASE}/api/workspaces`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(token),
   });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch workspaces: HTTP ${res.status}`);
-  }
-  return res.json();
+  return parseResponse<WorkspacesPayload>(res);
 }
 
 export async function createWorkspace(
@@ -45,16 +41,12 @@ export async function createWorkspace(
   const res = await fetch(`${API_BASE}/api/workspaces`, {
     method: 'POST',
     headers: {
+      ...authHeaders(token),
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ path, name }),
   });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(errData.error || 'Failed to create workspace');
-  }
-  return res.json();
+  return parseResponse<Workspace>(res);
 }
 
 export async function deleteWorkspace(
@@ -63,15 +55,9 @@ export async function deleteWorkspace(
 ): Promise<{ ok: boolean }> {
   const res = await fetch(`${API_BASE}/api/workspaces/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(token),
   });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(errData.error || 'Failed to delete workspace');
-  }
-  return res.json();
+  return parseResponse<{ ok: boolean }>(res);
 }
 
 export async function switchSessionWorkspace(
@@ -80,38 +66,12 @@ export async function switchSessionWorkspace(
   workspaceId: string,
   path?: string,
 ): Promise<WorkspaceModePayload> {
-  const res = await fetch(
-    `${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/switch-workspace`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ workspaceId, path }),
-    },
-  );
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(errData.error || 'Failed to switch workspace');
-  }
-  return res.json();
+  return sessionApi.post<WorkspaceModePayload>(token, sessionId, 'switch-workspace', { workspaceId, path });
 }
 
 export async function fetchWorkspaceMode(
   token: string,
   sessionId: string,
 ): Promise<WorkspaceModePayload> {
-  const res = await fetch(
-    `${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/workspace-mode`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
-  if (!res.ok) {
-    throw new Error(`Failed to fetch workspace mode: HTTP ${res.status}`);
-  }
-  return res.json();
+  return sessionApi.get<WorkspaceModePayload>(token, sessionId, 'workspace-mode');
 }

@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/huacheng/ai-cli-online/internal/files"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 type FileHandler struct {
@@ -33,7 +33,7 @@ func (f *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 	subPath := r.URL.Query().Get("path")
 
 	targetDir := cwd
@@ -73,7 +73,7 @@ func (f *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 
 	if err := r.ParseMultipartForm(files.MaxUploadSize); err != nil {
 		http.Error(w, `{"error":"Upload payload too large"}`, http.StatusRequestEntityTooLarge)
@@ -132,7 +132,7 @@ func (f *FileHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 	resolved, err := files.ValidatePathNoSymlink(filePath, cwd)
 	if err != nil {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
@@ -162,7 +162,7 @@ func (f *FileHandler) DownloadCwd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 	dirName := filepath.Base(cwd)
 
 	w.Header().Set("Content-Type", "application/gzip")
@@ -219,7 +219,7 @@ func (f *FileHandler) Touch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 	resolved, err := files.ValidateNewPath(req.Name, cwd)
 	if err != nil {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
@@ -258,7 +258,7 @@ func (f *FileHandler) Mkdir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 	resolved, err := files.ValidateNewPath(req.Path, cwd)
 	if err != nil {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
@@ -289,7 +289,7 @@ func (f *FileHandler) Rm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 	resolved, err := files.ValidatePath(req.Path, cwd)
 	if err != nil {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
@@ -318,7 +318,7 @@ func (f *FileHandler) GetFileContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, f.auth.cfg.DefaultWorkingDir)
 	resolved, err := files.ValidatePathNoSymlink(filePath, cwd)
 	if err != nil {
 		home, _ := os.UserHomeDir()

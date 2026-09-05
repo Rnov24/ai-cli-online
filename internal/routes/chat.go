@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/huacheng/ai-cli-online/internal/agy"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 type ChatHandler struct {
@@ -33,7 +33,7 @@ func (c *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, c.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, c.auth.cfg.DefaultWorkingDir)
 
 	reply, convId, err := agy.RunPromptStream(
 		r.Context(),
@@ -89,7 +89,7 @@ func (c *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	flusher.Flush()
 
-	cwd := tmux.GetCwd(sessionName, c.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, c.auth.cfg.DefaultWorkingDir)
 
 	_, _, err := agy.RunPromptStream(
 		r.Context(),

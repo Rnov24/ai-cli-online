@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 type AuthHelper struct {
@@ -50,7 +50,7 @@ func (a *AuthHelper) ResolveSession(w http.ResponseWriter, r *http.Request, sess
 		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
 		return ""
 	}
-	if !tmux.IsValidSessionId(sessionId) {
+	if !terminal.IsValidSessionId(sessionId) {
 		http.Error(w, `{"error":"Invalid sessionId"}`, http.StatusBadRequest)
 		return ""
 	}
@@ -58,7 +58,7 @@ func (a *AuthHelper) ResolveSession(w http.ResponseWriter, r *http.Request, sess
 	if token == "" {
 		token = "default"
 	}
-	return tmux.BuildSessionName(token, sessionId)
+	return terminal.BuildSessionName(token, sessionId)
 }
 
 func (a *AuthHelper) TokenHash(token string) string {

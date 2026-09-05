@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/tmux"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 type GitHandler struct {
@@ -70,7 +70,7 @@ func (g *GitHandler) GitLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, g.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, g.auth.cfg.DefaultWorkingDir)
 
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
@@ -241,7 +241,7 @@ func (g *GitHandler) GitDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, g.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, g.auth.cfg.DefaultWorkingDir)
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -273,7 +273,7 @@ func (g *GitHandler) GitBranches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cwd := tmux.GetCwd(sessionName, g.auth.cfg.DefaultWorkingDir)
+	cwd := terminal.GetCwd(sessionName, g.auth.cfg.DefaultWorkingDir)
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 

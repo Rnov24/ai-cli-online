@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { ServerSession } from '../types';
 import { saveFontSize } from '../api/settings';
-import { API_BASE, authHeaders } from '../api/client';
+import { sessionsApi } from '../api/apiClient';
 import type { AppState, SettingsSlice } from './types';
 
 let fontSizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -61,11 +61,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
     const token = get().token;
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/sessions`, {
-        headers: authHeaders(token),
-      });
-      if (!res.ok) return;
-      const data: ServerSession[] = await res.json();
+      const data = await sessionsApi.list<ServerSession[]>(token);
       set({ serverSessions: data });
     } catch {
       // ignore fetch errors
