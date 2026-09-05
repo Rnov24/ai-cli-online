@@ -150,6 +150,8 @@ func (s *Server) Start() error {
 				w.Header().Set("Content-Type", "font/woff")
 			} else if strings.HasSuffix(cleanPath, ".ttf") {
 				w.Header().Set("Content-Type", "font/ttf")
+			} else if strings.HasSuffix(cleanPath, ".webmanifest") {
+				w.Header().Set("Content-Type", "application/manifest+json")
 			}
 			fileServer.ServeHTTP(w, r)
 			return
