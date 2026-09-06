@@ -45,6 +45,8 @@ func (s *Server) Start() error {
 	setH := routes.NewSettingsHandler(auth, s.db)
 	chatH := routes.NewChatHandler(auth, s.db)
 	wsH := routes.NewWorkspaceHandler(auth, s.db)
+	convH := routes.NewConversationsHandler(auth)
+	skillsH := routes.NewSkillsHandler(auth, s.db)
 	hub := ws.InitHub(s.cfg)
 
 	// Cleanly mark any orphaned active turns as interrupted on server start
@@ -56,6 +58,16 @@ func (s *Server) Start() error {
 
 	// Auto-seed default Home and project workspaces
 	s.seedDefaultWorkspaces()
+
+	// AGY CLI Conversations
+	mux.HandleFunc("GET /api/agy/conversations", convH.ListConversations)
+	mux.HandleFunc("GET /api/agy/conversations/{id}/messages", convH.GetConversationMessages)
+	mux.HandleFunc("DELETE /api/agy/conversations/{id}", convH.DeleteConversation)
+
+	// Skills Management
+	mux.HandleFunc("GET /api/skills", skillsH.ListSkills)
+	mux.HandleFunc("GET /api/skills/content", skillsH.GetSkillContent)
+	mux.HandleFunc("POST /api/skills/scaffold", skillsH.ScaffoldSkill)
 
 	// Chat & Headless AI Execution
 	mux.HandleFunc("POST /api/sessions/{sessionId}/chat", chatH.HandleChat)
