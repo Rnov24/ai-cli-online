@@ -18,6 +18,10 @@ honor its STOP conditions, and update your row when done.
 | [008](008-antigravity-plugin-lifecycle-and-discovery-management.md) | Antigravity Plugin Lifecycle and Discovery Management | P1 | M | — | DONE |
 | [009](009-multi-persona-system-and-agent-customization.md) | Multi-Persona System and Dynamic Agent Customization | P1 | M | — | DONE |
 | [010](010-color-palette-synchronization-and-theme-unification.md) | Synchronize Color Palettes and Eliminate Theme Desynchronization Across Components | P1 | M | — | DONE |
+| [011](011-security-and-file-integrity-hardening.md) | Security & File Integrity Hardening | P1 | S | — | TODO |
+| [012](012-concurrency-stream-stability-and-tarball-integrity.md) | Concurrency, Stream Stability, and Tarball Integrity | P1 | S | — | TODO |
+| [013](013-repository-hygiene-and-legacy-server-retirement.md) | Repository Hygiene & Legacy Server Workspace Retirement | P2 | S | — | TODO |
+| [014](014-high-frequency-stream-batching-and-conversation-index-performance.md) | High-Frequency Stream Batching & Conversation Index Performance | P2 | M | — | TODO |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -27,6 +31,8 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 004 requires Plan 003**: A standalone Android APK (Plan 004) cannot assume `tmux` is installed in `/system/bin`; it requires the direct PTY shell fallback implemented in Plan 003.
 - **Plan 008 and Plan 009 are independent**: Either may be executed first. Plan 008 formalizes the plugin management layer (`/api/plugins` & `PluginsModal.tsx`); Plan 009 formalizes the multi-persona system (`/api/personas` & `PersonaSelectorModal.tsx`). Both build on the completed Skills Hub (Plan 007) and responsive SVG foundations (Plans 005 & 006).
 - **Plan 010 is independent**: It synchronizes design system color tokens, repairs Light Theme contrast dropouts, and eliminates orphan CSS variable references across all existing modals and panels.
+- **Plan 011 is highest priority**: It eliminates the critical `DELETE /api/sessions/:sessionId/rm` workspace deletion bug and closes the DOMPurify XSS sink in `MarkdownRenderer.tsx`.
+- **Plans 012, 013, and 014 are independent**: Plan 012 repairs websocket concurrency and tarball generation; Plan 013 removes the legacy Node server workspace to eliminate 22 `npm audit` vulnerabilities; Plan 014 improves chat rendering and conversation list latency.
 
 ## Findings considered and rejected
 
