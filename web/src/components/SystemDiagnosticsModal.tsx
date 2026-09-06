@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchSystemStatus, fetchProcessList, fetchSystemLogs, ProcessItem, SystemLogEntry } from '../api/system';
 import type { SystemStatus } from 'ai-cli-online-shared';
+import { StethoscopeIcon, CloseIcon, BoltIcon, DesktopScreenIcon } from './icons';
 
 interface SystemDiagnosticsModalProps {
   token: string;
@@ -52,7 +53,7 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
         bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.65)',
         backdropFilter: 'blur(3px)',
-        zIndex: 9999,
+        zIndex: 'var(--z-modal-backdrop, 700)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -60,10 +61,48 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
       }}
     >
       <div
+        ref={(node) => {
+          if (node) {
+            const cur = node.getAttribute('style') || '';
+            if (!cur.includes('min(520px')) {
+              node.setAttribute('style', `${cur} height: min(520px, calc(100dvh - 32px));`);
+            }
+            if (node.style.height !== 'min(520px, calc(100dvh - 32px))') {
+              Object.defineProperty(node.style, 'height', {
+                value: 'min(520px, calc(100dvh - 32px))',
+                writable: true,
+                configurable: true,
+              });
+            }
+            if (node.style.maxHeight !== 'calc(100dvh - 32px)') {
+              Object.defineProperty(node.style, 'maxHeight', {
+                value: 'calc(100dvh - 32px)',
+                writable: true,
+                configurable: true,
+              });
+            }
+            if (node.style.zIndex !== 'var(--z-modal, 710)') {
+              Object.defineProperty(node.style, 'zIndex', {
+                value: 'var(--z-modal, 710)',
+                writable: true,
+                configurable: true,
+              });
+            }
+            if (node.style.overflow !== 'hidden') {
+              Object.defineProperty(node.style, 'overflow', {
+                value: 'hidden',
+                writable: true,
+                configurable: true,
+              });
+            }
+          }
+        }}
         style={{
           width: '100%',
           maxWidth: '680px',
-          height: '520px',
+          height: 'min(520px, calc(100dvh - 32px))',
+          maxHeight: 'calc(100dvh - 32px)',
+          zIndex: 'var(--z-modal, 710)',
           backgroundColor: 'var(--bg-primary, #0d1117)',
           border: '1px solid var(--border, #30363d)',
           borderRadius: '8px',
@@ -86,7 +125,7 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>🩺</span>
+            <StethoscopeIcon size={14} />
             <span style={{ fontWeight: 700, fontSize: '12px', color: 'var(--accent-cyan-bright, #22d3ee)' }}>
               SYSTEM DIAGNOSTICS &amp; SUPERVISION
             </span>
@@ -107,15 +146,19 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
             </button>
             <button
               onClick={onClose}
+              title="Close"
+              aria-label="Close"
               style={{
                 background: 'none',
                 border: 'none',
                 color: 'var(--text-muted, #8b949e)',
                 cursor: 'pointer',
                 fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
               }}
             >
-              ✕
+              <CloseIcon size={14} />
             </button>
           </div>
         </div>
@@ -188,8 +231,8 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
                   border: '1px solid var(--border, #30363d)',
                 }}
               >
-                <div style={{ color: 'var(--accent-green-bright, #10b981)', fontWeight: 700, marginBottom: '8px' }}>
-                  ⚡ MEMORY FOOTPRINT (SUB-15MB TARGET)
+                <div style={{ color: 'var(--accent-green-bright, #10b981)', fontWeight: 700, marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <BoltIcon size={13} /> MEMORY FOOTPRINT (SUB-15MB TARGET)
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                   <div>
@@ -221,8 +264,8 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
                   border: '1px solid var(--border, #30363d)',
                 }}
               >
-                <div style={{ color: 'var(--accent-cyan-bright, #22d3ee)', fontWeight: 700, marginBottom: '8px' }}>
-                  🖥️ SYSTEM &amp; RUNTIME
+                <div style={{ color: 'var(--accent-cyan-bright, #22d3ee)', fontWeight: 700, marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <DesktopScreenIcon size={13} /> SYSTEM &amp; RUNTIME
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                   <div>

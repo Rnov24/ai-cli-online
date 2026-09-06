@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
+import { fetchSkills, type SkillItem } from '../api/skills';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -47,6 +48,18 @@ export const CommandPalette = React.memo(function CommandPalette({
   const theme = useStore((s) => s.theme);
   const fontSize = useStore((s) => s.fontSize);
   const setFontSize = useStore((s) => s.setFontSize);
+  const token = useStore((s) => s.token);
+  const [discoveredSkills, setDiscoveredSkills] = useState<SkillItem[]>([]);
+
+  useEffect(() => {
+    if (isOpen && token) {
+      fetchSkills(token)
+        .then((res) => {
+          setDiscoveredSkills(res.skills || []);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, token]);
 
   useEffect(() => {
     if (isOpen) {
@@ -124,6 +137,17 @@ export const CommandPalette = React.memo(function CommandPalette({
     },
 
     // Assistant & System Operations
+    {
+      id: 'cmd-skills-manager',
+      category: 'SKILLS',
+      title: 'Skills & Capabilities Hub — Manage Workspace & Global Skills',
+      desc: 'Inspect SKILL.md instructions, copy commands, and scaffold project skills',
+      shortcut: '⌥S',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-skills-modal'));
+        onClose();
+      },
+    },
     {
       id: 'cmd-goal',
       category: 'SKILLS',
@@ -243,6 +267,15 @@ export const CommandPalette = React.memo(function CommandPalette({
       desc: 'Purge local chat history and reset context',
       action: () => runCommand('/clear'),
     },
+    ...discoveredSkills
+      .filter((sk) => !['goal', 'auto', 'plan', 'verify', 'exec', 'check', 'review', 'merge', 'report', 'research', 'grill-me', 'schedule', 'learn', 'teamwork-preview', 'browser', 'doctor', 'diagnostics', 'agents', 'plugins', 'mcp', 'permissions', 'compress', 'clear', 'exit'].includes(sk.name))
+      .map((sk) => ({
+        id: `cmd-skill-${sk.scope}-${sk.name}`,
+        category: 'SKILLS' as const,
+        title: `/${sk.name} — ${sk.description}`,
+        desc: `[${sk.scope.toUpperCase()}] ${sk.skillFile}`,
+        action: () => runCommand(`/${sk.name} `),
+      })),
 
     // Panels
     {
@@ -307,6 +340,28 @@ export const CommandPalette = React.memo(function CommandPalette({
       desc: `Current size: ${fontSize}px`,
       action: () => {
         setFontSize(Math.max(10, fontSize - 1));
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-plugins-manager',
+      category: 'SYSTEM',
+      title: 'Antigravity Plugins — Manage Extensions & Toolkits',
+      desc: 'Inspect installed plugins, components, and marketplace packages',
+      shortcut: '⌥P',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-switch-persona',
+      category: 'SYSTEM',
+      title: '/agents — Switch Agent Persona & Mindset',
+      desc: 'Toggle between Architect, Auditor, Pair Programmer, SRE, and Assistant',
+      shortcut: '⌥A',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-persona-modal'));
         onClose();
       },
     },

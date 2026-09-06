@@ -101,12 +101,14 @@ func RunPromptStream(
 	workingDir string,
 	conversationId string,
 	prompt string,
+	personaId string,
 	onEvent func(event StreamEvent),
 ) (string, string, error) {
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	resolvedPrompt := persona.BuildPromptWithPersona(workingDir, prompt, conversationId)
+	pDef := persona.ResolvePersona(personaId, workingDir)
+	resolvedPrompt := persona.BuildPromptWithPersonaConfig(workingDir, prompt, conversationId, pDef)
 
 	args := []string{
 		"-p", resolvedPrompt,

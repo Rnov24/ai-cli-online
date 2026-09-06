@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ToolCall } from 'ai-cli-online-shared';
+import { ShieldIcon, HelpIcon, CloseIcon } from './icons';
 
 interface InteractiveClarifyModalProps {
   toolCall: ToolCall;
@@ -98,7 +99,9 @@ export function InteractiveClarifyModal({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14px' }}>{isPermission ? '🛡️' : '❓'}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+              {isPermission ? <ShieldIcon size={14} color="var(--accent-red)" /> : <HelpIcon size={14} color="var(--accent-cyan)" />}
+            </span>
             <span
               style={{
                 fontWeight: 700,
@@ -117,9 +120,11 @@ export function InteractiveClarifyModal({
               color: 'var(--text-muted, #8b949e)',
               cursor: 'pointer',
               fontSize: '14px',
+              display: 'inline-flex',
+              alignItems: 'center',
             }}
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </div>
 

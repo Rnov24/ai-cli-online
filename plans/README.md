@@ -12,6 +12,11 @@ honor its STOP conditions, and update your row when done.
 | [002](002-mobile-headless-launcher-and-pwa.md) | Add Mobile Headless 1-Tap Launcher and Standalone PWA Support | P1 | S | 001 | DONE |
 | [003](003-pty-direct-shell-fallback.md) | Implement Direct PTY Shell Fallback when Tmux is Unavailable | P2 | M | — | DONE |
 | [004](004-standalone-android-foreground-service-spike.md) | Spike — Standalone Android Foreground Service Companion APK | P3 | M | 003 | DONE |
+| [005](005-responsive-ui-ux-and-overlap-remediation.md) | Remediate UI/UX Component Responsiveness and Overlapping Across Viewports | P1 | M | — | DONE |
+| [006](006-replace-emoji-assets-with-svg-icons.md) | Replace Emoji-Based UI Assets with Unified SVG Icon System | P2 | M | — | DONE |
+| [007](007-workspace-and-project-skills-management.md) | Implement Workspace and Project-Based Skills Management | P1 | M | — | DONE |
+| [008](008-antigravity-plugin-lifecycle-and-discovery-management.md) | Antigravity Plugin Lifecycle and Discovery Management | P1 | M | — | DONE |
+| [009](009-multi-persona-system-and-agent-customization.md) | Multi-Persona System and Dynamic Agent Customization | P1 | M | — | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -19,6 +24,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 
 - **Plan 002 requires Plan 001**: The mobile 1-tap headless launcher (`~/.shortcuts/tasks/agy-start`) builds on the standardized Go daemon startup patterns and wake-lock behavior refined in Plan 001.
 - **Plan 004 requires Plan 003**: A standalone Android APK (Plan 004) cannot assume `tmux` is installed in `/system/bin`; it requires the direct PTY shell fallback implemented in Plan 003.
+- **Plan 008 and Plan 009 are independent**: Either may be executed first. Plan 008 formalizes the plugin management layer (`/api/plugins` & `PluginsModal.tsx`); Plan 009 formalizes the multi-persona system (`/api/personas` & `PersonaSelectorModal.tsx`). Both build on the completed Skills Hub (Plan 007) and responsive SVG foundations (Plans 005 & 006).
 
 ## Findings considered and rejected
 

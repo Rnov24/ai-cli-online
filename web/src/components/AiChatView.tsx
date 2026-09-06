@@ -2,6 +2,18 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { TurnAnchor, PresentationMode } from './TurnAnchor';
 import { InteractiveClarifyModal } from './InteractiveClarifyModal';
 import { SystemDiagnosticsModal } from './SystemDiagnosticsModal';
+import {
+  RobotIcon,
+  LaptopIcon,
+  ClipboardIcon,
+  BoltIcon,
+  TargetIcon,
+  StethoscopeIcon,
+  DownloadIcon,
+  TrashIcon,
+  CodeIcon,
+  ShieldIcon,
+} from './icons';
 import { fetchSessionJournal, TurnJournalItem } from '../api/journal';
 import { exportSessionToHtml } from '../utils/exportHtml';
 import { useStore } from '../store';
@@ -13,6 +25,47 @@ import {
   createWorkspace,
   WorkspaceModePayload,
 } from '../api/workspaces';
+import { fetchSkills, type SkillItem } from '../api/skills';
+import { SkillsManagementModal } from './SkillsManagementModal';
+import { fetchPlugins } from '../api/plugins';
+import { PluginsModal } from './PluginsModal';
+import { fetchPersonas, setSessionPersona, type PersonaDefinition } from '../api/personas';
+import { PersonaSelectorModal } from './PersonaSelectorModal';
+
+// Ensure localStorage has a working fallback in test/jsdom/opaque-origin environments under Node 22+
+try {
+  let hasWorkingStorage = false;
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+      localStorage.getItem('__test__');
+      hasWorkingStorage = true;
+    }
+  } catch {
+    hasWorkingStorage = false;
+  }
+
+  if (!hasWorkingStorage) {
+    const map = new Map<string, string>();
+    const memStorage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, val: string) => { map.set(key, String(val)); },
+      removeItem: (key: string) => { map.delete(key); },
+      clear: () => { map.clear(); },
+      get length() { return map.size; },
+      key: (i: number) => Array.from(map.keys())[i] ?? null,
+    };
+    if (typeof globalThis !== 'undefined') {
+      try {
+        Object.defineProperty(globalThis, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        Object.defineProperty(window, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+  }
+} catch {}
 
 interface AiChatViewProps {
   sessionId: string;
@@ -141,6 +194,12 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const [activeClarifyToolCall, setActiveClarifyToolCall] = useState<ToolCall | null>(null);
   const [pendingQueue, setPendingQueue] = useState<string[]>([]);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
+  const [showSkillsModal, setShowSkillsModal] = useState(false);
+  const [showPluginsModal, setShowPluginsModal] = useState(false);
+  const [showPersonaModal, setShowPersonaModal] = useState(false);
+  const [activePersona, setActivePersona] = useState<PersonaDefinition | null>(null);
+  const [discoveredSkills, setDiscoveredSkills] = useState<SkillItem[]>([]);
+
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem(`chat-messages-${sessionId}`);
@@ -177,6 +236,9 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     try {
       const modeData = await fetchWorkspaceMode(token, sessionId);
       setWorkspaceMode(modeData);
+      fetchSkills(token, modeData.cwd)
+        .then((res) => setDiscoveredSkills(res.skills || []))
+        .catch(() => {});
     } catch {
       // ignore
     }
@@ -185,6 +247,34 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   useEffect(() => {
     refreshWorkspaceMode();
   }, [refreshWorkspaceMode]);
+
+  useEffect(() => {
+    const handleOpenSkills = () => setShowSkillsModal(true);
+    const handleOpenPlugins = () => setShowPluginsModal(true);
+    const handleOpenPersona = () => setShowPersonaModal(true);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        setShowSkillsModal((prev) => !prev);
+      } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setShowPluginsModal((prev) => !prev);
+      } else if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        setShowPersonaModal((prev) => !prev);
+      }
+    };
+    window.addEventListener('agy:open-skills-modal', handleOpenSkills);
+    window.addEventListener('agy:open-plugins-modal', handleOpenPlugins);
+    window.addEventListener('agy:open-persona-modal', handleOpenPersona);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('agy:open-skills-modal', handleOpenSkills);
+      window.removeEventListener('agy:open-plugins-modal', handleOpenPlugins);
+      window.removeEventListener('agy:open-persona-modal', handleOpenPersona);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -376,8 +466,54 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
   const isHome = workspaceMode?.isHome ?? false;
 
+  useEffect(() => {
+    if (!token) return;
+    fetchPersonas(token, sessionId)
+      .then((data) => {
+        if (data.activePersonaId) {
+          const matched = data.personas.find((p) => p.id === data.activePersonaId);
+          if (matched) {
+            setActivePersona(matched);
+            return;
+          }
+        }
+        const defaultId = isHome ? 'agentic-assistant' : 'coding-agent';
+        const def = data.personas.find((p) => p.id === defaultId);
+        if (def) setActivePersona(def);
+      })
+      .catch(() => {});
+  }, [sessionId, token, isHome]);
+
+  const mergedCommands = useMemo(() => {
+    const list: SlashCommandItem[] = [];
+    const seen = new Set<string>();
+
+    // Discovered skills from active workspace or global plugins
+    for (const sk of discoveredSkills) {
+      const cmd = `/${sk.name}`;
+      if (!seen.has(cmd)) {
+        seen.add(cmd);
+        list.push({
+          cmd,
+          desc: `[${sk.scope.toUpperCase()}] ${sk.description}`,
+          category: sk.scope === 'workspace' ? 'coding' : 'common',
+        });
+      }
+    }
+
+    // Static builtin slash commands
+    for (const sc of SLASH_COMMANDS) {
+      if (!seen.has(sc.cmd)) {
+        seen.add(sc.cmd);
+        list.push(sc);
+      }
+    }
+
+    return list;
+  }, [discoveredSkills]);
+
   const filteredCommands = useMemo(() => {
-    const matched = SLASH_COMMANDS.filter(
+    const matched = mergedCommands.filter(
       (sc) =>
         sc.cmd.toLowerCase().includes(slashFilter) ||
         sc.desc.toLowerCase().includes(slashFilter),
@@ -410,7 +546,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
       return bWeight - aWeight;
     });
-  }, [slashFilter, isHome]);
+  }, [slashFilter, isHome, mergedCommands]);
 
   const selectSlashCommand = (cmd: string) => {
     setInputText(cmd + ' ');
@@ -591,38 +727,184 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       return;
     }
 
-    // Active Skills Reference
-    if (text === '/skills') {
-      window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'skills' } }));
-      const skillsText = [
-        '### ⚡ Active `ai-cli-task` Lifecycle Skills & Autonomous Tools',
+    // Active Skills Reference & Management Hub
+    if (text === '/skills' || text === '/skills list') {
+      setShowSkillsModal(true);
+      window.dispatchEvent(new CustomEvent('agy:open-skills-modal'));
+
+      const workspaceSkills = discoveredSkills.filter((s) => s.scope === 'workspace');
+      const globalSkills = discoveredSkills.filter((s) => s.scope === 'global');
+      const builtinSkills = discoveredSkills.filter((s) => s.scope === 'builtin');
+
+      const lines: string[] = [
+        '### 🧩 Active Antigravity Skills & Capabilities Hub',
         '',
-        '1. **/auto `<module>`**: Autonomous 13-skill loop (plan → research → check → verify → exec → merge → report)',
-        '2. **/plan `<module>`**: Architecture and step-by-step implementation plan',
-        '3. **/research `<module>`**: External references and dependency gathering',
-        '4. **/check `<module>`**: Feasibility validation before code modifications',
-        '5. **/verify `<module>`**: Execute domain-adapted tests (unit, build, integration)',
-        '6. **/exec `<module>`**: Execute approved implementation plan',
-        '7. **/review `<module>`**: Review diffs, security, and changes',
-        '8. **/merge `<module>`**: Merge isolated worktree branch to main',
-        '9. **/report `<module>`**: Generate formal task completion report',
-        '10. **/init `<module>`**: Initialize task module and branch',
-        '11. **/cancel `<module>`**: Cancel task & clean worktree',
-        '12. **/list**: Query status of all task modules',
-        '13. **/annotate `<file>` `<ann>`**: Process Plan panel annotations',
-        '14. **/summarize `<module>`**: Regenerate context summary',
+        `*Discovered **${discoveredSkills.length}** total skills across workspace, plugins, and built-in systems.*`,
         '',
-        '*Click **[? HELP]** in header to inspect the complete Skills & Tools reference.*',
-      ].join('\n');
+      ];
+
+      if (workspaceSkills.length > 0) {
+        lines.push('#### 📁 Project / Workspace Skills (`.agents/skills`)');
+        for (const s of workspaceSkills) {
+          lines.push(`- **\`/${s.name}\`**: ${s.description}`);
+        }
+        lines.push('');
+      }
+
+      if (globalSkills.length > 0) {
+        lines.push('#### 🌐 Global & Plugin Skills (`~/.gemini/config/plugins`, `~/.agents/skills`)');
+        for (const s of globalSkills) {
+          lines.push(`- **\`/${s.name}\`**: ${s.description}`);
+        }
+        lines.push('');
+      }
+
+      if (builtinSkills.length > 0) {
+        lines.push('#### ⚙️ Built-In AGY Skills');
+        for (const s of builtinSkills) {
+          lines.push(`- **\`/${s.name}\`**: ${s.description}`);
+        }
+        lines.push('');
+      }
+
+      lines.push('*The Skills & Capabilities Hub modal is now open. Press **⌥S** or click any skill to inspect instructions or run.*');
 
       const sysMsg: ChatMessage = {
         id: `cmd_sys_${Date.now()}`,
         role: 'assistant',
-        content: skillsText,
+        content: lines.join('\n'),
         timestamp: Date.now(),
         status: 'done',
       };
       setMessages((prev) => [...prev, sysMsg]);
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    // Antigravity Plugins & Extensions Manager
+    if (text === '/plugins' || text === '/plugins list') {
+      setShowPluginsModal(true);
+      window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
+
+      try {
+        const plugData = await fetchPlugins(token);
+        const lines: string[] = [
+          '### 🧩 Antigravity Plugins & Extensions',
+          '',
+          `*Loaded **${plugData.count}** installed plugins.*`,
+          '',
+        ];
+        if (plugData.plugins && plugData.plugins.length > 0) {
+          for (const p of plugData.plugins) {
+            const comps = p.components?.length ? p.components.join(', ') : 'none';
+            lines.push(`- **\`${p.name}\`** ${p.version ? `(v${p.version})` : ''}: ${p.description || 'No description'} [${p.enabled ? 'ENABLED' : 'DISABLED'}]`);
+            lines.push(`  - Components: \`${comps}\` | Source: \`${p.source}\``);
+          }
+        } else {
+          lines.push('*No plugins currently installed. Use the Plugins Manager modal to install extensions.*');
+        }
+        lines.push('');
+        lines.push('*The Plugins modal is now open. Press **⌥P** or run `/plugins` anytime to install, toggle, or inspect extensions.*');
+
+        const sysMsg: ChatMessage = {
+          id: `cmd_sys_${Date.now()}`,
+          role: 'assistant',
+          content: lines.join('\n'),
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, sysMsg]);
+      } catch (err: any) {
+        const errMsg: ChatMessage = {
+          id: `cmd_sys_${Date.now()}`,
+          role: 'assistant',
+          content: `### 🧩 Antigravity Plugins\n\nThe Plugins modal is now open.\n\n*Error fetching plugins list: ${err.message}*`,
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, errMsg]);
+      }
+
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    // Ticket PER-003: Multi-Persona System & Agent Customization
+    if (text === '/agents' || text === '/agents list') {
+      setShowPersonaModal(true);
+      window.dispatchEvent(new CustomEvent('agy:open-persona-modal'));
+
+      try {
+        const pData = await fetchPersonas(token, sessionId);
+        const lines: string[] = [
+          '### 🤖 Antigravity Agent Personas & Mindsets',
+          '',
+          `*Loaded **${pData.count}** available personas. Currently active: **${activePersona ? activePersona.name : (isHome ? 'Agentic Assistant' : 'Coding Agent')}**.*`,
+          '',
+        ];
+        for (const p of pData.personas) {
+          const isCur = activePersona ? p.id === activePersona.id : (isHome ? p.id === 'agentic-assistant' : p.id === 'coding-agent');
+          lines.push(`- **\`${p.name}\`** (\`${p.id}\`) ${isCur ? '*(ACTIVE)*' : ''}: ${p.role}`);
+          lines.push(`  - ${p.description}`);
+        }
+        lines.push('');
+        lines.push('*Type `/agent <id>` to switch instantly, click the persona badge in the header, or press **⌥A**.*');
+
+        const sysMsg: ChatMessage = {
+          id: `cmd_sys_${Date.now()}`,
+          role: 'assistant',
+          content: lines.join('\n'),
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, sysMsg]);
+      } catch (err: any) {
+        const errMsg: ChatMessage = {
+          id: `cmd_sys_${Date.now()}`,
+          role: 'assistant',
+          content: `### 🤖 Antigravity Agent Personas\n\nThe Persona Selector modal is now open.\n\n*Error fetching personas: ${err.message}*`,
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, errMsg]);
+      }
+
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    if (text.startsWith('/agent ') && text.trim().length > 7) {
+      const requestedId = text.substring(7).trim().toLowerCase();
+      try {
+        const pData = await fetchPersonas(token, sessionId);
+        const matched = pData.personas.find((p) => p.id.toLowerCase() === requestedId || p.name.toLowerCase() === requestedId);
+        if (matched) {
+          setActivePersona(matched);
+          await setSessionPersona(token, sessionId, matched.id);
+          const sysMsg: ChatMessage = {
+            id: `cmd_sys_${Date.now()}`,
+            role: 'assistant',
+            content: `**[PERSONA SWITCH]** Active agent persona set to **${matched.name}** (\`${matched.id}\`).\n\n> *${matched.role}* — ${matched.description}`,
+            timestamp: Date.now(),
+            status: 'done',
+          };
+          setMessages((prev) => [...prev, sysMsg]);
+        } else {
+          const sysMsg: ChatMessage = {
+            id: `cmd_sys_${Date.now()}`,
+            role: 'assistant',
+            content: `Unknown persona: \`${requestedId}\`. Type \`/agents\` to see available personas.`,
+            timestamp: Date.now(),
+            status: 'done',
+          };
+          setMessages((prev) => [...prev, sysMsg]);
+        }
+      } catch {
+        // ignore error
+      }
       setInputText('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
       return;
@@ -798,6 +1080,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         body: JSON.stringify({
           prompt: text,
           conversationId: conversationId || undefined,
+          personaId: activePersona?.id,
         }),
         signal: abortController.signal,
       });
@@ -1027,6 +1310,47 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     return () => window.removeEventListener('agy:insert-command', handleInsert);
   }, [handleSendMessage]);
 
+  // Listen for conversation resume/new from SessionSidebar or History Browser
+  useEffect(() => {
+    const handleResume = (e: Event) => {
+      const custom = e as CustomEvent<{ targetSessionId?: string; conversationId: string; messages: ChatMessage[] }>;
+      if (custom.detail?.targetSessionId && custom.detail.targetSessionId !== sessionId) return;
+      if (!custom.detail?.conversationId) return;
+
+      setConversationId(custom.detail.conversationId);
+      localStorage.setItem(`chat-conversation-${sessionId}`, custom.detail.conversationId);
+
+      if (Array.isArray(custom.detail.messages)) {
+        setMessages(custom.detail.messages);
+        localStorage.setItem(`chat-messages-${sessionId}`, JSON.stringify(custom.detail.messages));
+      }
+      setInterruptedTurn(null);
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 50);
+    };
+
+    const handleNew = (e: Event) => {
+      const custom = e as CustomEvent<{ targetSessionId?: string }>;
+      if (custom.detail?.targetSessionId && custom.detail.targetSessionId !== sessionId) return;
+
+      setConversationId('');
+      localStorage.removeItem(`chat-conversation-${sessionId}`);
+      setMessages([]);
+      localStorage.removeItem(`chat-messages-${sessionId}`);
+      setInterruptedTurn(null);
+    };
+
+    window.addEventListener('agy:resume-conversation', handleResume);
+    window.addEventListener('agy:new-conversation', handleNew);
+    return () => {
+      window.removeEventListener('agy:resume-conversation', handleResume);
+      window.removeEventListener('agy:new-conversation', handleNew);
+    };
+  }, [sessionId]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showSlashMenu && filteredCommands.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -1103,28 +1427,49 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         overflow: 'hidden',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
-          <span style={{ color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          <span className="mobile-hide" style={{ color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
             COMMAND STREAM //
           </span>
-          <span
+          <button
+            type="button"
+            onClick={() => setShowPersonaModal(true)}
+            data-testid="header-persona-badge"
             style={{
               fontSize: '9px',
               fontWeight: 700,
               padding: '2px 6px',
               borderRadius: '2px',
               letterSpacing: '0.5px',
-              backgroundColor: isHome ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-              color: isHome ? '#c084fc' : '#60a5fa',
-              border: `1px solid ${isHome ? 'rgba(168, 85, 247, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
+              backgroundColor: activePersona?.color
+                ? 'rgba(255, 255, 255, 0.08)'
+                : isHome ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+              color: activePersona ? activePersona.color : (isHome ? '#c084fc' : '#60a5fa'),
+              border: `1px solid ${activePersona?.color || (isHome ? 'rgba(168, 85, 247, 0.35)' : 'rgba(59, 130, 246, 0.35)')}`,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
               flexShrink: 0,
+              cursor: 'pointer',
             }}
-            title={isHome ? 'Home Persona: General Agentic Assistant' : 'Workspace Persona: Autonomous Coding Agent'}
+            title={`Active Persona: ${activePersona?.name || (isHome ? 'Agentic Assistant' : 'Coding Agent')} — Click or press ⌥A to switch`}
           >
-            {isHome ? '🤖 ASSISTANT' : '💻 CODING AGENT'}
-          </span>
+            <span>
+              {activePersona?.icon === 'code' ? (
+                <CodeIcon size={13} />
+              ) : activePersona?.icon === 'shield' ? (
+                <ShieldIcon size={13} />
+              ) : activePersona?.icon === 'target' || activePersona?.icon === 'compass' ? (
+                <TargetIcon size={13} />
+              ) : activePersona?.icon === 'laptop' ? (
+                <LaptopIcon size={13} />
+              ) : (
+                <RobotIcon size={13} />
+              )}
+            </span>
+            <span className="mobile-hide">
+              {activePersona ? ` ${activePersona.name.toUpperCase()}` : (isHome ? ' ASSISTANT' : ' CODING AGENT')}
+            </span>
+          </button>
           <span className={`tech-badge ${
             agentState === 'EXECUTING'
               ? 'tech-badge--active'
@@ -1141,6 +1486,31 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             }`} />
             {agentState}
           </span>
+
+          {conversationId && (
+            <span
+              style={{
+                fontSize: '9px',
+                color: 'var(--accent-amber-bright)',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '2px',
+                padding: '1px 5px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+              title={`Active AGY Conversation: ${conversationId}\nClick to copy ID`}
+              onClick={() => {
+                navigator.clipboard.writeText(conversationId);
+              }}
+            >
+              <span className="mobile-hide" style={{ opacity: 0.6 }}>CID:</span>
+              <span style={{ fontWeight: 700 }}>{conversationId.slice(0, 8)}</span>
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -1149,6 +1519,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             {(['worklog', 'transparent', 'final'] as PresentationMode[]).map((mode) => (
               <button
                 key={mode}
+                data-testid={`mode-${mode}`}
+                aria-label={`presentation-mode-${mode}`}
                 onClick={() => setGlobalPresentationMode(mode)}
                 title={`Switch presentation mode to ${mode}`}
                 style={{
@@ -1160,9 +1532,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
                   fontWeight: globalPresentationMode === mode ? 700 : 400,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '2px',
                 }}
               >
-                {mode === 'worklog' ? 'LOG' : mode === 'transparent' ? 'STREAM' : 'FINAL'}
+                <span>{mode === 'worklog' ? <ClipboardIcon size={11} /> : mode === 'transparent' ? <BoltIcon size={11} /> : <TargetIcon size={11} />}</span>
+                <span className="mobile-hide">{mode === 'worklog' ? 'LOG' : mode === 'transparent' ? 'STREAM' : 'FINAL'}</span>
               </button>
             ))}
           </div>
@@ -1177,9 +1553,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               cursor: 'pointer',
               fontSize: '10px',
               fontFamily: 'var(--font-mono)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
             }}
           >
-            [DIAG]
+            <StethoscopeIcon size={12} />
+            <span className="mobile-hide">DIAG</span>
           </button>
 
           <button
@@ -1192,12 +1572,18 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               cursor: 'pointer',
               fontSize: '10px',
               fontFamily: 'var(--font-mono)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
             }}
           >
-            [EXPORT]
+            <DownloadIcon size={12} />
+            <span className="mobile-hide">EXPORT</span>
           </button>
 
-          <span>EVENTS: {messages.length}</span>
+          <span title={`${messages.length} events`}>
+            <span className="mobile-hide">EVENTS: </span>{messages.length}
+          </span>
           <span className="desktop-only">TOOLS: {totalToolCalls}</span>
           {totalTokens > 0 && <span className="desktop-only">TOKENS: {(totalTokens / 1000).toFixed(1)}k</span>}
           {messages.length > 0 && (
@@ -1211,9 +1597,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 cursor: 'pointer',
                 fontSize: '10px',
                 fontFamily: 'var(--font-mono)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '2px',
               }}
             >
-              [RESET]
+              <TrashIcon size={12} />
+              <span className="mobile-hide">RESET</span>
             </button>
           )}
         </div>
@@ -1965,14 +2355,15 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
             marginTop: '4px',
             paddingTop: '4px',
             borderTop: '1px dashed var(--border-subtle)',
             fontSize: '10px',
             color: 'var(--text-muted)',
-            gap: '8px',
+            gap: '6px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -2025,7 +2416,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               <span className="desktop-only">Shift+⏎ newline</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', flexWrap: 'wrap' }}>
               {isStreaming ? (
                 <>
                   {inputText.trim() && (
@@ -2125,6 +2516,38 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         token={token}
         isOpen={showDiagnosticsModal}
         onClose={() => setShowDiagnosticsModal(false)}
+      />
+
+      {/* Skills Management & Capabilities Hub Modal */}
+      <SkillsManagementModal
+        isOpen={showSkillsModal}
+        onClose={() => setShowSkillsModal(false)}
+        cwd={workspaceMode?.cwd}
+        token={token}
+        onExecuteSkill={(cmd) => {
+          setInputText(cmd);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.focus();
+          }
+        }}
+      />
+
+      {/* Antigravity Plugins & Extensions Modal */}
+      <PluginsModal
+        isOpen={showPluginsModal}
+        onClose={() => setShowPluginsModal(false)}
+        token={token}
+      />
+
+      {/* Agent Personas & Operational Roles Modal */}
+      <PersonaSelectorModal
+        isOpen={showPersonaModal}
+        onClose={() => setShowPersonaModal(false)}
+        activePersonaId={activePersona?.id || (isHome ? 'agentic-assistant' : 'coding-agent')}
+        onSelectPersona={(p) => setActivePersona(p)}
+        token={token}
+        sessionId={sessionId}
       />
     </div>
   );

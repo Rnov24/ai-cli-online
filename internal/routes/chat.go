@@ -38,6 +38,7 @@ func (c *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Prompt         string `json:"prompt"`
 		ConversationId string `json:"conversationId"`
+		PersonaId      string `json:"personaId,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Prompt == "" {
 		http.Error(w, `{"error":"Prompt required"}`, http.StatusBadRequest)
@@ -61,12 +62,25 @@ func (c *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 
 	cwd := terminal.GetCwd(sessionName, c.auth.cfg.DefaultWorkingDir)
 
+	personaId := req.PersonaId
+	if personaId == "" && c.db != nil {
+		token := c.auth.ExtractToken(r)
+		if token == "" {
+			token = "default"
+		}
+		tokenHash := c.auth.TokenHash(token)
+		if val, found, _ := c.db.GetSetting(tokenHash, "session_persona:"+sessionName); found && val != "" {
+			personaId = val
+		}
+	}
+
 	reply, convId, err := agy.RunPromptStream(
 		r.Context(),
 		sessionName,
 		cwd,
 		req.ConversationId,
 		req.Prompt,
+		personaId,
 		func(event agy.StreamEvent) {},
 	)
 
@@ -105,6 +119,7 @@ func (c *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Prompt         string `json:"prompt"`
 		ConversationId string `json:"conversationId"`
+		PersonaId      string `json:"personaId,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Prompt == "" {
 		http.Error(w, `{"error":"Prompt required"}`, http.StatusBadRequest)
@@ -176,12 +191,25 @@ func (c *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	personaId := req.PersonaId
+	if personaId == "" && c.db != nil {
+		token := c.auth.ExtractToken(r)
+		if token == "" {
+			token = "default"
+		}
+		tokenHash := c.auth.TokenHash(token)
+		if val, found, _ := c.db.GetSetting(tokenHash, "session_persona:"+sessionName); found && val != "" {
+			personaId = val
+		}
+	}
+
 	_, _, err := agy.RunPromptStream(
 		r.Context(),
 		sessionName,
 		cwd,
 		req.ConversationId,
 		req.Prompt,
+		personaId,
 		func(event agy.StreamEvent) {
 			event.TurnId = turnId
 

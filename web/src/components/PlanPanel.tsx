@@ -8,7 +8,9 @@ import { fetchFiles } from '../api/files';
 import type { FileEntry } from '../api/files';
 import { fetchFileContent } from '../api/docs';
 import { fetchWorkspaceMode } from '../api/workspaces';
+import { fetchPlugins } from '../api/plugins';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
+import { FolderIcon, EditIcon, ClipboardIcon } from './icons';
 
 interface PlanPanelProps {
   sessionId: string;
@@ -108,11 +110,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     setPlanLoading(true);
     setShowInitGuide(false);
     (async () => {
-      let home = '';
       try {
         const res = await fetchFiles(token, sessionId);
         if (cancelled) return;
-        home = res.home || '';
         const aiTasksEntry = res.files.find((f: FileEntry) => f.name === 'AiTasks' && f.type === 'directory');
         if (aiTasksEntry) {
           const dirPath = res.cwd + '/AiTasks';
@@ -134,24 +134,15 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
         if (!cancelled) setPlanLoading(false);
       }
 
-      // Check if ai-cli-task plugin is installed in Antigravity by reading import_manifest.json
+      // Check if ai-cli-task plugin is installed via robust backend plugin API
       try {
         if (cancelled) return;
-        if (home) {
-          const manifestFile = `${home}/.gemini/config/import_manifest.json`;
-          const result = await fetchFileContent(token, sessionId, manifestFile, 0);
-          if (!cancelled && result) {
-            try {
-              const parsed = JSON.parse(result.content);
-              const imports = parsed.imports || [];
-              const hasPlugin = imports.some((imp: { name?: string }) => imp.name === 'ai-cli-task');
-              if (!hasPlugin) setShowPluginPrompt(true);
-            } catch { setShowPluginPrompt(true); }
-          } else {
-            setShowPluginPrompt(true);
-          }
+        const data = await fetchPlugins(token);
+        if (!cancelled) {
+          const hasPlugin = data.plugins?.some((p) => p.name === 'ai-cli-task');
+          if (!hasPlugin) setShowPluginPrompt(true);
         }
-      } catch { /* ignore — file not accessible or doesn't exist */ }
+      } catch { /* ignore — plugin endpoint not accessible or network issue */ }
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -462,7 +453,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
               borderColor: mobileView === 'browser' ? 'var(--accent-amber)' : 'transparent',
             }}
           >
-            📁 Files {planSelectedFile ? `(${planSelectedFile.split('/').pop()})` : ''}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <FolderIcon size={12} /> Files {planSelectedFile ? `(${planSelectedFile.split('/').pop()})` : ''}
+            </span>
           </button>
           <button
             className="mecha-btn"
@@ -478,7 +471,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
               opacity: planSelectedFile ? 1 : 0.4,
             }}
           >
-            ✏️ Document
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <EditIcon size={12} /> Document
+            </span>
           </button>
         </div>
       )}
@@ -535,7 +530,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
                   fontSize: '20px',
                   marginBottom: '2px',
                 }}>
-                  📋
+                  <ClipboardIcon size={24} color="var(--accent-amber-bright)" />
                 </div>
                 <span style={{ color: 'var(--text-bright)', fontSize: 14, fontWeight: 700 }}>
                   {isHome ? 'AiTasks/ Not Found in Home Directory' : 'AiTasks/ directory not found'}
@@ -597,7 +592,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
                     onClick={() => setMobileView('browser')}
                     style={{ padding: '6px 14px', fontSize: '11px', marginTop: '8px' }}
                   >
-                    📁 Browse Files
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <FolderIcon size={12} /> Browse Files
+                    </span>
                   </button>
                 )}
               </div>

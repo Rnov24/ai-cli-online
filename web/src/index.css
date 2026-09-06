@@ -14,6 +14,19 @@
   font-display: swap;
 }
 
+/* Standardized Z-Index Scale */
+:root {
+  --z-base: 1;
+  --z-header: 30;
+  --z-split-resizer: 40;
+  --z-drawer-backdrop: 500;
+  --z-drawer: 510;
+  --z-modal-backdrop: 700;
+  --z-modal: 710;
+  --z-popover: 800;
+  --z-toast: 900;
+}
+
 :root, [data-theme="dark"] {
   /* Futuristic Mecha / Industrial Palette */
   --bg-base: #08090b;             /* Near-black background */
@@ -2038,7 +2051,7 @@ body.resizing-panes-h * {
   inset: 0;
   background: rgba(8, 9, 11, 0.85);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: var(--z-modal-backdrop, 700);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -2093,6 +2106,21 @@ body.resizing-panes-h * {
 }
 
 /* Responsive utilities */
+@media (max-width: 1024px) {
+  .tablet-hide {
+    display: none !important;
+  }
+  .tablet-shrink {
+    max-width: 160px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-hide {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .desktop-only {
     display: none !important;

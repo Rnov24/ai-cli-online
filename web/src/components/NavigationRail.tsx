@@ -1,4 +1,14 @@
 import { useStore } from '../store';
+import {
+  TaskPulseIcon,
+  FolderIcon,
+  GitBranchIcon,
+  SettingsIcon,
+  HelpIcon,
+  LogoutIcon,
+  CloseIcon,
+  PuzzleIcon,
+} from './icons';
 
 interface NavigationRailProps {
   expanded: boolean;
@@ -98,7 +108,7 @@ export function NavigationRail({
                 justifyContent: 'center',
               }}
             >
-              ✕
+              <CloseIcon size={14} />
             </button>
           ) : (
             <button
@@ -241,7 +251,7 @@ export function NavigationRail({
               transition: 'all 0.15s ease',
             }}
           >
-            <span style={{ fontSize: '13px' }}>⌁</span>
+            <TaskPulseIcon size={14} />
             {isExpanded && (
               <span style={{ fontSize: '11px', fontWeight: 600 }}>TASKS &amp; PLAN</span>
             )}
@@ -268,7 +278,7 @@ export function NavigationRail({
               transition: 'all 0.15s ease',
             }}
           >
-            <span style={{ fontSize: '13px' }}>◇</span>
+            <FolderIcon size={14} />
             {isExpanded && (
               <span style={{ fontSize: '11px', fontWeight: 600 }}>FILES</span>
             )}
@@ -295,7 +305,7 @@ export function NavigationRail({
               transition: 'all 0.15s ease',
             }}
           >
-            <span style={{ fontSize: '13px' }}>🌿</span>
+            <GitBranchIcon size={14} />
             {isExpanded && (
               <span style={{ fontSize: '11px', fontWeight: 600 }}>GIT GRAPH</span>
             )}
@@ -322,6 +332,34 @@ export function NavigationRail({
         )}
 
         <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('agy:open-skills-modal'));
+            if (mobileOpen) onCloseMobile();
+          }}
+          title="Skills & Capabilities Hub (⌥S)"
+          aria-label="Open skills hub"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: mobileOpen ? '10px 14px' : (isExpanded ? '6px 10px' : '8px 0'),
+            minHeight: mobileOpen ? '42px' : 'auto',
+            justifyContent: isExpanded ? 'flex-start' : 'center',
+            borderRadius: '2px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--accent-purple)',
+            cursor: 'pointer',
+            marginBottom: '2px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <PuzzleIcon size={14} />
+          {isExpanded && <span style={{ fontSize: '11px' }}>SKILLS HUB</span>}
+        </button>
+
+        <button
           onClick={onOpenSettings}
           title="System Settings"
           style={{
@@ -341,7 +379,7 @@ export function NavigationRail({
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{ fontSize: '12px' }}>⚙</span>
+          <SettingsIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px' }}>SETTINGS</span>}
         </button>
 
@@ -370,7 +408,7 @@ export function NavigationRail({
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{ fontSize: '13px', fontWeight: 700 }}>?</span>
+          <HelpIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px', fontWeight: 600 }}>HELP &amp; GUIDE</span>}
         </button>
 
@@ -397,7 +435,7 @@ export function NavigationRail({
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{ fontSize: '12px' }}>⎋</span>
+          <LogoutIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px' }}>LOGOUT</span>}
         </button>
       </div>

@@ -36,6 +36,11 @@ if [[ ! -x "${CLI_BIN}" ]]; then
   (cd "$ROOT_DIR" && go build -o bin/ai-cli-online ./cmd/ai-cli-online)
 fi
 
+# Create symlink in $PREFIX/bin for convenient global CLI access
+if [[ -d "${PREFIX:-/data/data/com.termux/files/usr}/bin" ]]; then
+  ln -sf "${CLI_BIN}" "${PREFIX:-/data/data/com.termux/files/usr}/bin/ai-cli-online" 2>/dev/null || true
+fi
+
 echo "Configuring boot script at: ${BOOT_SCRIPT}"
 
 cat > "$BOOT_SCRIPT" << 'BOOT_EOF'

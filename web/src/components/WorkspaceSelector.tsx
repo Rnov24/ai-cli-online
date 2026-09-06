@@ -6,20 +6,26 @@ import {
   switchSessionWorkspace,
   Workspace,
 } from '../api/workspaces';
+import { HomeIcon, FolderIcon, CheckIcon, CloseIcon } from './icons';
 
 interface WorkspaceSelectorProps {
   token: string;
-  sessionId: string;
+  sessionId?: string;
   cwd?: string | null;
+  currentCwd?: string | null;
   onWorkspaceSwitched?: (newCwd: string, isHome: boolean, mode: 'agentic-assistant' | 'coding-agent') => void;
+  onWorkspaceChange?: (newCwd: string, isHome: boolean, mode: 'agentic-assistant' | 'coding-agent') => void;
 }
 
 export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   token,
   sessionId,
-  cwd,
+  cwd: cwdProp,
+  currentCwd,
   onWorkspaceSwitched,
+  onWorkspaceChange,
 }) => {
+  const cwd = currentCwd !== undefined ? currentCwd : cwdProp;
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWsId, setActiveWsId] = useState('');
   const [isHome, setIsHome] = useState(false);
@@ -33,14 +39,35 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const popoverRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    if (!el.style.width) {
+      Object.defineProperty(el.style, 'width', {
+        value: 'min(320px, calc(100vw - 24px))',
+        configurable: true,
+        writable: true,
+      });
+    }
+    if (!el.style.maxHeight) {
+      Object.defineProperty(el.style, 'maxHeight', {
+        value: 'min(440px, calc(100dvh - 60px))',
+        configurable: true,
+        writable: true,
+      });
+    }
+  }, []);
+
   const loadWorkspaces = useCallback(async () => {
     if (!token) return;
     try {
       const data = await fetchWorkspaces(token);
-      setWorkspaces(data.workspaces);
-      setActiveWsId(data.activeWorkspaceId);
-      setIsHome(data.isHome);
-      setMode(data.mode);
+      const wsList = Array.isArray(data) ? data : (data as any)?.workspaces || [];
+      setWorkspaces(wsList);
+      if ((data as any)?.activeWorkspaceId) {
+        setActiveWsId((data as any).activeWorkspaceId);
+      }
+      if ((data as any)?.isHome !== undefined) setIsHome((data as any).isHome);
+      if ((data as any)?.mode !== undefined) setMode((data as any).mode);
     } catch {
       // ignore
     }
@@ -88,6 +115,9 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       if (onWorkspaceSwitched) {
         onWorkspaceSwitched(res.cwd, res.isHome, res.mode);
       }
+      if (onWorkspaceChange) {
+        onWorkspaceChange(res.cwd, res.isHome, res.mode);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to switch workspace');
     } finally {
@@ -122,7 +152,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       await deleteWorkspace(token, id);
       setWorkspaces((prev) => prev.filter((w) => w.id !== id));
       if (activeWsId === id) {
-        const homeWs = workspaces.find((w) => w.isHome);
+        const homeWs = (workspaces || []).find((w) => w.isHome);
         if (homeWs) {
           handleSelectWorkspace(homeWs);
         }
@@ -133,7 +163,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   };
 
   // Find active workspace display name
-  const activeWorkspace = workspaces.find((w) => w.id === activeWsId) || {
+  const activeWorkspace = (workspaces || []).find((w) => w.id === activeWsId) || {
     name: isHome ? 'Home (~)' : cwd ? cwd.split(/[/\\]/).pop() || 'Workspace' : 'Workspace',
     isHome,
   };
@@ -167,7 +197,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
           e.currentTarget.style.borderColor = 'var(--border)';
         }}
       >
-        <span style={{ fontSize: '12px' }}>{isHome ? '🏠' : '📁'}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{isHome ? <HomeIcon size={13} /> : <FolderIcon size={13} />}</span>
         <span
           style={{
             maxWidth: '140px',
@@ -199,23 +229,26 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       {/* Popover Dropdown */}
       {isOpen && (
         <div
+          ref={popoverRef}
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
+            left: 'auto',
+            right: 0,
             marginTop: '4px',
-            width: '320px',
-            maxHeight: '440px',
+            width: 'min(320px, calc(100vw - 24px))',
+            maxHeight: 'min(440px, calc(100dvh - 60px))',
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             borderRadius: '6px',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
-            zIndex: 9999,
+            zIndex: 'var(--z-popover, 800)',
             overflowY: 'auto',
             padding: '8px',
             color: 'var(--text-primary)',
           }}
         >
+          <div style={{ position: 'fixed', inset: 0, zIndex: -1 }} onClick={() => setIsOpen(false)} />
           <div
             style={{
               padding: '4px 6px 8px',
@@ -338,13 +371,13 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', padding: '2px 6px', fontWeight: 600 }}>
               PERSONAL ROOT
             </div>
-            {workspaces
+            {(workspaces || [])
               .filter((w) => w.isHome)
               .map((ws) => {
                 const isActive = isHome;
                 return (
                   <div
-                    key={ws.id}
+                    key={ws.id || ws.path}
                     onClick={() => handleSelectWorkspace(ws)}
                     style={{
                       display: 'flex',
@@ -366,7 +399,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🏠</span>
+                        <HomeIcon size={13} />
                         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-bright)' }}>
                           {ws.name}
                         </span>
@@ -387,7 +420,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                         {ws.path}
                       </div>
                     </div>
-                    {isActive && <span style={{ color: 'var(--accent-cyan)', fontSize: '14px', fontWeight: 700 }}>✓</span>}
+                    {isActive && <CheckIcon size={14} color="var(--accent-cyan)" />}
                   </div>
                 );
               })}
@@ -398,13 +431,13 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', padding: '2px 6px', fontWeight: 600 }}>
               PROJECT WORKSPACES (CODING AGENT)
             </div>
-            {workspaces
+            {(workspaces || [])
               .filter((w) => !w.isHome)
               .map((ws) => {
                 const isActive = !isHome && activeWsId === ws.id;
                 return (
                   <div
-                    key={ws.id}
+                    key={ws.id || ws.path}
                     onClick={() => handleSelectWorkspace(ws)}
                     style={{
                       display: 'flex',
@@ -413,8 +446,8 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                       padding: '6px 8px',
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      background: isActive ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
-                      border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.4)' : 'transparent'}`,
+                      background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                      border: `1px solid ${isActive ? 'rgba(59, 130, 246, 0.4)' : 'transparent'}`,
                       margin: '2px 0',
                     }}
                     onMouseEnter={(e) => {
@@ -424,49 +457,44 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                       if (!isActive) e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <div style={{ minWidth: 0, flex: 1, paddingRight: '6px' }}>
+                    <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>📁</span>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: 'var(--text-bright)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
+                        <FolderIcon size={13} color="var(--accent-blue, #60a5fa)" />
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-bright)' }}>
                           {ws.name}
                         </span>
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            color: 'var(--accent-blue, #60a5fa)',
+                            fontWeight: 700,
+                            padding: '1px 4px',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            borderRadius: '2px',
+                          }}
+                        >
+                          Coding Agent
+                        </span>
                       </div>
-                      <div
-                        style={{
-                          fontSize: '10px',
-                          color: 'var(--text-muted)',
-                          marginTop: '2px',
-                          paddingLeft: '22px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', paddingLeft: '22px' }}>
                         {ws.path}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {isActive && <span style={{ color: 'var(--accent-green)', fontSize: '14px', fontWeight: 700 }}>✓</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {isActive && <CheckIcon size={14} color="var(--accent-blue, #60a5fa)" />}
                       <button
                         type="button"
                         onClick={(e) => handleDeleteWorkspace(e, ws.id)}
-                        title="Remove workspace from list"
+                        title="Unlink Workspace"
                         style={{
                           background: 'transparent',
                           border: 'none',
                           color: 'var(--text-muted)',
                           cursor: 'pointer',
-                          fontSize: '12px',
                           padding: '2px 4px',
+                          fontSize: '11px',
+                          lineHeight: 1,
+                          borderRadius: '2px',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.color = '#ef4444';
@@ -475,14 +503,14 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                           e.currentTarget.style.color = 'var(--text-muted)';
                         }}
                       >
-                        ✕
+                        <CloseIcon size={12} />
                       </button>
                     </div>
                   </div>
                 );
               })}
 
-            {workspaces.filter((w) => !w.isHome).length === 0 && (
+            {(workspaces || []).filter((w) => !w.isHome).length === 0 && (
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '6px 8px', fontStyle: 'italic' }}>
                 No project workspaces registered yet. Click &quot;+ Add Workspace&quot; to link a repository.
               </div>

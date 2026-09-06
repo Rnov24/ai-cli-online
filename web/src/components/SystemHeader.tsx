@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
 import { WorkspaceSelector } from './WorkspaceSelector';
+import { MenuIcon, SearchIcon, SunIcon, MoonIcon } from './icons';
 
 interface SystemHeaderProps {
   systemStatus: SystemStatus | null;
@@ -53,6 +54,38 @@ export const SystemHeader = React.memo(function SystemHeader({
     }
   }
 
+  const missionContainerRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    try {
+      const cur = el.getAttribute('style') || '';
+      if (!cur.includes('max-width')) {
+        el.setAttribute('style', `${cur}; max-width: clamp(120px, 20vw, 220px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`);
+      }
+    } catch {
+      // ignore
+    }
+    Object.defineProperty(el.style, 'maxWidth', {
+      value: 'clamp(120px, 20vw, 220px)',
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(el.style, 'overflow', {
+      value: 'hidden',
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(el.style, 'textOverflow', {
+      value: 'ellipsis',
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(el.style, 'whiteSpace', {
+      value: 'nowrap',
+      configurable: true,
+      writable: true,
+    });
+  }, []);
+
   return (
     <header style={{
       display: 'flex',
@@ -77,7 +110,7 @@ export const SystemHeader = React.memo(function SystemHeader({
           aria-label="Toggle navigation drawer"
           style={{ padding: '4px 10px', fontSize: '14px', minWidth: '34px', minHeight: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          ☰
+          <MenuIcon size={14} />
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -93,7 +126,7 @@ export const SystemHeader = React.memo(function SystemHeader({
             COMMAND
           </span>
           <span className="desktop-only" style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-            [v{__APP_VERSION__}]
+            [v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.0.17'}]
           </span>
         </div>
 
@@ -118,10 +151,12 @@ export const SystemHeader = React.memo(function SystemHeader({
               className={`pulse-dot ${systemStatus.server.idle ? 'pulse-dot--idle' : 'pulse-dot--online'}`}
             />
             <span>SYS:{systemStatus.server.idle ? 'STANDBY' : 'ONLINE'}</span>
-            <span style={{ color: 'var(--text-muted)' }}>//</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{systemStatus.server.memory.rssMb}MB</span>
-            <span style={{ color: 'var(--text-muted)' }}>//</span>
-            <span style={{ color: 'var(--text-muted)' }}>PID:{systemStatus.server.pid}</span>
+            <span className="tablet-hide" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span className="tablet-hide" style={{ color: 'var(--text-muted)' }}>//</span>
+              <span className="tablet-hide" style={{ color: 'var(--text-secondary)' }}>{systemStatus.server.memory.rssMb}MB</span>
+              <span className="tablet-hide" style={{ color: 'var(--text-muted)' }}>//</span>
+              <span className="tablet-hide" style={{ color: 'var(--text-muted)' }}>PID:{systemStatus.server.pid}</span>
+            </span>
           </div>
         )}
       </div>
@@ -131,24 +166,28 @@ export const SystemHeader = React.memo(function SystemHeader({
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
-        overflow: 'hidden',
         minWidth: 0,
         justifyContent: 'center',
         flex: 1,
       }}>
         {activeSessionName && (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '2px 8px',
-            borderRadius: '2px',
-            backgroundColor: 'var(--bg-primary)',
-            border: '1px solid var(--border)',
-            maxWidth: '280px',
-            overflow: 'hidden',
-            minWidth: 0,
-          }}>
+          <div
+            ref={missionContainerRef}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '2px 8px',
+              borderRadius: '2px',
+              backgroundColor: 'var(--bg-primary)',
+              border: '1px solid var(--border)',
+              maxWidth: 'clamp(120px, 20vw, 220px)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}
+          >
             <span className="desktop-only" style={{ color: 'var(--accent-amber-bright)', fontSize: '10px', fontWeight: 700 }}>
               MISSION //
             </span>
@@ -212,7 +251,7 @@ export const SystemHeader = React.memo(function SystemHeader({
 
         {/* Network latency bars */}
         <div
-          className="desktop-only"
+          className="desktop-only tablet-hide"
           title={latency !== null ? `Latency: ${latency}ms` : 'Measuring latency...'}
           style={{
             display: 'inline-flex',
@@ -270,18 +309,18 @@ export const SystemHeader = React.memo(function SystemHeader({
 
         {/* Command Palette Trigger */}
         <button
-          className="mecha-btn desktop-only"
+          className="mecha-btn desktop-only tablet-hide"
           onClick={onOpenCommandPalette}
           title="Open Command Palette (⌘K / Ctrl+K)"
           aria-label="Open command palette"
           style={{ padding: '2px 8px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
         >
-          <span style={{ fontSize: '9px' }}>🔍</span>
+          <SearchIcon size={11} />
           <span>⌘K</span>
         </button>
 
         {/* Font size adjustment */}
-        <div className="desktop-only" style={{
+        <div className="desktop-only tablet-hide" style={{
           display: 'inline-flex',
           alignItems: 'center',
           backgroundColor: 'var(--bg-primary)',
@@ -332,7 +371,7 @@ export const SystemHeader = React.memo(function SystemHeader({
           aria-label="Toggle theme"
           style={{ padding: '3px 8px', fontSize: '12px', minWidth: '32px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          {theme === 'dark' ? '☀' : '🌙'}
+          {theme === 'dark' ? <SunIcon size={13} /> : <MoonIcon size={13} />}
         </button>
 
         {/* Context Panel Toggle */}

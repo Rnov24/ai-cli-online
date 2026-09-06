@@ -3,6 +3,7 @@ import type { ChatMessage } from 'ai-cli-online-shared';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ThinkingBlock } from './ThinkingBlock';
 import { ToolCallCard } from './ToolCallCard';
+import { CheckIcon, BoltIcon } from './icons';
 
 export type PresentationMode = 'worklog' | 'transparent' | 'final';
 
@@ -201,9 +202,12 @@ export const TurnAnchor = memo(function TurnAnchor({
                 cursor: 'pointer',
                 fontSize: '9px',
                 fontFamily: 'var(--font-mono)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
               }}
             >
-              {isCopied ? '✓ COPIED' : '[COPY]'}
+              {isCopied ? <><CheckIcon size={11} /> COPIED</> : '[COPY]'}
             </button>
           )}
         </div>
@@ -240,7 +244,9 @@ export const TurnAnchor = memo(function TurnAnchor({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: 'var(--accent-cyan-bright)' }}>⚡ WORKLOG SUMMARY</span>
+                <span style={{ color: 'var(--accent-cyan-bright)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <BoltIcon size={12} /> WORKLOG SUMMARY
+                </span>
                 <span style={{ color: 'var(--text-muted)' }}>//</span>
                 <span>{toolCount} tool calls</span>
                 {message.status === 'streaming' && (
