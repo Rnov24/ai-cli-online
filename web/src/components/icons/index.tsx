@@ -298,3 +298,18 @@ export const DesktopScreenIcon = createIcon('DesktopScreenIcon', (
     <line x1="12" y1="17" x2="12" y2="21" />
   </>
 ));
+
+export const CodeIcon = createIcon('CodeIcon', (
+  <>
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
+  </>
+));
+
+export const PlusIcon = createIcon('PlusIcon', (
+  <>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </>
+));
+

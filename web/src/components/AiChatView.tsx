@@ -23,6 +23,8 @@ import {
   createWorkspace,
   WorkspaceModePayload,
 } from '../api/workspaces';
+import { fetchSkills, type SkillItem } from '../api/skills';
+import { SkillsManagementModal } from './SkillsManagementModal';
 
 // Ensure localStorage has a working fallback in test/jsdom/opaque-origin environments under Node 22+
 try {
@@ -186,6 +188,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const [activeClarifyToolCall, setActiveClarifyToolCall] = useState<ToolCall | null>(null);
   const [pendingQueue, setPendingQueue] = useState<string[]>([]);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
+  const [showSkillsModal, setShowSkillsModal] = useState(false);
+  const [discoveredSkills, setDiscoveredSkills] = useState<SkillItem[]>([]);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem(`chat-messages-${sessionId}`);
@@ -222,6 +226,9 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     try {
       const modeData = await fetchWorkspaceMode(token, sessionId);
       setWorkspaceMode(modeData);
+      fetchSkills(token, modeData.cwd)
+        .then((res) => setDiscoveredSkills(res.skills || []))
+        .catch(() => {});
     } catch {
       // ignore
     }
@@ -230,6 +237,22 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   useEffect(() => {
     refreshWorkspaceMode();
   }, [refreshWorkspaceMode]);
+
+  useEffect(() => {
+    const handleOpenSkills = () => setShowSkillsModal(true);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        setShowSkillsModal((prev) => !prev);
+      }
+    };
+    window.addEventListener('agy:open-skills-modal', handleOpenSkills);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('agy:open-skills-modal', handleOpenSkills);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -421,8 +444,36 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
   const isHome = workspaceMode?.isHome ?? false;
 
+  const mergedCommands = useMemo(() => {
+    const list: SlashCommandItem[] = [];
+    const seen = new Set<string>();
+
+    // Discovered skills from active workspace or global plugins
+    for (const sk of discoveredSkills) {
+      const cmd = `/${sk.name}`;
+      if (!seen.has(cmd)) {
+        seen.add(cmd);
+        list.push({
+          cmd,
+          desc: `[${sk.scope.toUpperCase()}] ${sk.description}`,
+          category: sk.scope === 'workspace' ? 'coding' : 'common',
+        });
+      }
+    }
+
+    // Static builtin slash commands
+    for (const sc of SLASH_COMMANDS) {
+      if (!seen.has(sc.cmd)) {
+        seen.add(sc.cmd);
+        list.push(sc);
+      }
+    }
+
+    return list;
+  }, [discoveredSkills]);
+
   const filteredCommands = useMemo(() => {
-    const matched = SLASH_COMMANDS.filter(
+    const matched = mergedCommands.filter(
       (sc) =>
         sc.cmd.toLowerCase().includes(slashFilter) ||
         sc.desc.toLowerCase().includes(slashFilter),
@@ -455,7 +506,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
       return bWeight - aWeight;
     });
-  }, [slashFilter, isHome]);
+  }, [slashFilter, isHome, mergedCommands]);
 
   const selectSlashCommand = (cmd: string) => {
     setInputText(cmd + ' ');
@@ -636,34 +687,52 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       return;
     }
 
-    // Active Skills Reference
-    if (text === '/skills') {
-      window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'skills' } }));
-      const skillsText = [
-        '### ⚡ Active `ai-cli-task` Lifecycle Skills & Autonomous Tools',
+    // Active Skills Reference & Management Hub
+    if (text === '/skills' || text === '/skills list') {
+      setShowSkillsModal(true);
+      window.dispatchEvent(new CustomEvent('agy:open-skills-modal'));
+
+      const workspaceSkills = discoveredSkills.filter((s) => s.scope === 'workspace');
+      const globalSkills = discoveredSkills.filter((s) => s.scope === 'global');
+      const builtinSkills = discoveredSkills.filter((s) => s.scope === 'builtin');
+
+      const lines: string[] = [
+        '### 🧩 Active Antigravity Skills & Capabilities Hub',
         '',
-        '1. **/auto `<module>`**: Autonomous 13-skill loop (plan → research → check → verify → exec → merge → report)',
-        '2. **/plan `<module>`**: Architecture and step-by-step implementation plan',
-        '3. **/research `<module>`**: External references and dependency gathering',
-        '4. **/check `<module>`**: Feasibility validation before code modifications',
-        '5. **/verify `<module>`**: Execute domain-adapted tests (unit, build, integration)',
-        '6. **/exec `<module>`**: Execute approved implementation plan',
-        '7. **/review `<module>`**: Review diffs, security, and changes',
-        '8. **/merge `<module>`**: Merge isolated worktree branch to main',
-        '9. **/report `<module>`**: Generate formal task completion report',
-        '10. **/init `<module>`**: Initialize task module and branch',
-        '11. **/cancel `<module>`**: Cancel task & clean worktree',
-        '12. **/list**: Query status of all task modules',
-        '13. **/annotate `<file>` `<ann>`**: Process Plan panel annotations',
-        '14. **/summarize `<module>`**: Regenerate context summary',
+        `*Discovered **${discoveredSkills.length}** total skills across workspace, plugins, and built-in systems.*`,
         '',
-        '*Click **[? HELP]** in header to inspect the complete Skills & Tools reference.*',
-      ].join('\n');
+      ];
+
+      if (workspaceSkills.length > 0) {
+        lines.push('#### 📁 Project / Workspace Skills (`.agents/skills`)');
+        for (const s of workspaceSkills) {
+          lines.push(`- **\`/${s.name}\`**: ${s.description}`);
+        }
+        lines.push('');
+      }
+
+      if (globalSkills.length > 0) {
+        lines.push('#### 🌐 Global & Plugin Skills (`~/.gemini/config/plugins`, `~/.agents/skills`)');
+        for (const s of globalSkills) {
+          lines.push(`- **\`/${s.name}\`**: ${s.description}`);
+        }
+        lines.push('');
+      }
+
+      if (builtinSkills.length > 0) {
+        lines.push('#### ⚙️ Built-In AGY Skills');
+        for (const s of builtinSkills) {
+          lines.push(`- **\`/${s.name}\`**: ${s.description}`);
+        }
+        lines.push('');
+      }
+
+      lines.push('*The Skills & Capabilities Hub modal is now open. Press **⌥S** or click any skill to inspect instructions or run.*');
 
       const sysMsg: ChatMessage = {
         id: `cmd_sys_${Date.now()}`,
         role: 'assistant',
-        content: skillsText,
+        content: lines.join('\n'),
         timestamp: Date.now(),
         status: 'done',
       };
@@ -2258,6 +2327,21 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         token={token}
         isOpen={showDiagnosticsModal}
         onClose={() => setShowDiagnosticsModal(false)}
+      />
+
+      {/* Skills Management & Capabilities Hub Modal */}
+      <SkillsManagementModal
+        isOpen={showSkillsModal}
+        onClose={() => setShowSkillsModal(false)}
+        cwd={workspaceMode?.cwd}
+        token={token}
+        onExecuteSkill={(cmd) => {
+          setInputText(cmd);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.focus();
+          }
+        }}
       />
     </div>
   );

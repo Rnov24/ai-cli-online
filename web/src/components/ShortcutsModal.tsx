@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useStore } from '../store';
+import { fetchSkills, type SkillItem } from '../api/skills';
 import {
   RocketIcon,
   BoltIcon,
@@ -282,6 +284,18 @@ export function ShortcutsModal({
   const [activeTab, setActiveTab] = useState<'guide' | 'commands' | 'skills' | 'shortcuts'>(() => normalizeTab(initialTab));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'assistant' | 'coding' | 'common' | 'system'>('all');
+  const token = useStore((s) => s.token);
+  const [discoveredSkills, setDiscoveredSkills] = useState<SkillItem[]>([]);
+
+  useEffect(() => {
+    if (isOpen && token) {
+      fetchSkills(token)
+        .then((res) => {
+          setDiscoveredSkills(res.skills || []);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, token]);
 
   useEffect(() => {
     if (isOpen) {
@@ -693,6 +707,89 @@ export function ShortcutsModal({
           {/* TAB 3: SKILLS & TOOLS REFERENCE */}
           {activeTab === 'skills' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Hub Launch Banner */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  backgroundColor: 'var(--bg-primary)',
+                  border: '1px solid var(--accent-purple)',
+                  borderRadius: '4px',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-bright)', fontFamily: 'var(--font-mono)' }}>
+                    SKILLS &amp; CAPABILITIES MANAGEMENT HUB
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Inspect full SKILL.md runbooks, discover workspace-specific skills, or scaffold new project skills.
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('agy:open-skills-modal'));
+                    onClose();
+                  }}
+                  style={{
+                    backgroundColor: 'var(--accent-purple)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '3px',
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <PuzzleIcon size={12} />
+                  <span>OPEN SKILLS MANAGER (⌥S)</span>
+                </button>
+              </div>
+
+              {/* Workspace-Scoped Skills */}
+              {discoveredSkills.filter((s) => s.scope === 'workspace').length > 0 && (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-cyan-bright)', marginBottom: '8px', letterSpacing: '0.8px' }}>
+                    // ACTIVE WORKSPACE-SCOPED SKILLS (.agents/skills)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+                    {discoveredSkills
+                      .filter((s) => s.scope === 'workspace')
+                      .map((sk) => (
+                        <div
+                          key={sk.name}
+                          style={{
+                            padding: '8px 10px',
+                            backgroundColor: 'var(--bg-primary)',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            borderRadius: '3px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-cyan-bright)', fontFamily: 'var(--font-mono)' }}>
+                              /{sk.name}
+                            </span>
+                            <span style={{ fontSize: '9px', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', padding: '0 4px', borderRadius: '2px' }}>
+                              PROJECT
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                            {sk.description}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               {/* ai-cli-task Lifecycle */}
               <div>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-amber-bright)', marginBottom: '8px', letterSpacing: '0.8px' }}>

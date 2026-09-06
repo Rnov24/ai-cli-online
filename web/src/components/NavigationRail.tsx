@@ -7,6 +7,7 @@ import {
   HelpIcon,
   LogoutIcon,
   CloseIcon,
+  PuzzleIcon,
 } from './icons';
 
 interface NavigationRailProps {
@@ -329,6 +330,34 @@ export function NavigationRail({
             SYSTEM //
           </div>
         )}
+
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('agy:open-skills-modal'));
+            if (mobileOpen) onCloseMobile();
+          }}
+          title="Skills & Capabilities Hub (⌥S)"
+          aria-label="Open skills hub"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: mobileOpen ? '10px 14px' : (isExpanded ? '6px 10px' : '8px 0'),
+            minHeight: mobileOpen ? '42px' : 'auto',
+            justifyContent: isExpanded ? 'flex-start' : 'center',
+            borderRadius: '2px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--accent-purple)',
+            cursor: 'pointer',
+            marginBottom: '2px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <PuzzleIcon size={14} />
+          {isExpanded && <span style={{ fontSize: '11px' }}>SKILLS HUB</span>}
+        </button>
 
         <button
           onClick={onOpenSettings}
