@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -60,6 +61,9 @@ func main() {
 	case "install-boot":
 		runInstallBoot()
 
+	case "uninstall-boot":
+		runUninstallBoot()
+
 	case "-v", "--version", "version":
 		fmt.Printf("ai-cli-online v%s (Go native)\n", AppVersion)
 
@@ -83,7 +87,8 @@ Commands:
   status                 Show running status, PID, memory, and services
   stop                   Stop running server daemon
   restart [-p port]      Restart running server daemon
-  install-boot           Configure auto-start on Android device boot (Termux:Boot)
+  install-boot           Configure auto-start on system boot (Windows Startup / Termux)
+  uninstall-boot         Remove auto-start configuration
   version                Print version
 
 Options:
@@ -241,7 +246,11 @@ func runStatus() {
 	fmt.Println("========================================")
 
 	plat := "Linux"
-	if pid.IsTermux() {
+	if runtime.GOOS == "windows" {
+		plat = "Windows"
+	} else if runtime.GOOS == "darwin" {
+		plat = "macOS"
+	} else if pid.IsTermux() {
 		plat = "Android (Termux)"
 	}
 	fmt.Printf("  Platform:    %s\n", plat)
@@ -281,8 +290,12 @@ func runStatus() {
 }
 
 func runInstallBoot() {
+	if runtime.GOOS == "windows" {
+		runInstallWindowsStartup()
+		return
+	}
 	if !pid.IsTermux() {
-		fmt.Println("install-boot is currently tailored for Termux on Android.")
+		fmt.Println("install-boot is currently tailored for Windows and Termux (Android).")
 		fmt.Println("For Linux VPS systemd service, see install-service.sh.")
 		return
 	}
@@ -389,4 +402,90 @@ echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] AGY Online boot script finished." >> 
 		fmt.Println(`    adb shell "settings put global settings_enable_monitor_phantom_procs false"`)
 		fmt.Println()
 	}
+}
+
+func runInstallWindowsStartup() {
+	appData := os.Getenv("APPDATA")
+	if appData == "" {
+		home, _ := os.UserHomeDir()
+		appData = filepath.Join(home, "AppData", "Roaming")
+	}
+	startupDir := filepath.Join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
+	if err := os.MkdirAll(startupDir, 0755); err != nil {
+		fmt.Printf("Failed to create Windows Startup directory: %v\n", err)
+		return
+	}
+
+	self, err := os.Executable()
+	if err != nil {
+		fmt.Printf("Failed to resolve executable path: %v\n", err)
+		return
+	}
+	self, _ = filepath.EvalSymlinks(self)
+	self = filepath.Clean(self)
+
+	// Create silent VBS launcher in Startup folder
+	vbsPath := filepath.Join(startupDir, "start-ai-cli-online.vbs")
+	vbsContent := fmt.Sprintf(`' ==============================================================================
+' AGY Online Silent Background Auto-Start on Windows Logon
+' Launches ai-cli-online in detached daemon mode (-d) with zero console flash
+' ==============================================================================
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run """" & "%s" & """ start -d", 0, False
+`, strings.ReplaceAll(self, `"`, `""`))
+
+	if err := os.WriteFile(vbsPath, []byte(vbsContent), 0644); err != nil {
+		fmt.Printf("Failed to write startup launcher to %s: %v\n", vbsPath, err)
+		return
+	}
+
+	fmt.Println("==================================================")
+	fmt.Println("  AGY Online Windows Auto-Start Configured")
+	fmt.Println("==================================================")
+	fmt.Printf("  Target binary:   %s\n", self)
+	fmt.Printf("  Startup script:  %s\n", vbsPath)
+	fmt.Println("  Mode:            Silent background daemon (-d)")
+	fmt.Println("  Behavior:        Automatically starts when you log in to Windows.")
+	fmt.Println()
+	fmt.Println("  Verify now:      ai-cli-online start -d")
+	fmt.Println("  Check status:    ai-cli-online status")
+	fmt.Println("  Open UI:         http://localhost:3001")
+	fmt.Println("  To uninstall:    ai-cli-online uninstall-boot")
+	fmt.Println("==================================================")
+}
+
+func runUninstallWindowsStartup() {
+	appData := os.Getenv("APPDATA")
+	if appData == "" {
+		home, _ := os.UserHomeDir()
+		appData = filepath.Join(home, "AppData", "Roaming")
+	}
+	startupDir := filepath.Join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
+	vbsPath := filepath.Join(startupDir, "start-ai-cli-online.vbs")
+
+	if _, err := os.Stat(vbsPath); err == nil {
+		_ = os.Remove(vbsPath)
+		fmt.Printf("✔ Removed Windows auto-start launcher: %s\n", vbsPath)
+	} else {
+		fmt.Printf("No auto-start launcher found at: %s\n", vbsPath)
+	}
+}
+
+func runUninstallBoot() {
+	if runtime.GOOS == "windows" {
+		runUninstallWindowsStartup()
+		return
+	}
+	if pid.IsTermux() {
+		home, _ := os.UserHomeDir()
+		bootScript := filepath.Join(home, ".termux", "boot", "start-ai-cli-online.sh")
+		if _, err := os.Stat(bootScript); err == nil {
+			_ = os.Remove(bootScript)
+			fmt.Printf("✔ Removed Termux boot script: %s\n", bootScript)
+		} else {
+			fmt.Printf("No Termux boot script found at: %s\n", bootScript)
+		}
+		return
+	}
+	fmt.Println("uninstall-boot is tailored for Windows and Termux (Android).")
 }
