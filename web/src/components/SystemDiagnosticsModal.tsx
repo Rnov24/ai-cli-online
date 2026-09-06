@@ -146,6 +146,8 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
             </button>
             <button
               onClick={onClose}
+              title="Close"
+              aria-label="Close"
               style={{
                 background: 'none',
                 border: 'none',
