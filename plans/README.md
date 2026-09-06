@@ -17,6 +17,7 @@ honor its STOP conditions, and update your row when done.
 | [007](007-workspace-and-project-skills-management.md) | Implement Workspace and Project-Based Skills Management | P1 | M | — | DONE |
 | [008](008-antigravity-plugin-lifecycle-and-discovery-management.md) | Antigravity Plugin Lifecycle and Discovery Management | P1 | M | — | DONE |
 | [009](009-multi-persona-system-and-agent-customization.md) | Multi-Persona System and Dynamic Agent Customization | P1 | M | — | DONE |
+| [010](010-color-palette-synchronization-and-theme-unification.md) | Synchronize Color Palettes and Eliminate Theme Desynchronization Across Components | P1 | M | — | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -25,6 +26,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 002 requires Plan 001**: The mobile 1-tap headless launcher (`~/.shortcuts/tasks/agy-start`) builds on the standardized Go daemon startup patterns and wake-lock behavior refined in Plan 001.
 - **Plan 004 requires Plan 003**: A standalone Android APK (Plan 004) cannot assume `tmux` is installed in `/system/bin`; it requires the direct PTY shell fallback implemented in Plan 003.
 - **Plan 008 and Plan 009 are independent**: Either may be executed first. Plan 008 formalizes the plugin management layer (`/api/plugins` & `PluginsModal.tsx`); Plan 009 formalizes the multi-persona system (`/api/personas` & `PersonaSelectorModal.tsx`). Both build on the completed Skills Hub (Plan 007) and responsive SVG foundations (Plans 005 & 006).
+- **Plan 010 is independent**: It synchronizes design system color tokens, repairs Light Theme contrast dropouts, and eliminates orphan CSS variable references across all existing modals and panels.
 
 ## Findings considered and rejected
 
