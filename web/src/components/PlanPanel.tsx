@@ -110,11 +110,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     setPlanLoading(true);
     setShowInitGuide(false);
     (async () => {
-      let home = '';
       try {
         const res = await fetchFiles(token, sessionId);
         if (cancelled) return;
-        home = res.home || '';
         const aiTasksEntry = res.files.find((f: FileEntry) => f.name === 'AiTasks' && f.type === 'directory');
         if (aiTasksEntry) {
           const dirPath = res.cwd + '/AiTasks';

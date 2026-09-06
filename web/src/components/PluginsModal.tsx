@@ -11,7 +11,6 @@ import {
   CloseIcon,
   SearchIcon,
   PlusIcon,
-  CheckIcon,
   TrashIcon,
   CodeIcon,
   BoltIcon,

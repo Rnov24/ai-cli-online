@@ -122,6 +122,19 @@ func Open(dataDir string) (*DB, error) {
 	CREATE INDEX IF NOT EXISTS idx_workspaces_is_home ON workspaces(is_home);
 	CREATE INDEX IF NOT EXISTS idx_turn_journal_session ON turn_journal(session_name, created_at);
 	CREATE INDEX IF NOT EXISTS idx_turn_journal_status ON turn_journal(session_name, status);
+
+	CREATE TABLE IF NOT EXISTS custom_personas (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		role TEXT NOT NULL,
+		icon TEXT NOT NULL DEFAULT 'robot',
+		color TEXT NOT NULL DEFAULT 'var(--accent-blue)',
+		description TEXT NOT NULL DEFAULT '',
+		directive TEXT NOT NULL,
+		tags TEXT NOT NULL DEFAULT '[]',
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL
+	);
 	`
 	if _, err := sqlDb.Exec(schema); err != nil {
 		sqlDb.Close()
@@ -437,5 +450,84 @@ func (d *DB) MarkAllActiveTurnsInterrupted() (int64, error) {
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// --- Custom Persona Methods ---
+
+type CustomPersonaRow struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Role        string `json:"role"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
+	Description string `json:"description"`
+	Directive   string `json:"directive"`
+	Tags        string `json:"tags"`
+	CreatedAt   int64  `json:"createdAt"`
+	UpdatedAt   int64  `json:"updatedAt"`
+}
+
+func (d *DB) ListCustomPersonas() ([]CustomPersonaRow, error) {
+	if d == nil || d.db == nil {
+		return nil, nil
+	}
+	rows, err := d.db.Query("SELECT id, name, role, icon, color, description, directive, tags, created_at, updated_at FROM custom_personas ORDER BY created_at ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []CustomPersonaRow
+	for rows.Next() {
+		var p CustomPersonaRow
+		if err := rows.Scan(&p.Id, &p.Name, &p.Role, &p.Icon, &p.Color, &p.Description, &p.Directive, &p.Tags, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, p)
+	}
+	return list, nil
+}
+
+func (d *DB) SaveCustomPersona(p CustomPersonaRow) error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	now := time.Now().UnixMilli()
+	if p.CreatedAt == 0 {
+		p.CreatedAt = now
+	}
+	p.UpdatedAt = now
+
+	query := `
+	INSERT INTO custom_personas (id, name, role, icon, color, description, directive, tags, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(id) DO UPDATE SET
+		name = excluded.name,
+		role = excluded.role,
+		icon = excluded.icon,
+		color = excluded.color,
+		description = excluded.description,
+		directive = excluded.directive,
+		tags = excluded.tags,
+		updated_at = excluded.updated_at
+	`
+	_, err := d.db.Exec(query, p.Id, p.Name, p.Role, p.Icon, p.Color, p.Description, p.Directive, p.Tags, p.CreatedAt, p.UpdatedAt)
+	return err
+}
+
+func (d *DB) GetCustomPersona(id string) (*CustomPersonaRow, error) {
+	if d == nil || d.db == nil {
+		return nil, nil
+	}
+	var p CustomPersonaRow
+	err := d.db.QueryRow("SELECT id, name, role, icon, color, description, directive, tags, created_at, updated_at FROM custom_personas WHERE id = ?", id).
+		Scan(&p.Id, &p.Name, &p.Role, &p.Icon, &p.Color, &p.Description, &p.Directive, &p.Tags, &p.CreatedAt, &p.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }
 

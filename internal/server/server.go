@@ -48,6 +48,7 @@ func (s *Server) Start() error {
 	convH := routes.NewConversationsHandler(auth)
 	skillsH := routes.NewSkillsHandler(auth, s.db)
 	plugH := routes.NewPluginsHandler(auth)
+	personaH := routes.NewPersonasHandler(auth, s.db)
 	hub := ws.InitHub(s.cfg)
 
 	// Cleanly mark any orphaned active turns as interrupted on server start
@@ -76,6 +77,12 @@ func (s *Server) Start() error {
 	mux.HandleFunc("POST /api/plugins/install", plugH.InstallPlugin)
 	mux.HandleFunc("POST /api/plugins/uninstall", plugH.UninstallPlugin)
 	mux.HandleFunc("POST /api/plugins/toggle", plugH.TogglePlugin)
+
+	// Personas Management
+	mux.HandleFunc("GET /api/personas", personaH.ListPersonas)
+	mux.HandleFunc("GET /api/personas/{id}", personaH.GetPersona)
+	mux.HandleFunc("POST /api/personas", personaH.CreateCustomPersona)
+	mux.HandleFunc("POST /api/sessions/{sessionId}/persona", personaH.SetSessionPersona)
 
 	// Chat & Headless AI Execution
 	mux.HandleFunc("POST /api/sessions/{sessionId}/chat", chatH.HandleChat)
