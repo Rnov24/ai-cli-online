@@ -1,4 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
+import {
+  RocketIcon,
+  BoltIcon,
+  PuzzleIcon,
+  KeyboardIcon,
+  CloseIcon,
+  HomeIcon,
+  FolderIcon,
+} from './icons';
 
 export type HelpGuideTab = 'guide' | 'quickstart' | 'commands' | 'skills' | 'shortcuts';
 
@@ -362,7 +371,7 @@ export function ShortcutsModal({
               padding: '2px',
             }}
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -380,10 +389,10 @@ export function ShortcutsModal({
           }}
         >
           {[
-            { id: 'guide', label: '🚀 QUICK START & PERSONAS' },
-            { id: 'commands', label: '⚡ SLASH COMMANDS DIRECTORY' },
-            { id: 'skills', label: '🧩 SKILLS & TOOLS' },
-            { id: 'shortcuts', label: '⌨️ KEYBOARD SHORTCUTS' },
+            { id: 'guide', label: 'QUICK START & PERSONAS', icon: <RocketIcon size={13} /> },
+            { id: 'commands', label: 'SLASH COMMANDS DIRECTORY', icon: <BoltIcon size={13} /> },
+            { id: 'skills', label: 'SKILLS & TOOLS', icon: <PuzzleIcon size={13} /> },
+            { id: 'shortcuts', label: 'KEYBOARD SHORTCUTS', icon: <KeyboardIcon size={13} /> },
           ].map((t) => {
             const isActive = activeTab === t.id;
             return (
@@ -402,9 +411,13 @@ export function ShortcutsModal({
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                 }}
               >
-                {t.label}
+                {t.icon}
+                <span>{t.label}</span>
               </button>
             );
           })}
@@ -438,7 +451,7 @@ export function ShortcutsModal({
                     borderLeft: '4px solid #c084fc',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '16px' }}>🏠</span>
+                      <HomeIcon size={16} color="#c084fc" />
                       <span style={{ fontSize: '13px', fontWeight: 700, color: '#c084fc' }}>
                         HOME DIRECTORY (~)
                       </span>
@@ -463,7 +476,7 @@ export function ShortcutsModal({
                     borderLeft: '4px solid #60a5fa',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '16px' }}>📁</span>
+                      <FolderIcon size={16} color="#60a5fa" />
                       <span style={{ fontSize: '13px', fontWeight: 700, color: '#60a5fa' }}>
                         PROJECT WORKSPACE
                       </span>

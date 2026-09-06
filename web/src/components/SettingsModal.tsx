@@ -1,5 +1,6 @@
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
+import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon } from './icons';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,8 +30,8 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
           backgroundColor: 'var(--bg-primary)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: 'var(--accent-amber-bright)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-              ⚙
+            <span style={{ color: 'var(--accent-amber-bright)', display: 'inline-flex', alignItems: 'center' }}>
+              <SettingsIcon size={14} />
             </span>
             <span style={{
               fontFamily: 'var(--font-mono)',
@@ -59,7 +60,7 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
               padding: '4px',
             }}
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -102,9 +103,9 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
               <button
                 className="mecha-btn"
                 onClick={toggleTheme}
-                style={{ padding: '4px 12px' }}
+                style={{ padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                {theme === 'dark' ? '🌙 MECHA DARK' : '☀ INDUSTRIAL LIGHT'}
+                {theme === 'dark' ? <><MoonIcon size={12} /> MECHA DARK</> : <><SunIcon size={12} /> INDUSTRIAL LIGHT</>}
               </button>
             </div>
 
@@ -239,8 +240,9 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                     onClose();
                   }
                 }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               >
-                ⎋ DISCONNECT
+                <LogoutIcon size={12} /> DISCONNECT
               </button>
             </div>
           </div>
