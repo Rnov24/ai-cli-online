@@ -18,32 +18,22 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUN_USER="${SUDO_USER:-$(whoami)}"
 RUN_HOME=$(eval echo "~${RUN_USER}")
 
-# Node.js 路径
-NODE_BIN=$(su - "$RUN_USER" -c "which node" 2>/dev/null || true)
-# Fallback: source nvm if plain login shell didn't find node
-if [[ -z "$NODE_BIN" ]]; then
-  NODE_BIN=$(su - "$RUN_USER" -c "source ~/.nvm/nvm.sh 2>/dev/null; which node" 2>/dev/null || true)
-fi
-if [[ -z "$NODE_BIN" ]]; then
-  echo "[错误] 未找到 node，请先安装 Node.js >= 18"
-  exit 1
-fi
-NODE_DIR=$(dirname "$NODE_BIN")
-NODE_VERSION=$("$NODE_BIN" --version)
-
-NPM_BIN=$(su - "$RUN_USER" -c "which npm" 2>/dev/null || true)
-if [[ -z "$NPM_BIN" ]]; then
-  NPM_BIN=$(su - "$RUN_USER" -c "source ~/.nvm/nvm.sh 2>/dev/null; which npm" 2>/dev/null || true)
-fi
-if [[ -z "$NPM_BIN" ]]; then
-  echo "[错误] 未找到 npm"
-  exit 1
+# 检查 Go 二进制程序
+CLI_BIN="${PROJECT_DIR}/bin/ai-cli-online"
+if [[ ! -x "$CLI_BIN" ]]; then
+  echo "未检测到已编译的 bin/ai-cli-online，尝试编译..."
+  if command -v go &>/dev/null; then
+    (cd "$PROJECT_DIR" && go build -o bin/ai-cli-online ./cmd/ai-cli-online)
+  else
+    echo "[错误] 未找到 bin/ai-cli-online 且未安装 go 编译器。"
+    echo "请先在编译机或本地执行: go build -o bin/ai-cli-online ./cmd/ai-cli-online"
+    exit 1
+  fi
 fi
 
 # 检查 tmux
 if ! command -v tmux &>/dev/null; then
-  echo "[错误] 未找到 tmux，请先安装: sudo apt install tmux"
-  exit 1
+  echo "[警告] 未找到 tmux，请先安装: sudo apt install tmux"
 fi
 
 # --- 确认信息 ---
@@ -54,8 +44,7 @@ echo "================================"
 echo ""
 echo "  项目目录:  $PROJECT_DIR"
 echo "  运行用户:  $RUN_USER"
-echo "  Node.js:   $NODE_BIN ($NODE_VERSION)"
-echo "  npm:       $NPM_BIN"
+echo "  运行文件:  $CLI_BIN"
 echo "  服务文件:  $SERVICE_FILE"
 echo ""
 
@@ -78,12 +67,9 @@ After=network.target
 [Service]
 Type=simple
 User=${RUN_USER}
-WorkingDirectory=${PROJECT_DIR}/server
-Environment=PATH=${NODE_DIR}:${RUN_HOME}/.gemini/antigravity-cli/bin:/data/data/com.termux/files/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-Environment=NODE_ENV=production
-EnvironmentFile=-${PROJECT_DIR}/server/.env
-ExecStartPre=${NPM_BIN} run --prefix ${PROJECT_DIR} build
-ExecStart=${NODE_BIN} dist/index.js
+WorkingDirectory=${PROJECT_DIR}
+Environment=PATH=${RUN_HOME}/.gemini/antigravity-cli/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=${CLI_BIN} start
 Restart=on-failure
 RestartSec=5
 
@@ -136,7 +122,7 @@ fi
 if [[ "$SETUP_NGINX" =~ ^[Yy] ]]; then
   # 读取端口 (从 .env 或默认 3001)
   BACKEND_PORT="3001"
-  ENV_FILE="${PROJECT_DIR}/server/.env"
+  ENV_FILE="${PROJECT_DIR}/.env"
   if [[ -f "$ENV_FILE" ]]; then
     ENV_PORT=$(grep -E '^PORT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d ' "'"'" || true)
     if [[ -n "$ENV_PORT" ]]; then
@@ -271,7 +257,7 @@ NGINX_EOF
   ln -s "$NGINX_CONF" "$NGINX_ENABLED"
   echo "[nginx] 已启用站点"
 
-  # 设置 server/.env 的 HTTPS_ENABLED=false 和 TRUST_PROXY=1
+  # 设置 .env 的 HTTPS_ENABLED=false 和 TRUST_PROXY=1
   if [[ -f "$ENV_FILE" ]]; then
     # 更新已有的 HTTPS_ENABLED
     if grep -q '^HTTPS_ENABLED=' "$ENV_FILE"; then

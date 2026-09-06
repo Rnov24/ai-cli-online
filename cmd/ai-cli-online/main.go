@@ -293,9 +293,21 @@ func runInstallBoot() {
 	bootScript := filepath.Join(bootDir, "start-ai-cli-online.sh")
 
 	self, _ := os.Executable()
+	self, _ = filepath.EvalSymlinks(self)
+
+	// Create symlink in $PREFIX/bin for convenient global access
+	prefix := os.Getenv("PREFIX")
+	if prefix == "" {
+		prefix = "/data/data/com.termux/files/usr"
+	}
+	prefixBin := filepath.Join(prefix, "bin", "ai-cli-online")
+	_ = os.Remove(prefixBin)
+	_ = os.Symlink(self, prefixBin)
+
 	content := fmt.Sprintf(`#!/data/data/com.termux/files/usr/bin/bash
 # ==============================================================================
 # AGY Online Auto-Start on Android Boot (Termux:Boot)
+# Runs headlessly in the background without opening the Termux terminal UI
 # ==============================================================================
 
 # 1. Acquire wake-lock to prevent CPU sleep when screen is off
@@ -312,10 +324,20 @@ BOOT_LOG="${HOME}/.ai-cli-online/logs/boot.log"
 mkdir -p "${HOME}/.ai-cli-online/logs"
 echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] Device booted. Starting AGY Online..." >> "$BOOT_LOG"
 
-# 3. Validate executable
+# 3. Resolve binary path
+PROJECT_DIR="${HOME}/ai-cli-online"
 CLI_BIN="%s"
+
 if [[ ! -x "$CLI_BIN" ]]; then
-  echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] ERROR: $CLI_BIN is not executable" >> "$BOOT_LOG"
+  if [[ -x "${PROJECT_DIR}/bin/ai-cli-online" ]]; then
+    CLI_BIN="${PROJECT_DIR}/bin/ai-cli-online"
+  elif command -v ai-cli-online >/dev/null 2>&1; then
+    CLI_BIN="$(command -v ai-cli-online)"
+  fi
+fi
+
+if [[ ! -x "$CLI_BIN" ]]; then
+  echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] ERROR: ai-cli-online binary not found or not executable" >> "$BOOT_LOG"
   exit 1
 fi
 
@@ -323,6 +345,9 @@ fi
 sleep 3
 
 # 5. Start AGY Online in background daemon mode
+if [[ -d "$PROJECT_DIR" ]]; then
+  cd "$PROJECT_DIR"
+fi
 "$CLI_BIN" start -d >> "$BOOT_LOG" 2>&1
 echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] AGY Online boot script finished." >> "$BOOT_LOG"
 `, self)
