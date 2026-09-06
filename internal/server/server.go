@@ -47,6 +47,7 @@ func (s *Server) Start() error {
 	wsH := routes.NewWorkspaceHandler(auth, s.db)
 	convH := routes.NewConversationsHandler(auth)
 	skillsH := routes.NewSkillsHandler(auth, s.db)
+	plugH := routes.NewPluginsHandler(auth)
 	hub := ws.InitHub(s.cfg)
 
 	// Cleanly mark any orphaned active turns as interrupted on server start
@@ -68,6 +69,13 @@ func (s *Server) Start() error {
 	mux.HandleFunc("GET /api/skills", skillsH.ListSkills)
 	mux.HandleFunc("GET /api/skills/content", skillsH.GetSkillContent)
 	mux.HandleFunc("POST /api/skills/scaffold", skillsH.ScaffoldSkill)
+
+	// Plugins Management
+	mux.HandleFunc("GET /api/plugins", plugH.ListPlugins)
+	mux.HandleFunc("GET /api/plugins/{name}", plugH.GetPlugin)
+	mux.HandleFunc("POST /api/plugins/install", plugH.InstallPlugin)
+	mux.HandleFunc("POST /api/plugins/uninstall", plugH.UninstallPlugin)
+	mux.HandleFunc("POST /api/plugins/toggle", plugH.TogglePlugin)
 
 	// Chat & Headless AI Execution
 	mux.HandleFunc("POST /api/sessions/{sessionId}/chat", chatH.HandleChat)

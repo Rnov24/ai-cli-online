@@ -8,6 +8,7 @@ import { fetchFiles } from '../api/files';
 import type { FileEntry } from '../api/files';
 import { fetchFileContent } from '../api/docs';
 import { fetchWorkspaceMode } from '../api/workspaces';
+import { fetchPlugins } from '../api/plugins';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 import { FolderIcon, EditIcon, ClipboardIcon } from './icons';
 
@@ -135,24 +136,15 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
         if (!cancelled) setPlanLoading(false);
       }
 
-      // Check if ai-cli-task plugin is installed in Antigravity by reading import_manifest.json
+      // Check if ai-cli-task plugin is installed via robust backend plugin API
       try {
         if (cancelled) return;
-        if (home) {
-          const manifestFile = `${home}/.gemini/config/import_manifest.json`;
-          const result = await fetchFileContent(token, sessionId, manifestFile, 0);
-          if (!cancelled && result) {
-            try {
-              const parsed = JSON.parse(result.content);
-              const imports = parsed.imports || [];
-              const hasPlugin = imports.some((imp: { name?: string }) => imp.name === 'ai-cli-task');
-              if (!hasPlugin) setShowPluginPrompt(true);
-            } catch { setShowPluginPrompt(true); }
-          } else {
-            setShowPluginPrompt(true);
-          }
+        const data = await fetchPlugins(token);
+        if (!cancelled) {
+          const hasPlugin = data.plugins?.some((p) => p.name === 'ai-cli-task');
+          if (!hasPlugin) setShowPluginPrompt(true);
         }
-      } catch { /* ignore — file not accessible or doesn't exist */ }
+      } catch { /* ignore — plugin endpoint not accessible or network issue */ }
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps

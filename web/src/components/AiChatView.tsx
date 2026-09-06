@@ -25,6 +25,8 @@ import {
 } from '../api/workspaces';
 import { fetchSkills, type SkillItem } from '../api/skills';
 import { SkillsManagementModal } from './SkillsManagementModal';
+import { fetchPlugins } from '../api/plugins';
+import { PluginsModal } from './PluginsModal';
 
 // Ensure localStorage has a working fallback in test/jsdom/opaque-origin environments under Node 22+
 try {
@@ -189,6 +191,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const [pendingQueue, setPendingQueue] = useState<string[]>([]);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [showSkillsModal, setShowSkillsModal] = useState(false);
+  const [showPluginsModal, setShowPluginsModal] = useState(false);
   const [discoveredSkills, setDiscoveredSkills] = useState<SkillItem[]>([]);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -240,16 +243,22 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
   useEffect(() => {
     const handleOpenSkills = () => setShowSkillsModal(true);
+    const handleOpenPlugins = () => setShowPluginsModal(true);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         setShowSkillsModal((prev) => !prev);
+      } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setShowPluginsModal((prev) => !prev);
       }
     };
     window.addEventListener('agy:open-skills-modal', handleOpenSkills);
+    window.addEventListener('agy:open-plugins-modal', handleOpenPlugins);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('agy:open-skills-modal', handleOpenSkills);
+      window.removeEventListener('agy:open-plugins-modal', handleOpenPlugins);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -737,6 +746,55 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         status: 'done',
       };
       setMessages((prev) => [...prev, sysMsg]);
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    // Antigravity Plugins & Extensions Manager
+    if (text === '/plugins' || text === '/plugins list') {
+      setShowPluginsModal(true);
+      window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
+
+      try {
+        const plugData = await fetchPlugins(token);
+        const lines: string[] = [
+          '### 🧩 Antigravity Plugins & Extensions',
+          '',
+          `*Loaded **${plugData.count}** installed plugins.*`,
+          '',
+        ];
+        if (plugData.plugins && plugData.plugins.length > 0) {
+          for (const p of plugData.plugins) {
+            const comps = p.components?.length ? p.components.join(', ') : 'none';
+            lines.push(`- **\`${p.name}\`** ${p.version ? `(v${p.version})` : ''}: ${p.description || 'No description'} [${p.enabled ? 'ENABLED' : 'DISABLED'}]`);
+            lines.push(`  - Components: \`${comps}\` | Source: \`${p.source}\``);
+          }
+        } else {
+          lines.push('*No plugins currently installed. Use the Plugins Manager modal to install extensions.*');
+        }
+        lines.push('');
+        lines.push('*The Plugins modal is now open. Press **⌥P** or run `/plugins` anytime to install, toggle, or inspect extensions.*');
+
+        const sysMsg: ChatMessage = {
+          id: `cmd_sys_${Date.now()}`,
+          role: 'assistant',
+          content: lines.join('\n'),
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, sysMsg]);
+      } catch (err: any) {
+        const errMsg: ChatMessage = {
+          id: `cmd_sys_${Date.now()}`,
+          role: 'assistant',
+          content: `### 🧩 Antigravity Plugins\n\nThe Plugins modal is now open.\n\n*Error fetching plugins list: ${err.message}*`,
+          timestamp: Date.now(),
+          status: 'done',
+        };
+        setMessages((prev) => [...prev, errMsg]);
+      }
+
       setInputText('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
       return;
@@ -2342,6 +2400,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             textareaRef.current.focus();
           }
         }}
+      />
+
+      {/* Antigravity Plugins & Extensions Modal */}
+      <PluginsModal
+        isOpen={showPluginsModal}
+        onClose={() => setShowPluginsModal(false)}
+        token={token}
       />
     </div>
   );

@@ -344,6 +344,28 @@ export const CommandPalette = React.memo(function CommandPalette({
       },
     },
     {
+      id: 'cmd-plugins-manager',
+      category: 'SYSTEM',
+      title: 'Antigravity Plugins — Manage Extensions & Toolkits',
+      desc: 'Inspect installed plugins, components, and marketplace packages',
+      shortcut: '⌥P',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-switch-persona',
+      category: 'SYSTEM',
+      title: '/agents — Switch Agent Persona & Mindset',
+      desc: 'Toggle between Architect, Auditor, Pair Programmer, SRE, and Assistant',
+      shortcut: '⌥A',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-persona-modal'));
+        onClose();
+      },
+    },
+    {
       id: 'open-settings',
       category: 'SYSTEM',
       title: 'System Settings',
