@@ -129,7 +129,7 @@ export const TurnAnchor = memo(function TurnAnchor({
               title="Compact Worklog view"
               style={{
                 background: activeMode === 'worklog' ? 'var(--accent-cyan)' : 'transparent',
-                color: activeMode === 'worklog' ? '#000' : 'var(--text-muted)',
+                color: activeMode === 'worklog' ? 'var(--btn-contrast-text)' : 'var(--text-muted)',
                 border: 'none',
                 padding: '2px 6px',
                 fontSize: '9px',
@@ -145,7 +145,7 @@ export const TurnAnchor = memo(function TurnAnchor({
               title="Transparent Stream view (tools + reasoning)"
               style={{
                 background: activeMode === 'transparent' ? 'var(--accent-cyan)' : 'transparent',
-                color: activeMode === 'transparent' ? '#000' : 'var(--text-muted)',
+                color: activeMode === 'transparent' ? 'var(--btn-contrast-text)' : 'var(--text-muted)',
                 border: 'none',
                 padding: '2px 6px',
                 fontSize: '9px',
@@ -161,7 +161,7 @@ export const TurnAnchor = memo(function TurnAnchor({
               title="Final Answer Only"
               style={{
                 background: activeMode === 'final' ? 'var(--accent-cyan)' : 'transparent',
-                color: activeMode === 'final' ? '#000' : 'var(--text-muted)',
+                color: activeMode === 'final' ? 'var(--btn-contrast-text)' : 'var(--text-muted)',
                 border: 'none',
                 padding: '2px 6px',
                 fontSize: '9px',

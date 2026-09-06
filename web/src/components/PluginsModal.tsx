@@ -186,8 +186,8 @@ export function PluginsModal({
     >
       <div
         style={{
-          backgroundColor: 'var(--bg-card, #12151c)',
-          border: '1px solid var(--border-color, #232a3b)',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '8px',
           width: 'min(780px, calc(100vw - 24px))',
           maxHeight: 'min(680px, calc(100dvh - 32px))',
@@ -203,7 +203,7 @@ export function PluginsModal({
         <div
           style={{
             padding: '14px 18px',
-            borderBottom: '1px solid var(--border-color, #232a3b)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -219,7 +219,7 @@ export function PluginsModal({
                   fontSize: '13px',
                   fontWeight: 600,
                   letterSpacing: '1px',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               >
                 ANTIGRAVITY PLUGINS
@@ -263,11 +263,11 @@ export function PluginsModal({
         <div
           style={{
             padding: '10px 18px',
-            borderBottom: '1px solid var(--border-color, #232a3b)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            backgroundColor: 'var(--bg-surface, #0f1219)',
+            backgroundColor: 'var(--bg-surface)',
             flexWrap: 'wrap',
           }}
         >
@@ -276,8 +276,8 @@ export function PluginsModal({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              backgroundColor: 'var(--bg-input, #0b0d13)',
-              border: '1px solid var(--border-color, #232a3b)',
+              backgroundColor: 'var(--bg-input)',
+              border: '1px solid var(--border-color)',
               borderRadius: '4px',
               padding: '4px 10px',
               flex: 1,
@@ -294,7 +294,7 @@ export function PluginsModal({
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: 'var(--text-primary, #e2e8f0)',
+                color: 'var(--text-primary)',
                 fontSize: '11px',
                 fontFamily: 'var(--font-mono, monospace)',
                 width: '100%',
@@ -346,7 +346,7 @@ export function PluginsModal({
             style={{
               padding: '5px 10px',
               backgroundColor: 'transparent',
-              border: '1px solid var(--border-color, #232a3b)',
+              border: '1px solid var(--border-color)',
               borderRadius: '4px',
               color: 'var(--text-muted, #64748b)',
               fontFamily: 'var(--font-mono, monospace)',
@@ -364,7 +364,7 @@ export function PluginsModal({
             style={{
               padding: '14px 18px',
               backgroundColor: 'rgba(59, 130, 246, 0.05)',
-              borderBottom: '1px solid var(--border-color, #232a3b)',
+              borderBottom: '1px solid var(--border-color)',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px',
@@ -383,13 +383,13 @@ export function PluginsModal({
                 style={{
                   flex: 1,
                   minWidth: '220px',
-                  backgroundColor: 'var(--bg-input, #0b0d13)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '4px',
                   padding: '6px 10px',
                   fontSize: '11px',
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               />
               <button
@@ -419,11 +419,11 @@ export function PluginsModal({
                 onClick={() => setInstallTarget('ai-cli-task')}
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '3px',
                   padding: '2px 8px',
                   fontSize: '10px',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                   cursor: 'pointer',
                   fontFamily: 'var(--font-mono, monospace)',
                 }}
@@ -475,7 +475,7 @@ export function PluginsModal({
                 actionMessage.type === 'success'
                   ? 'rgba(34, 197, 94, 0.15)'
                   : 'rgba(239, 68, 68, 0.15)',
-              borderBottom: '1px solid var(--border-color, #232a3b)',
+              borderBottom: '1px solid var(--border-color)',
               color:
                 actionMessage.type === 'success'
                   ? 'var(--accent-green, #22c55e)'
@@ -561,7 +561,7 @@ export function PluginsModal({
                   data-testid={`plugin-card-${plugin.name}`}
                   style={{
                     backgroundColor: 'var(--bg-elevated, #161b26)',
-                    border: '1px solid var(--border-color, #232a3b)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '6px',
                     padding: '14px 16px',
                     display: 'flex',
@@ -585,7 +585,7 @@ export function PluginsModal({
                         style={{
                           fontSize: '13px',
                           fontWeight: 600,
-                          color: 'var(--text-primary, #e2e8f0)',
+                          color: 'var(--text-primary)',
                           fontFamily: 'var(--font-mono, monospace)',
                         }}
                       >
@@ -598,8 +598,8 @@ export function PluginsModal({
                             fontSize: '10px',
                             padding: '1px 6px',
                             borderRadius: '3px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                            color: 'var(--text-secondary, #94a3b8)',
+                            backgroundColor: 'var(--badge-overlay-bg)',
+                            color: 'var(--text-secondary)',
                             fontFamily: 'var(--font-mono, monospace)',
                           }}
                         >
@@ -619,7 +619,7 @@ export function PluginsModal({
                           color:
                             plugin.source === 'antigravity'
                               ? 'var(--accent-cyan, #00f0ff)'
-                              : 'var(--text-secondary, #94a3b8)',
+                              : 'var(--text-secondary)',
                           fontFamily: 'var(--font-mono, monospace)',
                         }}
                       >
@@ -654,7 +654,7 @@ export function PluginsModal({
                           padding: '3px 8px',
                           fontSize: '10px',
                           borderRadius: '3px',
-                          border: '1px solid var(--border-color, #232a3b)',
+                          border: '1px solid var(--border-color)',
                           backgroundColor: plugin.enabled
                             ? 'rgba(239, 68, 68, 0.1)'
                             : 'rgba(34, 197, 94, 0.1)',
@@ -679,7 +679,7 @@ export function PluginsModal({
                           borderRadius: '3px',
                           border: isConfirming
                             ? '1px solid var(--accent-red, #ef4444)'
-                            : '1px solid var(--border-color, #232a3b)',
+                            : '1px solid var(--border-color)',
                           backgroundColor: isConfirming
                             ? 'var(--accent-red, #ef4444)'
                             : 'transparent',
@@ -704,7 +704,7 @@ export function PluginsModal({
                             padding: '3px 8px',
                             fontSize: '10px',
                             borderRadius: '3px',
-                            border: '1px solid var(--border-color, #232a3b)',
+                            border: '1px solid var(--border-color)',
                             backgroundColor: 'transparent',
                             color: 'var(--accent-cyan, #00f0ff)',
                             fontFamily: 'var(--font-mono, monospace)',
@@ -725,7 +725,7 @@ export function PluginsModal({
                     <div
                       style={{
                         fontSize: '11px',
-                        color: 'var(--text-secondary, #94a3b8)',
+                        color: 'var(--text-secondary)',
                         lineHeight: '1.4',
                       }}
                     >

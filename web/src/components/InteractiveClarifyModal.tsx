@@ -77,8 +77,8 @@ export function InteractiveClarifyModal({
         style={{
           width: '100%',
           maxWidth: '540px',
-          backgroundColor: 'var(--bg-primary, #0d1117)',
-          border: '1px solid var(--border, #30363d)',
+          backgroundColor: 'var(--bg-primary)',
+          border: '1px solid var(--border)',
           borderRadius: '8px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           overflow: 'hidden',
@@ -95,7 +95,7 @@ export function InteractiveClarifyModal({
             backgroundColor: isPermission
               ? 'rgba(239, 68, 68, 0.15)'
               : 'rgba(6, 182, 212, 0.15)',
-            borderBottom: '1px solid var(--border, #30363d)',
+            borderBottom: '1px solid var(--border)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -154,11 +154,11 @@ export function InteractiveClarifyModal({
                           padding: '8px 12px',
                           borderRadius: '5px',
                           border: `1px solid ${
-                            isSelected ? 'var(--accent-cyan-bright, #22d3ee)' : 'var(--border, #30363d)'
+                            isSelected ? 'var(--accent-cyan-bright, #22d3ee)' : 'var(--border)'
                           }`,
                           backgroundColor: isSelected
                             ? 'rgba(6, 182, 212, 0.1)'
-                            : 'var(--bg-secondary, #161b22)',
+                            : 'var(--bg-secondary)',
                           cursor: 'pointer',
                           fontSize: '12px',
                           color: isSelected
@@ -184,7 +184,8 @@ export function InteractiveClarifyModal({
               </div>
               <pre
                 style={{
-                  backgroundColor: '#000',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
                   padding: '10px',
                   borderRadius: '5px',
                   fontSize: '11px',
@@ -222,8 +223,8 @@ export function InteractiveClarifyModal({
                 width: '100%',
                 padding: '8px 10px',
                 borderRadius: '4px',
-                border: '1px solid var(--border, #30363d)',
-                backgroundColor: 'var(--bg-secondary, #161b22)',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--bg-secondary)',
                 color: 'var(--text-bright, #f0f6fc)',
                 fontSize: '12px',
                 boxSizing: 'border-box',
@@ -240,8 +241,8 @@ export function InteractiveClarifyModal({
             justifyContent: 'flex-end',
             gap: '8px',
             padding: '10px 16px',
-            backgroundColor: 'var(--bg-secondary, #161b22)',
-            borderTop: '1px solid var(--border, #30363d)',
+            backgroundColor: 'var(--bg-secondary)',
+            borderTop: '1px solid var(--border)',
           }}
         >
           {isPermission ? (
@@ -273,7 +274,7 @@ export function InteractiveClarifyModal({
                   borderRadius: '4px',
                   border: 'none',
                   backgroundColor: 'var(--accent-green-bright, #10b981)',
-                  color: '#000',
+                  color: 'var(--btn-contrast-text)',
                   fontWeight: 700,
                   fontSize: '11px',
                   cursor: 'pointer',
@@ -289,7 +290,7 @@ export function InteractiveClarifyModal({
                 style={{
                   padding: '6px 12px',
                   borderRadius: '4px',
-                  border: '1px solid var(--border, #30363d)',
+                  border: '1px solid var(--border)',
                   backgroundColor: 'transparent',
                   color: 'var(--text-muted, #8b949e)',
                   fontSize: '11px',
@@ -308,7 +309,7 @@ export function InteractiveClarifyModal({
                   borderRadius: '4px',
                   border: 'none',
                   backgroundColor: 'var(--accent-cyan-bright, #22d3ee)',
-                  color: '#000',
+                  color: 'var(--btn-contrast-text)',
                   fontWeight: 700,
                   fontSize: '11px',
                   cursor: 'pointer',

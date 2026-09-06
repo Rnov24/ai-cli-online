@@ -168,7 +168,7 @@ export function NavigationRail({
               }}>
                 {activeTab ? activeTab.name : 'MISSION'}
               </div>
-              <div style={{ fontSize: '9px', color: 'var(--accent-green-bright)', letterSpacing: '0.4px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--accent-green)', letterSpacing: '0.4px' }}>
                 ACTIVE PROCESS
               </div>
             </div>
