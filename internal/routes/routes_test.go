@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/huacheng/ai-cli-online/internal/config"
@@ -28,6 +29,7 @@ func TestRoutes(t *testing.T) {
 	}
 	auth := NewAuthHelper(cfg)
 	setH := NewSettingsHandler(auth, database)
+	sysH := NewSystemHandler(auth)
 
 	// 1. Health check
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
@@ -37,9 +39,36 @@ func TestRoutes(t *testing.T) {
 		t.Errorf("Expected 200, got %d", w.Code)
 	}
 
-	// 2. System status
+	// 2. System routes auth checks
+	// 2a. System status unauthorized
+	req = httptest.NewRequest(http.MethodGet, "/api/system/status", nil)
 	w = httptest.NewRecorder()
-	HandleSystemStatus(w, req)
+	sysH.HandleSystemStatus(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected 401 unauthorized for status, got %d", w.Code)
+	}
+
+	// 2b. System processes unauthorized
+	req = httptest.NewRequest(http.MethodGet, "/api/system/processes", nil)
+	w = httptest.NewRecorder()
+	sysH.HandleProcessList(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected 401 unauthorized for processes, got %d", w.Code)
+	}
+
+	// 2c. System logs unauthorized
+	req = httptest.NewRequest(http.MethodGet, "/api/system/logs", nil)
+	w = httptest.NewRecorder()
+	sysH.HandleSystemLogs(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected 401 unauthorized for logs, got %d", w.Code)
+	}
+
+	// 2d. System status authorized
+	req = httptest.NewRequest(http.MethodGet, "/api/system/status", nil)
+	req.Header.Set("Authorization", "Bearer test-secret")
+	w = httptest.NewRecorder()
+	sysH.HandleSystemStatus(w, req)
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected 200, got %d", w.Code)
 	}
@@ -49,6 +78,24 @@ func TestRoutes(t *testing.T) {
 	}
 	if status.Server.Pid <= 0 {
 		t.Errorf("Expected positive PID, got %d", status.Server.Pid)
+	}
+
+	// 2e. System processes authorized
+	req = httptest.NewRequest(http.MethodGet, "/api/system/processes", nil)
+	req.Header.Set("Authorization", "Bearer test-secret")
+	w = httptest.NewRecorder()
+	sysH.HandleProcessList(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200 for processes, got %d", w.Code)
+	}
+
+	// 2f. System logs authorized
+	req = httptest.NewRequest(http.MethodGet, "/api/system/logs", nil)
+	req.Header.Set("Authorization", "Bearer test-secret")
+	w = httptest.NewRecorder()
+	sysH.HandleSystemLogs(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200 for logs, got %d", w.Code)
 	}
 
 	// 3. Auth verify unauthorized
@@ -144,3 +191,80 @@ func TestRoutes(t *testing.T) {
 	}
 }
 
+
+func TestWriteFileContent_PathValidation(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ai-cli-editor-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	siblingDir, err := os.MkdirTemp("", "ai-cli-editor-sibling-*")
+	if err != nil {
+		t.Fatalf("Failed to create sibling dir: %v", err)
+	}
+	defer os.RemoveAll(siblingDir)
+
+	siblingFile := filepath.Join(siblingDir, "sibling.txt")
+	_ = os.WriteFile(siblingFile, []byte("sibling content"), 0644)
+
+	cfg := &config.Config{
+		AuthToken:         "test-secret",
+		DefaultWorkingDir: tempDir,
+	}
+	auth := NewAuthHelper(cfg)
+	editH := NewEditorHandler(auth, nil)
+
+	// Test writing outside cwd via ".." and sibling directory paths returns HTTP 403
+	badPaths := []string{
+		"../escape.txt",
+		"../../etc/passwd",
+		filepath.Join(tempDir, "..", "outside.txt"),
+		siblingFile,
+	}
+
+	for _, badPath := range badPaths {
+		body, _ := json.Marshal(map[string]string{
+			"path":    badPath,
+			"content": "malicious content",
+		})
+		req := httptest.NewRequest(http.MethodPut, "/api/sessions/tab-1/file-content", bytes.NewReader(body))
+		req.SetPathValue("sessionId", "tab-1")
+		req.Header.Set("Authorization", "Bearer test-secret")
+		w := httptest.NewRecorder()
+
+		editH.WriteFileContent(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("Path %q: expected 403 Forbidden, got %d (body: %s)", badPath, w.Code, w.Body.String())
+		}
+		var resp map[string]string
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp["error"] != "access denied: path outside workspace" {
+			t.Errorf("Path %q: expected error 'access denied: path outside workspace', got %v", badPath, resp["error"])
+		}
+	}
+
+	// Test writing to a valid file inside cwd succeeds
+	validFile := filepath.Join(tempDir, "valid.txt")
+	_ = os.WriteFile(validFile, []byte("original"), 0644)
+
+	body, _ := json.Marshal(map[string]string{
+		"path":    "valid.txt",
+		"content": "updated content",
+	})
+	req := httptest.NewRequest(http.MethodPut, "/api/sessions/tab-1/file-content", bytes.NewReader(body))
+	req.SetPathValue("sessionId", "tab-1")
+	req.Header.Set("Authorization", "Bearer test-secret")
+	w := httptest.NewRecorder()
+
+	editH.WriteFileContent(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected 200 for valid file inside cwd, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	data, _ := os.ReadFile(validFile)
+	if string(data) != "updated content" {
+		t.Errorf("Expected 'updated content', got %q", string(data))
+	}
+}

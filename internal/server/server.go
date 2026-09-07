@@ -49,6 +49,7 @@ func (s *Server) Start() error {
 	skillsH := routes.NewSkillsHandler(auth, s.db)
 	plugH := routes.NewPluginsHandler(auth)
 	personaH := routes.NewPersonasHandler(auth, s.db)
+	sysH := routes.NewSystemHandler(auth)
 	hub := ws.InitHub(s.cfg)
 
 	// Cleanly mark any orphaned active turns as interrupted on server start
@@ -93,9 +94,9 @@ func (s *Server) Start() error {
 
 	// System & Health
 	mux.HandleFunc("GET /api/health", routes.HandleHealth)
-	mux.HandleFunc("GET /api/system/status", routes.HandleSystemStatus)
-	mux.HandleFunc("GET /api/system/processes", routes.HandleProcessList)
-	mux.HandleFunc("GET /api/system/logs", routes.HandleSystemLogs)
+	mux.HandleFunc("GET /api/system/status", sysH.HandleSystemStatus)
+	mux.HandleFunc("GET /api/system/processes", sysH.HandleProcessList)
+	mux.HandleFunc("GET /api/system/logs", sysH.HandleSystemLogs)
 
 	// Auth
 	mux.HandleFunc("POST /api/auth/login", auth.HandleLogin)

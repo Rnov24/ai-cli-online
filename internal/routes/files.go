@@ -284,7 +284,12 @@ func (f *FileHandler) Rm(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Path string `json:"path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Path == "" || strings.Contains(req.Path, "..") {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
+		return
+	}
+	cleanReq := filepath.Clean(strings.TrimSpace(req.Path))
+	if cleanReq == "" || cleanReq == "." || cleanReq == "/" || cleanReq == "\\" || strings.Contains(req.Path, "..") {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
 		return
 	}
@@ -293,6 +298,12 @@ func (f *FileHandler) Rm(w http.ResponseWriter, r *http.Request) {
 	resolved, err := files.ValidatePath(req.Path, cwd)
 	if err != nil {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
+		return
+	}
+
+	home, _ := os.UserHomeDir()
+	if resolved == cwd || resolved == filepath.Clean(cwd) || (home != "" && resolved == filepath.Clean(home)) {
+		http.Error(w, `{"error":"Cannot delete workspace or home directory root"}`, http.StatusBadRequest)
 		return
 	}
 

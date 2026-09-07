@@ -75,7 +75,19 @@ func getRssMb() float64 {
 	return math.Round((float64(ms.Sys)/(1024*1024))*10) / 10
 }
 
-func HandleSystemStatus(w http.ResponseWriter, r *http.Request) {
+type SystemHandler struct {
+	auth *AuthHelper
+}
+
+func NewSystemHandler(auth *AuthHelper) *SystemHandler {
+	return &SystemHandler{auth: auth}
+}
+
+func (s *SystemHandler) HandleSystemStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 	idleMgr := idle.GetManager()
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
@@ -151,7 +163,11 @@ func AppendSystemLog(level, message string) {
 	}
 }
 
-func HandleSystemLogs(w http.ResponseWriter, r *http.Request) {
+func (s *SystemHandler) HandleSystemLogs(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 	logMu.RLock()
 	defer logMu.RUnlock()
 
@@ -172,7 +188,11 @@ type ProcessItem struct {
 	Connected   bool   `json:"connected"`
 }
 
-func HandleProcessList(w http.ResponseWriter, r *http.Request) {
+func (s *SystemHandler) HandleProcessList(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 	sessions, err := terminal.List("", nil, "")
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":"failed to list processes: %v"}`, err), http.StatusInternalServerError)
