@@ -202,3 +202,45 @@ func TestListSessionsWithDirectRegistry(t *testing.T) {
 		t.Errorf("expected direct session %s in list output", sessName)
 	}
 }
+
+func TestDirectSessionScrollbackOverflow(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe failed: %v", err)
+	}
+	defer r.Close()
+
+	s := &directSession{
+		sessionName: "test-overflow",
+		ptmx:        r,
+	}
+
+	total := maxScrollbackBytes + 1024
+	payload := make([]byte, total)
+	for i := range payload {
+		payload[i] = byte('A' + (i % 26))
+	}
+
+	go func() {
+		defer w.Close()
+		_, _ = w.Write(payload)
+	}()
+
+	buf := make([]byte, 4096)
+	for {
+		n, err := s.Read(buf)
+		if n == 0 || err != nil {
+			break
+		}
+	}
+
+	scroll := s.Scrollback()
+	if len(scroll) != maxScrollbackBytes {
+		t.Fatalf("expected scrollback length %d, got %d", maxScrollbackBytes, len(scroll))
+	}
+
+	expectedTail := string(payload[total-maxScrollbackBytes:])
+	if scroll != expectedTail {
+		t.Errorf("scrollback content mismatch with expected tail")
+	}
+}

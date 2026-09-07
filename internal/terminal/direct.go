@@ -135,14 +135,15 @@ func (s *directSession) Read(p []byte) (int, error) {
 	n, err := s.ptmx.Read(p)
 	if n > 0 {
 		s.mu.Lock()
-		if s.scrollback.Len()+n > maxScrollbackBytes {
-			// Trim older bytes if scrollback exceeds capacity
-			overflow := (s.scrollback.Len() + n) - maxScrollbackBytes
-			trimmed := s.scrollback.Bytes()[overflow:]
-			s.scrollback.Reset()
-			s.scrollback.Write(trimmed)
-		}
 		s.scrollback.Write(p[:n])
+		if s.scrollback.Len() > maxScrollbackBytes {
+			data := s.scrollback.Bytes()
+			excess := len(data) - maxScrollbackBytes
+			tail := make([]byte, maxScrollbackBytes)
+			copy(tail, data[excess:])
+			s.scrollback.Reset()
+			s.scrollback.Write(tail)
+		}
 		s.mu.Unlock()
 	}
 	return n, err
