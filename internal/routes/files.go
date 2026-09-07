@@ -181,11 +181,23 @@ func (f *FileHandler) DownloadCwd(w http.ResponseWriter, r *http.Request) {
 		if err != nil || rel == "." {
 			return nil
 		}
+
 		header, err := tar.FileInfoHeader(info, "")
 		if err != nil {
 			return nil
 		}
 		header.Name = rel
+
+		// Handle symlinks
+		if info.Mode()&os.ModeSymlink != 0 {
+			linkTarget, err := os.Readlink(path)
+			if err != nil {
+				return nil
+			}
+			header.Linkname = linkTarget
+			header.Size = 0
+			return tw.WriteHeader(header)
+		}
 
 		if err := tw.WriteHeader(header); err != nil {
 			return err

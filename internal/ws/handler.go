@@ -159,10 +159,16 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	var sessionName string
 	var termSession terminal.Session
 	var ptyMu sync.Mutex
+	var writeMu sync.Mutex
 
 	// Helper to send JSON message
 	sendJSON := func(msg serverMessage) {
-		b, _ := json.Marshal(msg)
+		b, err := json.Marshal(msg)
+		if err != nil {
+			return
+		}
+		writeMu.Lock()
+		defer writeMu.Unlock()
 		_ = conn.Write(ctx, websocket.MessageText, b)
 	}
 
@@ -171,6 +177,8 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		buf := make([]byte, 1+len(payload))
 		buf[0] = typePrefix
 		copy(buf[1:], payload)
+		writeMu.Lock()
+		defer writeMu.Unlock()
 		return conn.Write(ctx, websocket.MessageBinary, buf)
 	}
 
