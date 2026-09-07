@@ -18,7 +18,7 @@ honor its STOP conditions, and update your row when done.
 | [008](008-antigravity-plugin-lifecycle-and-discovery-management.md) | Antigravity Plugin Lifecycle and Discovery Management | P1 | M | — | DONE |
 | [009](009-multi-persona-system-and-agent-customization.md) | Multi-Persona System and Dynamic Agent Customization | P1 | M | — | DONE |
 | [010](010-color-palette-synchronization-and-theme-unification.md) | Synchronize Color Palettes and Eliminate Theme Desynchronization Across Components | P1 | M | — | DONE |
-| [011](011-security-and-file-integrity-hardening.md) | Security & File Integrity Hardening | P1 | S | — | TODO |
+| [011](011-security-and-file-integrity-hardening.md) | Security & File Integrity Hardening | P1 | S | — | DONE |
 | [012](012-concurrency-stream-stability-and-tarball-integrity.md) | Concurrency, Stream Stability, and Tarball Integrity | P1 | S | — | TODO |
 | [013](013-repository-hygiene-and-legacy-server-retirement.md) | Repository Hygiene & Legacy Server Workspace Retirement | P2 | S | — | TODO |
 | [014](014-high-frequency-stream-batching-and-conversation-index-performance.md) | High-Frequency Stream Batching & Conversation Index Performance | P2 | M | — | TODO |
