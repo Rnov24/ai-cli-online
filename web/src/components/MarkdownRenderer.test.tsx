@@ -171,4 +171,28 @@ function test() {
     // Preserves indentation spaces
     expect(lineTexts[2].textContent).toContain('    const b = 2;');
   });
+  it('sanitizes malicious onclick attributes from markdown input', () => {
+    const md = '<span onclick="window.evil=true">test</span>';
+    const { container } = render(<MarkdownRenderer content={md} />);
+    expect(container.querySelector('span')?.getAttribute('onclick')).toBeNull();
+  });
+
+  it('copies code block content on copy button click via event delegation', () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    const md = `\`\`\`javascript
+const x = 42;
+\`\`\``;
+    const { container } = render(<MarkdownRenderer content={md} />);
+    const copyBtn = container.querySelector('.code-copy-btn') as HTMLButtonElement;
+    expect(copyBtn).toBeTruthy();
+
+    copyBtn.click();
+    expect(writeTextMock).toHaveBeenCalledWith('const x = 42;');
+  });
 });
