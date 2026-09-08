@@ -39,6 +39,7 @@ function getMimeType(path: string): string {
 export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelProps) {
   const [currentPath, setCurrentPath] = useState('');
   const [entries, setEntries] = useState<FileEntry[]>([]);
+  const [filterText, setFilterText] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
   const loadDirectory = useCallback(async (path: string) => {
     setLoading(true);
     setActionError(null);
+    setFilterText('');
     try {
       const res = await fetchFiles(token, sessionId, path || undefined);
       setEntries(res.files || []);
@@ -134,6 +136,36 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
     }
   };
 
+  // Keyboard shortcut: Ctrl+S / Cmd+S to save, Escape to cancel editing
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      handleSaveFile();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditContent(fileContent || '');
+      setIsEditing(false);
+    }
+  };
+
+  // Global Escape key dismiss for open file preview
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isEditing) {
+          setEditContent(fileContent || '');
+          setIsEditing(false);
+        } else if (selectedFile) {
+          setSelectedFile(null);
+          setFileContent(null);
+          setFileEncoding('utf-8');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditing, selectedFile, fileContent]);
+
   const handleGoUp = () => {
     if (!currentPath) return;
     const parts = currentPath.split('/');
@@ -193,6 +225,11 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
     }
   };
 
+  const pathSegments = currentPath ? currentPath.split('/').filter(Boolean) : [];
+  const filteredEntries = filterText.trim()
+    ? entries.filter((e) => e.name.toLowerCase().includes(filterText.trim().toLowerCase()))
+    : entries;
+
   return (
     <div style={{
       display: 'flex',
@@ -213,10 +250,23 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
         fontSize: '12px',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+        <nav
+          aria-label="Breadcrumbs"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            minWidth: 0,
+            flex: '1 1 auto',
+          }}
+        >
           {currentPath && (
             <button
               onClick={handleGoUp}
+              title="Go up one directory"
+              aria-label="Go up one directory"
               style={{
                 background: 'none',
                 border: 'none',
@@ -224,25 +274,70 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                 color: 'var(--accent-blue)',
                 padding: '0 4px',
                 fontSize: '12px',
+                flexShrink: 0,
               }}
             >
               ⮤ Up
             </button>
           )}
-          <span style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontWeight: 600,
-            color: 'var(--text-bright)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}>
-            <FolderIcon size={13} color="var(--accent-blue)" /> /{currentPath}
-          </span>
-        </div>
+          <button
+            onClick={() => {
+              loadDirectory('');
+              setSelectedFile(null);
+              setFileContent(null);
+            }}
+            title="Navigate to root directory"
+            aria-label="Root directory"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: pathSegments.length === 0 ? 'var(--text-bright)' : 'var(--accent-blue)',
+              fontWeight: pathSegments.length === 0 ? 700 : 500,
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              padding: '0 2px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              flexShrink: 0,
+            }}
+          >
+            <FolderIcon size={13} color="var(--accent-blue)" />
+            <span>~</span>
+          </button>
+          {pathSegments.map((seg, idx) => {
+            const segPath = pathSegments.slice(0, idx + 1).join('/');
+            const isLast = idx === pathSegments.length - 1;
+            return (
+              <span key={segPath} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>/</span>
+                <button
+                  onClick={() => {
+                    loadDirectory(segPath);
+                    setSelectedFile(null);
+                    setFileContent(null);
+                  }}
+                  title={`Navigate to ${seg}`}
+                  aria-label={`Navigate to ${seg}`}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: isLast ? 'var(--text-bright)' : 'var(--accent-blue)',
+                    fontWeight: isLast ? 700 : 500,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                    padding: '0 2px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {seg}
+                </button>
+              </span>
+            );
+          })}
+        </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
@@ -301,6 +396,58 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
         </div>
       </div>
 
+      {/* Quick Filter Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '4px 10px',
+        backgroundColor: 'var(--bg-tertiary)',
+        borderBottom: '1px solid var(--border)',
+        gap: '6px',
+        flexShrink: 0,
+      }}>
+        <input
+          type="text"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          placeholder="Filter files..."
+          aria-label="Filter files in current directory"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '3px 8px',
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono)',
+            backgroundColor: 'var(--bg-primary)',
+            color: 'var(--text-bright)',
+            border: '1px solid var(--border)',
+            borderRadius: '3px',
+            outline: 'none',
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-blue)'; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+        />
+        {filterText && (
+          <button
+            onClick={() => setFilterText('')}
+            title="Clear filter"
+            aria-label="Clear filter"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              padding: '2px 4px',
+              fontSize: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            <CloseIcon size={11} />
+          </button>
+        )}
+      </div>
+
       {actionError && (
         <div style={{
           padding: '4px 10px',
@@ -330,8 +477,19 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
               <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
                 Empty directory
               </div>
+            ) : filteredEntries.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                <div>No files matching "{filterText}"</div>
+                <button
+                  className="mecha-btn"
+                  onClick={() => setFilterText('')}
+                  style={{ marginTop: '8px', fontSize: '10px' }}
+                >
+                  Clear filter
+                </button>
+              </div>
             ) : (
-              entries.map((entry) => (
+              filteredEntries.map((entry) => (
                 <div
                   key={entry.name}
                   onClick={() => handleOpenItem(entry)}
@@ -522,6 +680,8 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
+                  onKeyDown={handleEditorKeyDown}
+                  aria-label="File content editor"
                   spellCheck={false}
                   style={{
                     width: '100%',

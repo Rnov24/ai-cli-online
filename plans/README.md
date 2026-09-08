@@ -35,6 +35,7 @@ honor its STOP conditions, and update your row when done.
 | [025](025-plan-panel-file-loading-resilience-and-annotation-sync.md) | Plan Panel File Loading Resilience, REST Fallback, and Task Annotation Synchronization | P1 | M | 024 | DONE |
 | [026](026-interactive-clarify-ux-dual-schema-and-modal-accessibility.md) | Interactive Clarification Modal UX, Dual-Schema Question Resolution, and Modal Keyboard Accessibility | P1 | M | 025 | DONE |
 | [027](027-task-pipeline-sync-mobile-responsiveness-and-auto-engine-recovery.md) | Task Pipeline Lifecycle Synchronization, Mobile Responsiveness, and Task Auto Session Termination Recovery | P1 | M | 026 | DONE |
+| [028](028-workspace-files-breadcrumbs-filter-and-save-shortcut.md) | Workspace File Explorer Breadcrumb Navigation, Quick Filter, and Save Shortcut Hardening | P1 | M | 027 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -57,6 +58,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 025 builds on Plan 024**: Delivers resilient REST document loading, retry/error states, and adaptive polling sync to PlanPanel.tsx, resolving the indefinite loading hang.
 - **Plan 026 builds on Plan 025**: Implements dual-schema question normalization, Enter submission, Escape dismissal, and backdrop handlers across InteractiveClarifyModal and SystemDiagnosticsModal.
 - **Plan 027 builds on Plan 026**: Delivers prop-synced module names, Enter submission, ARIA accessibility, and responsive mobile visibility to TaskPipelineBar, with session crash and directory deletion recovery in Go task-auto engine.
+- **Plan 028 builds on Plan 027**: Delivers interactive segmented breadcrumb navigation, real-time file filtering, and Ctrl+S/Escape keyboard shortcut ergonomics to WorkspaceFilesPanel.
 
 ## Findings considered and rejected
 
