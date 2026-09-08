@@ -370,7 +370,7 @@ export const CommandPalette = React.memo(function CommandPalette({
       category: 'SYSTEM',
       title: '/agents: Switch Agent Persona & Mindset',
       desc: 'Toggle between Architect, Auditor, Pair Programmer, SRE, and Assistant',
-      shortcut: '⌥A',
+      shortcut: '⌥M',
       action: () => {
         window.dispatchEvent(new CustomEvent('agy:open-persona-modal'));
         onClose();

@@ -243,4 +243,20 @@ describe('PersonaSelectorModal', { timeout: 20000 }, () => {
       }));
     });
   });
+
+  it('calls onClose when Escape key is pressed', () => {
+    const onClose = vi.fn();
+    render(
+      <PersonaSelectorModal
+        isOpen={true}
+        onClose={onClose}
+        activePersonaId="coding-agent"
+        onSelectPersona={vi.fn()}
+        token="test-tok"
+      />
+    );
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalled();
+  });
 });

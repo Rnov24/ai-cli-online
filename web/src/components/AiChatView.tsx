@@ -277,7 +277,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       } else if (e.altKey && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
         setShowPluginsModal((prev) => !prev);
-      } else if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+      } else if (e.altKey && (e.key === 'm' || e.key === 'M')) {
         e.preventDefault();
         setShowPersonaModal((prev) => !prev);
       }

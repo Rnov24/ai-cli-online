@@ -29,6 +29,7 @@ honor its STOP conditions, and update your row when done.
 | [019](019-task-auto-daemon-resilience-session-cascade-and-adaptive-polling.md) | Task-Auto Daemon Resilience, Full Lifecycle Session Cleanup, and Unified Mobile Adaptive Polling | P1 | M | 018 | DONE |
 | [020](020-git-engine-hardening-root-diff-resolution-and-adaptive-sync.md) | Git Engine Hardening, Root Commit Diff Resolution, and Git History Adaptive Sync | P1 | M | — | DONE |
 | [021](021-file-streaming-resilience-binary-preview-and-adaptive-sync.md) | Workspace File Streaming Resilience, Binary Media Preview, and Filesystem Adaptive Sync | P1 | M | 020 | DONE |
+| [022](022-global-keyboard-navigation-modal-accessibility-and-shortcut-unification.md) | Global Keyboard Navigation, Modal Accessibility, and Shortcut Unification | P1 | M | 021 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -45,6 +46,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 019 builds on Plans 017 and 018**: Provides daemon reboot recovery for running tasks, cascades session deletion across DB/WebSockets/Watchers, and unifies mobile adaptive polling across all frontend panels.
 - **Plan 020 is independent**: Corrects root commit diffing, eliminates slice aliasing, protects against memory exhaustion via bounded output buffers, and adds interactive refresh/adaptive sync to the Git visualizer.
 - **Plan 021 builds on Plan 020**: Eliminates tarball file descriptor leaks on large workspaces, enables base64 binary image encoding, and adds real-time directory polling and image preview.
+- **Plan 022 builds on Plan 021**: Eliminates the Alt+A shortcut collision between AutoTaskModal and PersonaSelectorModal, elevates modal shortcuts to App.tsx global scope, implements Escape key dismissal across all modals, and documents unified shortcuts.
 
 ## Findings considered and rejected
 

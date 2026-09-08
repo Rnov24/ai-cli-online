@@ -254,4 +254,19 @@ describe('SkillsManagementModal', { timeout: 20000 }, () => {
       expect(screen.getByText('/security-scan')).toBeInTheDocument();
     });
   });
+
+  it('calls onClose when Escape key is pressed', () => {
+    const onClose = vi.fn();
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={onClose}
+        token="test-token"
+      />
+    );
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalled();
+  });
 });
+

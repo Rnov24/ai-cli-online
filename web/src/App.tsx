@@ -216,6 +216,27 @@ function App() {
         return;
       }
 
+      // Alt+S: Open Skills & Capabilities Hub
+      if (e.altKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('agy:open-skills-modal'));
+        return;
+      }
+
+      // Alt+P: Open Antigravity Plugins Manager
+      if (e.altKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
+        return;
+      }
+
+      // Alt+M: Switch Agent Persona & Mindset
+      if (e.altKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('agy:open-persona-modal'));
+        return;
+      }
+
       // Question mark: Open Shortcuts (when not typing)
       if (e.key === '?' && !isInput && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();

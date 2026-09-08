@@ -172,4 +172,12 @@ describe('PluginsModal', { timeout: 35000 }, () => {
 
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
+
+  it('calls onClose when Escape key is pressed', () => {
+    const handleClose = vi.fn();
+    render(<PluginsModal isOpen={true} onClose={handleClose} token="test-tok" />);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(handleClose).toHaveBeenCalledTimes(1);
+  });
 });

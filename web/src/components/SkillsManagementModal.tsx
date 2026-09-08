@@ -60,6 +60,17 @@ export function SkillsManagementModal({
   const [scaffoldError, setScaffoldError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     if (!isOpen || !token) return;
 
     let isMounted = true;

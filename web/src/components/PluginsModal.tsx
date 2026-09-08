@@ -63,6 +63,17 @@ export function PluginsModal({
   };
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     if (!isOpen || !token) return;
     loadPlugins();
     setConfirmUninstall(null);

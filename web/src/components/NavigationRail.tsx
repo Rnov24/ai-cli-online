@@ -12,6 +12,8 @@ import {
   ChevronRightIcon,
   ActivityIcon,
   TabsIcon,
+  BoltIcon,
+  RobotIcon,
 } from './icons';
 
 interface NavigationRailProps {
@@ -362,6 +364,62 @@ export function NavigationRail({
         >
           <PuzzleIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px' }}>SKILLS HUB</span>}
+        </button>
+
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
+            if (mobileOpen) onCloseMobile();
+          }}
+          title="Antigravity Plugins Manager (⌥P)"
+          aria-label="Open plugins manager"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: mobileOpen ? '10px 14px' : (isExpanded ? '6px 10px' : '8px 0'),
+            minHeight: mobileOpen ? '42px' : 'auto',
+            justifyContent: isExpanded ? 'flex-start' : 'center',
+            borderRadius: '2px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--accent-cyan-bright)',
+            cursor: 'pointer',
+            marginBottom: '2px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <BoltIcon size={14} />
+          {isExpanded && <span style={{ fontSize: '11px' }}>PLUGINS</span>}
+        </button>
+
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('agy:open-persona-modal'));
+            if (mobileOpen) onCloseMobile();
+          }}
+          title="Agent Personas & Mindsets (⌥M)"
+          aria-label="Open personas modal"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: mobileOpen ? '10px 14px' : (isExpanded ? '6px 10px' : '8px 0'),
+            minHeight: mobileOpen ? '42px' : 'auto',
+            justifyContent: isExpanded ? 'flex-start' : 'center',
+            borderRadius: '2px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--accent-green-bright)',
+            cursor: 'pointer',
+            marginBottom: '2px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <RobotIcon size={14} />
+          {isExpanded && <span style={{ fontSize: '11px' }}>PERSONAS</span>}
         </button>
 
         <button

@@ -79,4 +79,21 @@ describe('CommandPalette', () => {
 
     window.removeEventListener('agy:open-auto-task', eventSpy);
   });
+
+  it('triggers agy:open-persona-modal event and displays ⌥M shortcut for persona switch', () => {
+    const onClose = vi.fn();
+    const eventSpy = vi.fn();
+    window.addEventListener('agy:open-persona-modal', eventSpy);
+
+    render(<CommandPalette isOpen={true} onClose={onClose} />);
+
+    const personaItem = screen.getByText(/\/agents: Switch Agent Persona & Mindset/i);
+    expect(screen.getByText('⌥M')).toBeInTheDocument();
+
+    fireEvent.click(personaItem);
+    expect(eventSpy).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+
+    window.removeEventListener('agy:open-persona-modal', eventSpy);
+  });
 });
