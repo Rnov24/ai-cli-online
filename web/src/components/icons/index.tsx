@@ -313,3 +313,15 @@ export const PlusIcon = createIcon('PlusIcon', (
   </>
 ));
 
+export const MinusIcon = createIcon('MinusIcon', (
+  <line x1="5" y1="12" x2="19" y2="12" />
+));
+
+export const ChevronRightIcon = createIcon('ChevronRightIcon', (
+  <polyline points="9 18 15 12 9 6" />
+));
+
+export const ChevronLeftIcon = createIcon('ChevronLeftIcon', (
+  <polyline points="15 18 9 12 15 6" />
+));
+

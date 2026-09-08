@@ -47,6 +47,10 @@ describe('SVG Icon System', () => {
     { name: 'PuzzleIcon', Component: Icons.PuzzleIcon },
     { name: 'KeyboardIcon', Component: Icons.KeyboardIcon },
     { name: 'DesktopScreenIcon', Component: Icons.DesktopScreenIcon },
+    { name: 'PlusIcon', Component: Icons.PlusIcon },
+    { name: 'MinusIcon', Component: Icons.MinusIcon },
+    { name: 'ChevronRightIcon', Component: Icons.ChevronRightIcon },
+    { name: 'ChevronLeftIcon', Component: Icons.ChevronLeftIcon },
   ];
 
   it('exports createIcon and IconProps', () => {
