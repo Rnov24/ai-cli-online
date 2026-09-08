@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BoltIcon, ChevronRightIcon } from './icons';
 
 interface TaskPipelineBarProps {
@@ -20,6 +20,10 @@ const STEPS = [
 
 export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModal }: TaskPipelineBarProps) {
   const [moduleInput, setModuleInput] = useState(currentModule);
+
+  useEffect(() => {
+    setModuleInput(currentModule);
+  }, [currentModule]);
 
   const handleStepClick = (cmd: string) => {
     const target = moduleInput.trim();
@@ -44,8 +48,17 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
     }
   };
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAutoClick();
+    }
+  };
+
   return (
     <div
+      role="toolbar"
+      aria-label="Task lifecycle pipeline"
       data-testid="task-pipeline-bar"
       style={{
         display: 'flex',
@@ -57,6 +70,8 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
         gap: '8px',
         overflowX: 'auto',
         scrollbarWidth: 'none',
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-x',
         fontSize: '10px',
         fontFamily: 'var(--font-mono)',
         flexShrink: 0,
@@ -73,6 +88,7 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
           type="text"
           value={moduleInput}
           onChange={(e) => setModuleInput(e.target.value)}
+          onKeyDown={handleInputKeyDown}
           placeholder="module-name"
           aria-label="Target task module name"
           style={{
@@ -85,6 +101,7 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
             fontFamily: 'var(--font-mono)',
             width: '100px',
             maxWidth: '130px',
+            minHeight: '24px',
             outline: 'none',
             transition: 'border-color 0.15s ease',
           }}
@@ -95,12 +112,15 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
 
       {/* Stepper Pipeline */}
       <div
+        role="group"
+        aria-label="Lifecycle steps"
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '2px',
           overflowX: 'auto',
           scrollbarWidth: 'none',
+          WebkitOverflowScrolling: 'touch',
           flex: '1 1 auto',
           minWidth: 0,
           padding: '1px 0',
@@ -114,10 +134,11 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
               title={step.title}
               aria-label={step.title}
               style={{
-                padding: '2px 5px',
+                padding: '3px 6px',
                 fontSize: '9px',
                 gap: '3px',
                 whiteSpace: 'nowrap',
+                minHeight: '26px',
               }}
             >
               <span style={{ color: 'var(--text-muted)' }}>{step.num}</span>
@@ -139,16 +160,21 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
       </div>
 
       {/* Quick Actions & Autonomous Loop */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+      <div
+        role="group"
+        aria-label="Task quick actions"
+        style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+      >
         <button
           className="mecha-btn"
           onClick={() => onRunSkill('/list')}
           title="Query active task modules status (/list)"
           aria-label="Query task status"
           style={{
-            padding: '2px 6px',
+            padding: '3px 6px',
             fontSize: '9px',
             color: 'var(--text-secondary)',
+            minHeight: '26px',
           }}
         >
           LIST
@@ -159,9 +185,10 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
           title="Cancel current task module (/cancel)"
           aria-label="Cancel task"
           style={{
-            padding: '2px 6px',
+            padding: '3px 6px',
             fontSize: '9px',
             color: 'var(--text-muted)',
+            minHeight: '26px',
           }}
         >
           CANCEL
@@ -178,6 +205,7 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModa
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px',
+            minHeight: '26px',
           }}
         >
           <BoltIcon size={11} />

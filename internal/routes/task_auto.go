@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/huacheng/ai-cli-online/internal/db"
+	"github.com/huacheng/ai-cli-online/internal/files"
 	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
@@ -173,7 +174,7 @@ func (h *TaskAutoHandler) StopTaskAuto(w http.ResponseWriter, r *http.Request) {
 				Reason:    "user_stop",
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 			})
-			_ = os.WriteFile(stopPath, stopData, 0644)
+			_ = files.AtomicWriteFile(stopPath, stopData, 0644)
 			_ = h.db.DeleteTaskAuto(sessionName)
 		}
 	}
@@ -194,7 +195,7 @@ func (h *TaskAutoHandler) CleanupSession(sessionName string) {
 				Reason:    "session_killed",
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 			})
-			_ = os.WriteFile(stopPath, stopData, 0644)
+			_ = files.AtomicWriteFile(stopPath, stopData, 0644)
 			_ = os.Remove(filepath.Join(rec.TaskDir, ".auto-signal"))
 			_ = h.db.DeleteTaskAuto(sessionName)
 		}
@@ -219,7 +220,7 @@ func (h *TaskAutoHandler) RecoverOnStartup() {
 				Reason:    "server_restart_session_dead",
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 			})
-			_ = os.WriteFile(stopPath, stopData, 0644)
+			_ = files.AtomicWriteFile(stopPath, stopData, 0644)
 			_ = os.Remove(filepath.Join(rec.TaskDir, ".auto-signal"))
 			_ = h.db.DeleteTaskAuto(rec.SessionName)
 			continue
@@ -236,7 +237,7 @@ func (h *TaskAutoHandler) RecoverOnStartup() {
 				Reason:    "timeout",
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 			})
-			_ = os.WriteFile(stopPath, stopData, 0644)
+			_ = files.AtomicWriteFile(stopPath, stopData, 0644)
 			_ = os.Remove(filepath.Join(rec.TaskDir, ".auto-signal"))
 			_ = h.db.DeleteTaskAuto(rec.SessionName)
 			continue
@@ -344,20 +345,42 @@ func (h *TaskAutoHandler) watchAutoLoop(ctx context.Context, sessionName, taskDi
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// 1. Check timeout
-			if time.Since(startTime) >= time.Duration(timeoutMinutes)*time.Minute {
+			// 1. Check if session was terminated or killed externally
+			if !terminal.Exists(sessionName) {
 				stopData, _ := json.Marshal(AutoStopPayload{
-					Reason:    "timeout",
+					Reason:    "session_terminated",
 					Timestamp: time.Now().UTC().Format(time.RFC3339),
 				})
-				_ = os.WriteFile(stopPath, stopData, 0644)
+				_ = files.AtomicWriteFile(stopPath, stopData, 0644)
+				_ = os.Remove(signalPath)
 				if h.db != nil {
 					_ = h.db.DeleteTaskAuto(sessionName)
 				}
 				return
 			}
 
-			// 2. Read .auto-signal if present
+			// 2. Check if task directory was deleted
+			if _, err := os.Stat(taskDir); os.IsNotExist(err) {
+				if h.db != nil {
+					_ = h.db.DeleteTaskAuto(sessionName)
+				}
+				return
+			}
+
+			// 3. Check timeout
+			if time.Since(startTime) >= time.Duration(timeoutMinutes)*time.Minute {
+				stopData, _ := json.Marshal(AutoStopPayload{
+					Reason:    "timeout",
+					Timestamp: time.Now().UTC().Format(time.RFC3339),
+				})
+				_ = files.AtomicWriteFile(stopPath, stopData, 0644)
+				if h.db != nil {
+					_ = h.db.DeleteTaskAuto(sessionName)
+				}
+				return
+			}
+
+			// 4. Read .auto-signal if present
 			if data, err := os.ReadFile(signalPath); err == nil && len(data) > 0 {
 				var sig AutoSignalPayload
 				if err := json.Unmarshal(data, &sig); err == nil {
@@ -381,7 +404,7 @@ func (h *TaskAutoHandler) watchAutoLoop(ctx context.Context, sessionName, taskDi
 							Reason:    "max_iterations",
 							Timestamp: time.Now().UTC().Format(time.RFC3339),
 						})
-						_ = os.WriteFile(stopPath, stopData, 0644)
+						_ = files.AtomicWriteFile(stopPath, stopData, 0644)
 						if h.db != nil {
 							_ = h.db.DeleteTaskAuto(sessionName)
 						}

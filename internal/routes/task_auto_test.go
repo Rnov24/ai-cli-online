@@ -2,12 +2,14 @@ package routes
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/huacheng/ai-cli-online/internal/config"
 	"github.com/huacheng/ai-cli-online/internal/db"
@@ -262,6 +264,45 @@ func TestTaskAutoHandler(t *testing.T) {
 		_ = json.Unmarshal(stopBytes, &stopPayload)
 		if stopPayload.Reason != "server_restart_session_dead" {
 			t.Errorf("Expected reason server_restart_session_dead, got %s", stopPayload.Reason)
+		}
+	})
+
+	t.Run("watchAutoLoop reaps task and writes session_terminated when session terminates", func(t *testing.T) {
+		sessionTerm := "session-terminated-test"
+		taskDirTerm := filepath.Join(tempDir, "AiTasks", "task-term")
+		_ = os.MkdirAll(taskDirTerm, 0755)
+
+		_ = database.UpsertTaskAuto(&db.TaskAutoRecord{
+			SessionName:    sessionTerm,
+			TaskDir:        taskDirTerm,
+			Status:         "running",
+			MaxIterations:  10,
+			TimeoutMinutes: 15,
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go handler.watchAutoLoop(ctx, sessionTerm, taskDirTerm, 10, 15, time.Now())
+
+		// Wait for ticker (2s) to execute session check
+		time.Sleep(2200 * time.Millisecond)
+
+		// Dead session record should be reaped from DB
+		rec, _ := database.GetTaskAuto(sessionTerm)
+		if rec != nil {
+			t.Errorf("Expected terminated session record to be deleted, got %+v", rec)
+		}
+
+		// .auto-stop should have reason session_terminated
+		stopBytes, err := os.ReadFile(filepath.Join(taskDirTerm, ".auto-stop"))
+		if err != nil {
+			t.Fatalf("Expected .auto-stop file: %v", err)
+		}
+		var stopPayload AutoStopPayload
+		_ = json.Unmarshal(stopBytes, &stopPayload)
+		if stopPayload.Reason != "session_terminated" {
+			t.Errorf("Expected reason session_terminated, got %s", stopPayload.Reason)
 		}
 	})
 }

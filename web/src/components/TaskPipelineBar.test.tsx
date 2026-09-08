@@ -84,4 +84,61 @@ describe('TaskPipelineBar Component', () => {
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
     expect(emojiRegex.test(container.textContent || '')).toBe(false);
   });
+
+  it('synchronizes module input when currentModule prop updates', () => {
+    const onRunSkill = vi.fn();
+    const { rerender } = render(<TaskPipelineBar currentModule="initial-task" onRunSkill={onRunSkill} />);
+
+    const input = screen.getByLabelText(/target task module name/i) as HTMLInputElement;
+    expect(input.value).toBe('initial-task');
+
+    rerender(<TaskPipelineBar currentModule="switched-task" onRunSkill={onRunSkill} />);
+    expect(input.value).toBe('switched-task');
+  });
+
+  it('triggers auto loop when Enter key is pressed in module input', () => {
+    const onRunSkill = vi.fn();
+    const onOpenAutoModal = vi.fn();
+    render(
+      <TaskPipelineBar
+        currentModule=""
+        onRunSkill={onRunSkill}
+        onOpenAutoModal={onOpenAutoModal}
+      />
+    );
+
+    const input = screen.getByLabelText(/target task module name/i);
+    fireEvent.change(input, { target: { value: 'hotfix-42' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onRunSkill).toHaveBeenCalledWith('/auto hotfix-42');
+    expect(onOpenAutoModal).toHaveBeenCalledWith('hotfix-42');
+  });
+
+  it('dispatches agy:open-auto-task custom event when onOpenAutoModal is omitted', () => {
+    const onRunSkill = vi.fn();
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+    render(<TaskPipelineBar currentModule="auth-v3" onRunSkill={onRunSkill} />);
+
+    const autoBtn = screen.getByRole('button', { name: /trigger autonomous task loop/i });
+    fireEvent.click(autoBtn);
+
+    expect(onRunSkill).toHaveBeenCalledWith('/auto auth-v3');
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'agy:open-auto-task',
+        detail: { module: 'auth-v3' },
+      })
+    );
+  });
+
+  it('provides toolbar and group ARIA roles for accessibility', () => {
+    const onRunSkill = vi.fn();
+    render(<TaskPipelineBar onRunSkill={onRunSkill} />);
+
+    expect(screen.getByRole('toolbar', { name: /task lifecycle pipeline/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /lifecycle steps/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /task quick actions/i })).toBeInTheDocument();
+  });
 });

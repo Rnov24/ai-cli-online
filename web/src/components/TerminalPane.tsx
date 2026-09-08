@@ -415,7 +415,7 @@ export const TerminalPane = memo(function TerminalPane({ terminal, canClose }: T
 
         {/* Central Pure AI Command Timeline with Task Pipeline Bar */}
         <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div className="desktop-only">
+          <div style={{ flexShrink: 0, minWidth: 0, width: '100%' }}>
             <TaskPipelineBar
               onRunSkill={(cmd) => setExternalCommand({ cmd, id: Date.now() })}
             />
