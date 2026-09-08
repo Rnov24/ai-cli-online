@@ -37,15 +37,25 @@ interface GitBranchesResponse {
   branches: string[];
 }
 
+export interface GitLogOptions {
+  page?: number;
+  limit?: number;
+  file?: string;
+  q?: string;
+  all?: boolean;
+  branch?: string;
+}
+
 export async function fetchGitLog(
   sessionId: string,
   token: string,
-  opts: { page?: number; limit?: number; file?: string; all?: boolean; branch?: string } = {},
+  opts: GitLogOptions = {},
 ): Promise<GitLogResponse> {
   const query: Record<string, string> = {};
   if (opts.page) query.page = String(opts.page);
   if (opts.limit) query.limit = String(opts.limit);
   if (opts.file) query.file = opts.file;
+  if (opts.q) query.q = opts.q;
   if (opts.all) query.all = 'true';
   if (opts.branch) query.branch = opts.branch;
 

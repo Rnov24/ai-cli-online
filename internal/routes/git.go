@@ -115,6 +115,12 @@ func (g *GitHandler) GitLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	queryFilter := r.URL.Query().Get("q")
+	if queryFilter != "" && (strings.Contains(queryFilter, "\x00") || strings.Contains(queryFilter, "\n") || strings.Contains(queryFilter, "\r")) {
+		http.Error(w, `{"error":"Invalid query parameter"}`, http.StatusBadRequest)
+		return
+	}
+
 	all := r.URL.Query().Get("all") == "true"
 	branch := r.URL.Query().Get("branch")
 	if branch != "" && !validBranchRe.MatchString(branch) {
@@ -138,6 +144,9 @@ func (g *GitHandler) GitLog(w http.ResponseWriter, r *http.Request) {
 		args = append(args, "--all")
 	} else if branch != "" {
 		args = append(args, branch)
+	}
+	if queryFilter != "" {
+		args = append(args, "--grep="+queryFilter, "-i")
 	}
 	if fileFilter != "" {
 		args = append(args, "--", fileFilter)

@@ -5,7 +5,7 @@ import { fetchWorkspaceMode } from '../api/workspaces';
 import type { CommitInfo, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
 import type { LaneNode, Connection } from '../utils/gitGraph';
-import { HomeIcon, GitBranchIcon, RefreshCwIcon } from './icons';
+import { HomeIcon, GitBranchIcon, RefreshCwIcon, CloseIcon } from './icons';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface GitHistoryPanelProps {
@@ -567,13 +567,30 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
       .catch(() => {});
   }, [sessionId, token]);
 
-  const loadPage = useCallback(async (p: number, file: string, append: boolean, all: boolean, branch: string) => {
+  const loadPage = useCallback(async (p: number, searchStr: string, append: boolean, all: boolean, branch: string) => {
     setLoading(true);
     setError(null);
     try {
+      const trimmed = searchStr.trim();
+      let fileParam: string | undefined;
+      let qParam: string | undefined;
+
+      if (trimmed) {
+        if (trimmed.startsWith('file:')) {
+          fileParam = trimmed.slice(5).trim();
+        } else if (trimmed.startsWith('msg:') || trimmed.startsWith('q:')) {
+          qParam = trimmed.slice(trimmed.indexOf(':') + 1).trim();
+        } else if (trimmed.includes('/') || /\.(ts|tsx|js|jsx|go|md|json|css|html|yml|yaml|py|sh|sql|rs|c|cpp|h|java)$/i.test(trimmed)) {
+          fileParam = trimmed;
+        } else {
+          qParam = trimmed;
+        }
+      }
+
       const resp = await fetchGitLog(sessionId, token, {
         page: p,
-        file: file || undefined,
+        file: fileParam || undefined,
+        q: qParam || undefined,
         all: all || undefined,
         branch: branch || undefined,
       });
@@ -617,6 +634,19 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => setSearch(val), 300);
   }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchInput('');
+    setSearch('');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      handleClearSearch();
+    }
+  }, [handleClearSearch]);
 
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -705,24 +735,57 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
             .map((b) => <option key={b} value={b}>{b}</option>)}
           <option value="__all__">-- All branches --</option>
         </select>
-        <input
-          type="text"
-          value={searchInput}
-          onChange={handleSearchChange}
-          placeholder="Filter by file..."
-          style={{
-            flex: 1,
-            fontSize: smSize,
-            padding: isMobile ? '4px 8px' : '2px 6px',
-            minHeight: isMobile ? '28px' : 'auto',
-            border: '1px solid var(--border)',
-            borderRadius: 3,
-            backgroundColor: 'var(--bg-primary)',
-            color: 'var(--text-primary)',
-            outline: 'none',
-            minWidth: 0,
-          }}
-        />
+        <div style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          flex: 1,
+          minWidth: 0,
+        }}>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Search commits or filter by file..."
+            aria-label="Filter commits or files"
+            style={{
+              width: '100%',
+              fontSize: smSize,
+              padding: isMobile ? '4px 24px 4px 8px' : '2px 20px 2px 6px',
+              minHeight: isMobile ? '28px' : 'auto',
+              border: '1px solid var(--border)',
+              borderRadius: 3,
+              backgroundColor: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              outline: 'none',
+              minWidth: 0,
+            }}
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              title="Clear search input"
+              aria-label="Clear search input"
+              style={{
+                position: 'absolute',
+                right: 4,
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '2px 4px',
+                fontSize: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CloseIcon size={11} />
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleRefresh}
@@ -855,8 +918,22 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
             )}
 
             {!loading && commits.length === 0 && !error && (
-              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-secondary)', fontSize }}>
-                No commits found
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)', fontSize }}>
+                {searchInput.trim() ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <span>No commits matching &quot;{searchInput.trim()}&quot;</span>
+                    <button
+                      type="button"
+                      className="pane-btn"
+                      onClick={handleClearSearch}
+                      style={{ fontSize: smSize, padding: '4px 10px', cursor: 'pointer' }}
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                ) : (
+                  'No commits found'
+                )}
               </div>
             )}
 

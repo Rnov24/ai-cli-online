@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 
 // Mock zustand store
 vi.mock('../store', () => ({
@@ -125,5 +125,71 @@ describe('GitHistoryPanel', () => {
     });
     expect(screen.getByText(/Agentic Assistant/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Switch to a Project Workspace/i })).toBeInTheDocument();
+  });
+
+  it('dispatches search query with commit message query (q) or file query', async () => {
+    mockFetchGitLog.mockResolvedValue({
+      commits: [],
+      hasMore: false,
+    });
+
+    render(<GitHistoryPanel sessionId="t1" token="test-token" />);
+    const searchInput = screen.getByRole('textbox', { name: /filter commits or files/i });
+
+    // Type a keyword search (commit message search)
+    fireEvent.change(searchInput, { target: { value: 'feature login' } });
+
+    await waitFor(() => {
+      expect(mockFetchGitLog).toHaveBeenCalledWith('t1', 'test-token', expect.objectContaining({
+        q: 'feature login',
+      }));
+    });
+
+    // Type a file path search
+    fireEvent.change(searchInput, { target: { value: 'src/main.ts' } });
+
+    await waitFor(() => {
+      expect(mockFetchGitLog).toHaveBeenCalledWith('t1', 'test-token', expect.objectContaining({
+        file: 'src/main.ts',
+      }));
+    });
+  });
+
+  it('renders clear button and clears search on click and escape key', async () => {
+    mockFetchGitLog.mockResolvedValue({
+      commits: [],
+      hasMore: false,
+    });
+
+    render(<GitHistoryPanel sessionId="t1" token="test-token" />);
+    const searchInput = screen.getByRole('textbox', { name: /filter commits or files/i });
+
+    fireEvent.change(searchInput, { target: { value: 'custom query' } });
+    await waitFor(() => {
+      expect(screen.getByText('No commits matching "custom query"')).toBeInTheDocument();
+    });
+
+    // Clear via search input clear button
+    const clearBtn = screen.getByRole('button', { name: /clear search input/i });
+    fireEvent.click(clearBtn);
+
+    await waitFor(() => {
+      expect(searchInput).toHaveValue('');
+    });
+
+    // Type again and clear via empty-state Clear search button
+    fireEvent.change(searchInput, { target: { value: 'empty clear' } });
+    await waitFor(() => {
+      expect(screen.getByText('No commits matching "empty clear"')).toBeInTheDocument();
+    });
+    const emptyClearBtn = screen.getByRole('button', { name: /^clear search$/i });
+    fireEvent.click(emptyClearBtn);
+    expect(searchInput).toHaveValue('');
+
+    // Type again and clear via Escape
+    fireEvent.change(searchInput, { target: { value: 'escape test' } });
+    expect(searchInput).toHaveValue('escape test');
+    fireEvent.keyDown(searchInput, { key: 'Escape' });
+    expect(searchInput).toHaveValue('');
   });
 });

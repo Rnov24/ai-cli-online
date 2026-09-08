@@ -159,6 +159,53 @@ func TestGitRoutes(t *testing.T) {
 		}
 	})
 
+	t.Run("GitLog with q (commit message) filter returns matching commits", func(t *testing.T) {
+		// Search for "initial"
+		req := httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/git-log?q=initial", nil)
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+
+		gitH.GitLog(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d", w.Code)
+		}
+
+		var resp struct {
+			Commits []CommitInfo `json:"commits"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if len(resp.Commits) != 1 || resp.Commits[0].Hash != rootHash {
+			t.Fatalf("Expected only root commit for q=initial, got %d", len(resp.Commits))
+		}
+
+		// Search for non-existent commit message
+		req = httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/git-log?q=nonexistent-query-xyz", nil)
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w = httptest.NewRecorder()
+
+		gitH.GitLog(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d", w.Code)
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if len(resp.Commits) != 0 {
+			t.Errorf("Expected 0 commits for nonexistent query, got %d", len(resp.Commits))
+		}
+
+		// Query with control character should be rejected
+		req = httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/git-log?q=foo%0Abar", nil)
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w = httptest.NewRecorder()
+
+		gitH.GitLog(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400 Bad Request for query with newline, got %d", w.Code)
+		}
+	})
+
 	t.Run("GitDiff for normal commit returns patch against parent", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/git-diff?commit="+secondHash, nil)
 		req.SetPathValue("sessionId", sessionId)

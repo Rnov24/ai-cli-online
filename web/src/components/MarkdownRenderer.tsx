@@ -134,7 +134,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
 
     return DOMPurify.sanitize(raw, {
       ADD_TAGS: ['button', 'span', 'div'],
-      ADD_ATTR: ['data-code', 'data-action', 'class', 'style', 'aria-hidden'],
+      ADD_ATTR: ['data-code', 'data-action', 'class', 'style', 'aria-hidden', 'aria-label'],
     });
   }, [content]);
 
