@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os/exec"
 	"regexp"
@@ -45,22 +46,41 @@ type CommitInfo struct {
 	Files     []CommitFile `json:"files"`
 }
 
+const maxGitOutputBytes = 5 * 1024 * 1024 // 5MB output limit to protect mobile/VPS memory
+
 var (
-	validHashRe   = regexp.MustCompile(`^[a-f0-9]{7,40}$`)
+	validHashRe   = regexp.MustCompile(`^([a-f0-9]{7,64}|HEAD(~[0-9]+)?)$`)
 	validBranchRe = regexp.MustCompile(`^[\w\-\/.]+$`)
 )
 
 func runGit(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", err
 	}
-	return stdout.String(), nil
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+
+	limited := io.LimitReader(stdoutPipe, maxGitOutputBytes+1)
+	buf, readErr := io.ReadAll(limited)
+	waitErr := cmd.Wait()
+
+	if readErr != nil {
+		return "", readErr
+	}
+	if waitErr != nil {
+		return "", waitErr
+	}
+
+	if len(buf) > maxGitOutputBytes {
+		return string(buf[:maxGitOutputBytes]) + "\n\n[Diff truncated: exceeds 5MB size limit]", nil
+	}
+	return string(buf), nil
 }
 
 func (g *GitHandler) GitLog(w http.ResponseWriter, r *http.Request) {
@@ -115,9 +135,8 @@ func (g *GitHandler) GitLog(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("-%d", limit+1),
 	}
 	if all {
-		args = append(args[:1], append([]string{"--all"}, args[1:]...)...)
-	}
-	if branch != "" && !all {
+		args = append(args, "--all")
+	} else if branch != "" {
 		args = append(args, branch)
 	}
 	if fileFilter != "" {
@@ -245,13 +264,7 @@ func (g *GitHandler) GitDiff(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	var args []string
-	if _, err := runGit(ctx, cwd, "rev-parse", commit+"~1"); err == nil {
-		args = []string{"diff", commit + "~1", commit}
-	} else {
-		args = []string{"diff", "--root", commit}
-	}
-
+	args := []string{"show", "--format=", "--patch", commit}
 	if fileFilter != "" {
 		args = append(args, "--", fileFilter)
 	}

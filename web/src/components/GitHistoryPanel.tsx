@@ -5,7 +5,8 @@ import { fetchWorkspaceMode } from '../api/workspaces';
 import type { CommitInfo, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
 import type { LaneNode, Connection } from '../utils/gitGraph';
-import { HomeIcon, GitBranchIcon } from './icons';
+import { HomeIcon, GitBranchIcon, RefreshCwIcon } from './icons';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface GitHistoryPanelProps {
   sessionId: string;
@@ -587,6 +588,23 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
     }
   }, [sessionId, token]);
 
+  const handleRefresh = useCallback(() => {
+    fetchGitBranches(sessionId, token)
+      .then(({ current, branches: list }) => {
+        setCurrentBranch(current);
+        setBranches(list);
+      })
+      .catch(() => {});
+    loadPage(1, search, false, allBranches, selectedBranch);
+  }, [sessionId, token, loadPage, search, allBranches, selectedBranch]);
+
+  // Adaptive background sync every 15s when tab is active
+  useAdaptivePolling(handleRefresh, {
+    intervalMs: 15000,
+    backgroundIntervalMs: 0,
+    enabled: Boolean(sessionId && token && !isHome),
+  });
+
   // Initial load and reload on search/allBranches/selectedBranch change
   useEffect(() => {
     loadPage(1, search, false, allBranches, selectedBranch);
@@ -705,6 +723,34 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
             minWidth: 0,
           }}
         />
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={loading}
+          title="Refresh git history"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: isMobile ? '4px 6px' : '2px 6px',
+            minHeight: isMobile ? '28px' : 'auto',
+            border: '1px solid var(--border)',
+            borderRadius: 3,
+            backgroundColor: 'var(--bg-primary)',
+            color: 'var(--text-secondary)',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1,
+            flexShrink: 0,
+          }}
+        >
+          <RefreshCwIcon
+            size={12}
+            style={{
+              transition: 'transform 0.4s ease',
+              transform: loading ? 'rotate(180deg)' : 'none',
+            }}
+          />
+        </button>
       </div>
 
       {/* Home / Non-Git Graceful Guard Card */}
