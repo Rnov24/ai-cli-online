@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,10 @@ var sensitiveKeys = []string{"AUTH_TOKEN", "SECRET", "PASSWORD", "API_KEY", "PRI
 
 func sanitizedEnv() []string {
 	var env []string
+	pathFound := false
+	home, _ := os.UserHomeDir()
+	prefix := os.Getenv("PREFIX")
+
 	for _, e := range os.Environ() {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 0 {
@@ -29,10 +34,47 @@ func sanitizedEnv() []string {
 				break
 			}
 		}
-		if !sensitive {
-			env = append(env, e)
+		if sensitive {
+			continue
 		}
+
+		if upper == "PATH" && len(parts) == 2 {
+			pathFound = true
+			currPath := parts[1]
+			var extraPaths []string
+			if home != "" {
+				agyBin := filepath.Join(home, ".gemini", "antigravity-cli", "bin")
+				if !strings.Contains(currPath, agyBin) {
+					extraPaths = append(extraPaths, agyBin)
+				}
+			}
+			if prefix != "" {
+				pBin := filepath.Join(prefix, "bin")
+				if !strings.Contains(currPath, pBin) {
+					extraPaths = append(extraPaths, pBin)
+				}
+			}
+			if len(extraPaths) > 0 {
+				newPath := strings.Join(extraPaths, string(os.PathListSeparator)) + string(os.PathListSeparator) + currPath
+				env = append(env, "PATH="+newPath)
+				continue
+			}
+		}
+		env = append(env, e)
 	}
+
+	if !pathFound {
+		var paths []string
+		if home != "" {
+			paths = append(paths, filepath.Join(home, ".gemini", "antigravity-cli", "bin"))
+		}
+		if prefix != "" {
+			paths = append(paths, filepath.Join(prefix, "bin"))
+		}
+		paths = append(paths, "/usr/local/bin", "/usr/bin", "/bin")
+		env = append(env, "PATH="+strings.Join(paths, string(os.PathListSeparator)))
+	}
+
 	env = append(env, "TERM=xterm-256color")
 	return env
 }

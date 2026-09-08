@@ -193,6 +193,13 @@ function App() {
         return;
       }
 
+      // Alt+A: Open Autonomous Task Lifecycle Loop Modal
+      if (e.altKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setAutoTaskModalOpen(true);
+        return;
+      }
+
       // Alt+F: Open Files
       if (e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();

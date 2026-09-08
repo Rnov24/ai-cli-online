@@ -63,4 +63,20 @@ describe('CommandPalette', () => {
     expect(onExecute).toHaveBeenCalledWith('/goal ');
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('triggers agy:open-auto-task event when auto task loop is selected', () => {
+    const onClose = vi.fn();
+    const eventSpy = vi.fn();
+    window.addEventListener('agy:open-auto-task', eventSpy);
+
+    render(<CommandPalette isOpen={true} onClose={onClose} />);
+
+    const autoItem = screen.getByText(/Autonomous Task Lifecycle Loop Dialog/i);
+    fireEvent.click(autoItem);
+
+    expect(eventSpy).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+
+    window.removeEventListener('agy:open-auto-task', eventSpy);
+  });
 });

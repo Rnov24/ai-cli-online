@@ -64,6 +64,8 @@ type ChatMessageItem struct {
 
 var (
 	userReqRegex   = regexp.MustCompile(`(?s)<USER_REQUEST>\s*(.*?)\s*</USER_REQUEST>`)
+	metaBlockRegex = regexp.MustCompile(`(?s)<(ADDITIONAL_METADATA|SKILL|SYSTEM_MESSAGE|system|context)[^>]*>.*?</(ADDITIONAL_METADATA|SKILL|SYSTEM_MESSAGE|system|context)>`)
+	xmlTagRegex    = regexp.MustCompile(`<[^>]+>`)
 	validConvIdReg = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
@@ -78,14 +80,24 @@ func getBrainDir() string {
 func extractUserPrompt(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if match := userReqRegex.FindStringSubmatch(raw); len(match) > 1 {
-		return strings.TrimSpace(match[1])
+		raw = strings.TrimSpace(match[1])
 	}
-	// If no XML tag, check for lines
+	// Strip metadata blocks that might be embedded
+	raw = metaBlockRegex.ReplaceAllString(raw, "")
+
 	lines := strings.Split(raw, "\n")
 	for _, l := range lines {
 		trimmed := strings.TrimSpace(l)
-		if trimmed != "" && !strings.HasPrefix(trimmed, "<") {
-			return trimmed
+		if trimmed == "" {
+			continue
+		}
+		clean := xmlTagRegex.ReplaceAllString(trimmed, "")
+		clean = strings.TrimSpace(clean)
+		if clean != "" {
+			if len(clean) > 200 {
+				clean = clean[:200] + "..."
+			}
+			return clean
 		}
 	}
 	return raw

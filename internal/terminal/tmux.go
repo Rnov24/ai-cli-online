@@ -204,8 +204,29 @@ func IsTmuxAvailable() bool {
 }
 
 func IsAgyAvailable() bool {
-	_, err := exec.LookPath("agy")
-	return err == nil
+	if _, err := exec.LookPath("agy"); err == nil {
+		return true
+	}
+	if prefix := os.Getenv("PREFIX"); prefix != "" {
+		if _, err := os.Stat(filepath.Join(prefix, "bin", "agy")); err == nil {
+			return true
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates := []string{
+			filepath.Join(home, ".gemini", "antigravity-cli", "bin", "agy"),
+			filepath.Join(home, ".gemini", "antigravity-cli", "bin", "agy.exe"),
+			filepath.Join(home, "AppData", "Local", "agy", "bin", "agy.exe"),
+			filepath.Join(home, ".local", "bin", "agy"),
+			filepath.Join(home, "bin", "agy"),
+		}
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type tmuxSession struct {

@@ -74,6 +74,8 @@ func ResolveAgyBinary() string {
 	}
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
 		candidates := []string{
+			filepath.Join(home, ".gemini", "antigravity-cli", "bin", "agy"),
+			filepath.Join(home, ".gemini", "antigravity-cli", "bin", "agy.exe"),
 			filepath.Join(home, "AppData", "Local", "agy", "bin", "agy.exe"),
 			filepath.Join(home, ".local", "bin", "agy"),
 			filepath.Join(home, "bin", "agy"),
@@ -84,6 +86,12 @@ func ResolveAgyBinary() string {
 			if _, err := os.Stat(c); err == nil {
 				return c
 			}
+		}
+	}
+	if prefix := os.Getenv("PREFIX"); prefix != "" {
+		p := filepath.Join(prefix, "bin", "agy")
+		if _, err := os.Stat(p); err == nil {
+			return p
 		}
 	}
 	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {

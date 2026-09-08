@@ -156,6 +156,17 @@ export const CommandPalette = React.memo(function CommandPalette({
       action: () => runCommand('/goal '),
     },
     {
+      id: 'open-auto-task',
+      category: 'SKILLS',
+      title: 'Autonomous Task Lifecycle Loop Dialog (/auto)',
+      desc: 'Launch or monitor autonomous multi-step task execution loop with telemetry',
+      shortcut: '⌥A',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-auto-task'));
+        onClose();
+      },
+    },
+    {
       id: 'cmd-auto',
       category: 'SKILLS',
       title: '/auto: Full 13-Skill Task Lifecycle Loop',

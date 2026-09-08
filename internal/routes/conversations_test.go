@@ -247,3 +247,30 @@ func TestConversationsHandler_Pagination(t *testing.T) {
 	}
 }
 
+func TestExtractUserPrompt(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "<USER_REQUEST>\nFix the login button\n</USER_REQUEST>",
+			expected: "Fix the login button",
+		},
+		{
+			input:    "<USER_REQUEST>\n<SKILL>some skill info</SKILL>\n<ADDITIONAL_METADATA>meta</ADDITIONAL_METADATA>\nRefactor auth handler\n</USER_REQUEST>",
+			expected: "Refactor auth handler",
+		},
+		{
+			input:    "Plain text question without tags",
+			expected: "Plain text question without tags",
+		},
+	}
+
+	for _, c := range cases {
+		got := extractUserPrompt(c.input)
+		if got != c.expected {
+			t.Errorf("extractUserPrompt(%q) = %q; want %q", c.input, got, c.expected)
+		}
+	}
+}
+
