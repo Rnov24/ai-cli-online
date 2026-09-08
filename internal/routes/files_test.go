@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -186,5 +187,97 @@ func TestFileHandler_DownloadCwd_Symlink(t *testing.T) {
 
 	if _, ok := foundEntries["target.txt"]; !ok {
 		t.Fatalf("target.txt not found in tar archive")
+	}
+}
+
+func TestFileHandler_GetFileContent(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ai-cli-getcontent-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// 1. Text file
+	textFile := filepath.Join(tempDir, "note.txt")
+	textContent := "Hello from Antigravity text file!"
+	if err := os.WriteFile(textFile, []byte(textContent), 0644); err != nil {
+		t.Fatalf("Failed to write text file: %v", err)
+	}
+
+	// 2. Binary PNG file
+	pngFile := filepath.Join(tempDir, "sample.png")
+	pngBytes := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52}
+	if err := os.WriteFile(pngFile, pngBytes, 0644); err != nil {
+		t.Fatalf("Failed to write png file: %v", err)
+	}
+
+	cfg := &config.Config{
+		DefaultWorkingDir: tempDir,
+	}
+	auth := NewAuthHelper(cfg)
+	fileH := NewFileHandler(auth)
+
+	// Test 1: Fetch text file
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/tab-1/file-content?path=note.txt", nil)
+	req.SetPathValue("sessionId", "tab-1")
+	w := httptest.NewRecorder()
+	fileH.GetFileContent(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for note.txt, got %d: %s", w.Code, w.Body.String())
+	}
+	var textResp struct {
+		Content  string  `json:"content"`
+		Encoding string  `json:"encoding"`
+		Size     int64   `json:"size"`
+		Mtime    float64 `json:"mtime"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &textResp); err != nil {
+		t.Fatalf("Failed to decode json response: %v", err)
+	}
+	if textResp.Encoding != "utf-8" {
+		t.Errorf("Expected encoding utf-8, got %s", textResp.Encoding)
+	}
+	if textResp.Content != textContent {
+		t.Errorf("Expected content %q, got %q", textContent, textResp.Content)
+	}
+	if textResp.Size != int64(len(textContent)) {
+		t.Errorf("Expected size %d, got %d", len(textContent), textResp.Size)
+	}
+
+	// Test 2: Fetch binary PNG file
+	req = httptest.NewRequest(http.MethodGet, "/api/sessions/tab-1/file-content?path=sample.png", nil)
+	req.SetPathValue("sessionId", "tab-1")
+	w = httptest.NewRecorder()
+	fileH.GetFileContent(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for sample.png, got %d: %s", w.Code, w.Body.String())
+	}
+	var pngResp struct {
+		Content  string  `json:"content"`
+		Encoding string  `json:"encoding"`
+		Size     int64   `json:"size"`
+		Mtime    float64 `json:"mtime"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &pngResp); err != nil {
+		t.Fatalf("Failed to decode json response: %v", err)
+	}
+	if pngResp.Encoding != "base64" {
+		t.Errorf("Expected encoding base64, got %s", pngResp.Encoding)
+	}
+	if pngResp.Size != int64(len(pngBytes)) {
+		t.Errorf("Expected size %d, got %d", len(pngBytes), pngResp.Size)
+	}
+
+	// Test 3: StatusNotModified check with since
+	sinceURL := fmt.Sprintf("/api/sessions/tab-1/file-content?path=note.txt&since=%.0f", textResp.Mtime)
+	req = httptest.NewRequest(http.MethodGet, sinceURL, nil)
+	req.SetPathValue("sessionId", "tab-1")
+	w = httptest.NewRecorder()
+	fileH.GetFileContent(w, req)
+
+	if w.Code != http.StatusNotModified {
+		t.Errorf("Expected 304 Not Modified, got %d", w.Code)
 	}
 }

@@ -210,8 +210,8 @@ func (f *FileHandler) DownloadCwd(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil
 		}
-		defer file.Close()
 		_, _ = io.Copy(tw, file)
+		_ = file.Close()
 		return nil
 	})
 }
@@ -379,11 +379,12 @@ func (f *FileHandler) GetFileContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ext := strings.ToLower(filepath.Ext(resolved))
-	isPdf := (ext == ".pdf")
+	isBinary := (ext == ".pdf" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
+		ext == ".gif" || ext == ".webp" || ext == ".ico" || ext == ".bmp")
 
 	content := string(data)
 	encoding := "utf-8"
-	if isPdf {
+	if isBinary {
 		content = base64.StdEncoding.EncodeToString(data)
 		encoding = "base64"
 	}

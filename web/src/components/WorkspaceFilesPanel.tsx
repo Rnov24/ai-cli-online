@@ -3,7 +3,8 @@ import { fetchFiles, downloadFile, deleteItem, touchFile, mkdirPath } from '../a
 import type { FileEntry } from '../api/files';
 import { fetchFileContent, saveFileContent } from '../api/docs';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { FolderIcon, FileIcon, SaveIcon, CheckIcon, EditIcon, CloseIcon } from './icons';
+import { FolderIcon, FileIcon, SaveIcon, CheckIcon, EditIcon, CloseIcon, RefreshCwIcon } from './icons';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface WorkspaceFilesPanelProps {
   sessionId: string;
@@ -16,12 +17,32 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isImageFile(path: string): boolean {
+  return /\.(png|jpe?g|gif|webp|ico|bmp|svg)$/i.test(path);
+}
+
+function getMimeType(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'png': return 'image/png';
+    case 'jpg':
+    case 'jpeg': return 'image/jpeg';
+    case 'gif': return 'image/gif';
+    case 'webp': return 'image/webp';
+    case 'ico': return 'image/x-icon';
+    case 'bmp': return 'image/bmp';
+    case 'svg': return 'image/svg+xml';
+    default: return 'application/octet-stream';
+  }
+}
+
 export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelProps) {
   const [currentPath, setCurrentPath] = useState('');
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [fileEncoding, setFileEncoding] = useState<'utf-8' | 'base64'>('utf-8');
   const [contentLoading, setContentLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
@@ -54,12 +75,25 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
     loadDirectory('');
   }, [loadDirectory]);
 
+  const handleRefresh = useCallback(() => {
+    if (!isEditing) {
+      loadDirectory(currentPath);
+    }
+  }, [loadDirectory, currentPath, isEditing]);
+
+  useAdaptivePolling(handleRefresh, {
+    intervalMs: 8000,
+    backgroundIntervalMs: 0,
+    enabled: !isEditing,
+  });
+
   const handleOpenItem = async (entry: FileEntry) => {
     if (entry.type === 'directory') {
       const nextPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
       loadDirectory(nextPath);
       setSelectedFile(null);
       setFileContent(null);
+      setFileEncoding('utf-8');
     } else {
       const fullFilePath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
       setSelectedFile(fullFilePath);
@@ -68,11 +102,14 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
       try {
         const res = await fetchFileContent(token, sessionId, fullFilePath);
         const content = res ? res.content : '';
+        const encoding = res?.encoding === 'base64' ? 'base64' : 'utf-8';
         setFileContent(content);
+        setFileEncoding(encoding);
         setEditContent(content);
       } catch (err) {
         const errContent = `// Error reading file: ${err instanceof Error ? err.message : 'Unknown error'}`;
         setFileContent(errContent);
+        setFileEncoding('utf-8');
         setEditContent(errContent);
       } finally {
         setContentLoading(false);
@@ -208,6 +245,27 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            onClick={handleRefresh}
+            title="Refresh directory"
+            disabled={loading}
+            style={{
+              padding: isMobile ? '5px 8px' : '2px 6px',
+              minHeight: isMobile ? '28px' : 'auto',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              backgroundColor: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <RefreshCwIcon size={11} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
           <button
             onClick={handleNewFile}
             title="Create file"
@@ -391,7 +449,18 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                 <span>{selectedFile.split('/').pop()}</span>
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {isEditing ? (
+                {fileEncoding === 'base64' ? (
+                  <span style={{
+                    fontSize: '10px',
+                    color: isImageFile(selectedFile) ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    padding: '2px 6px',
+                    backgroundColor: isImageFile(selectedFile) ? 'rgba(56, 189, 248, 0.1)' : 'var(--bg-tertiary)',
+                    borderRadius: '3px',
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    {isImageFile(selectedFile) ? 'Image Preview' : 'Binary File'}
+                  </span>
+                ) : isEditing ? (
                   <>
                     <button
                       className="mecha-btn"
@@ -439,7 +508,7 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                 )}
                 <button
                   className="mecha-btn"
-                  onClick={() => { setSelectedFile(null); setFileContent(null); setIsEditing(false); }}
+                  onClick={() => { setSelectedFile(null); setFileContent(null); setFileEncoding('utf-8'); setIsEditing(false); }}
                   style={{ padding: '2px 8px', fontSize: '10px' }}
                 >
                   {isMobile ? '← Back' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><CloseIcon size={11} /> Close</span>}
@@ -472,7 +541,56 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                   }}
                 />
               ) : fileContent != null ? (
-                selectedFile.endsWith('.md') ? (
+                fileEncoding === 'base64' && isImageFile(selectedFile) ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px',
+                    height: '100%',
+                    boxSizing: 'border-box',
+                  }}>
+                    <img
+                      src={`data:${getMimeType(selectedFile)};base64,${fileContent}`}
+                      alt={selectedFile.split('/').pop()}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '80%',
+                        objectFit: 'contain',
+                        borderRadius: '4px',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'var(--bg-tertiary)',
+                      }}
+                    />
+                    <div style={{
+                      marginTop: '12px',
+                      fontSize: '11px',
+                      color: 'var(--text-secondary)',
+                      fontFamily: 'var(--font-mono)',
+                      textAlign: 'center',
+                    }}>
+                      {selectedFile.split('/').pop()}
+                    </div>
+                  </div>
+                ) : fileEncoding === 'base64' ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '32px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    textAlign: 'center',
+                    gap: '12px',
+                  }}>
+                    <FileIcon size={32} />
+                    <span>Binary file preview is not supported for this file type.</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)' }}>{selectedFile}</span>
+                  </div>
+                ) : selectedFile.endsWith('.md') ? (
                   <MarkdownRenderer content={fileContent} />
                 ) : (
                   <MarkdownRenderer content={`\`\`\`${selectedFile.split('.').pop() || 'text'}\n${fileContent}\n\`\`\``} />
