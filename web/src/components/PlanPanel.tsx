@@ -12,6 +12,41 @@ import { fetchPlugins } from '../api/plugins';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 import { FolderIcon, EditIcon, ClipboardIcon, ChevronRightIcon } from './icons';
 
+// Ensure localStorage has a working fallback in test/jsdom/opaque-origin environments under Node 22+
+try {
+  let hasWorkingStorage = false;
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+      localStorage.getItem('__test__');
+      hasWorkingStorage = true;
+    }
+  } catch {
+    hasWorkingStorage = false;
+  }
+
+  if (!hasWorkingStorage) {
+    const map = new Map<string, string>();
+    const memStorage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, val: string) => { map.set(key, String(val)); },
+      removeItem: (key: string) => { map.delete(key); },
+      clear: () => { map.clear(); },
+      get length() { return map.size; },
+      key: (i: number) => Array.from(map.keys())[i] ?? null,
+    };
+    if (typeof globalThis !== 'undefined') {
+      try {
+        Object.defineProperty(globalThis, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        Object.defineProperty(window, 'localStorage', { value: memStorage, configurable: true, writable: true });
+      } catch {}
+    }
+  }
+} catch {}
+
 interface PlanPanelProps {
   sessionId: string;
   token: string;
@@ -71,6 +106,8 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   }, []);
   const [planMarkdown, setPlanMarkdown] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileLoadError, setFileLoadError] = useState<string | null>(null);
   // When AiTasks/ directory is not found, show init guidance
   const [showInitGuide, setShowInitGuide] = useState(false);
   const [isHome, setIsHome] = useState(false);
@@ -175,41 +212,68 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     return () => unregisterFileStreamHandler(sessionId);
   }, [sessionId, fileStream.handleChunk, fileStream.handleControl]);
 
-  // Request file stream once WS is connected and planSelectedFile is known
+  // Load selected plan file via direct REST with mtime sync and error recovery
+  const loadPlanFile = useCallback(async (filePath: string) => {
+    if (!token || !filePath) return;
+    setFileLoading(true);
+    setFileLoadError(null);
+    try {
+      const res = await fetchFileContent(token, sessionId, filePath);
+      if (res) {
+        setPlanMarkdown(res.content);
+        planMtimeRef.current = res.mtime;
+        setFileLoadError(null);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load file';
+      setFileLoadError(msg);
+    } finally {
+      setFileLoading(false);
+    }
+  }, [token, sessionId]);
+
+  // Request file stream once WS is connected and planSelectedFile is known, with direct REST guarantee
   useEffect(() => {
     if (!planSelectedFile || !connected) return;
     if (planStreamedRef.current === planSelectedFile && planMarkdown) return;
     planStreamedRef.current = planSelectedFile;
-    fileStream.reset();
-    fileStream.startStream('content');
-    onRequestFileStream?.(planSelectedFile);
+
+    if (onRequestFileStream) {
+      fileStream.reset();
+      fileStream.startStream('content');
+      onRequestFileStream(planSelectedFile);
+    }
+
+    loadPlanFile(planSelectedFile);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planSelectedFile, connected]);
+  }, [planSelectedFile, connected, loadPlanFile, onRequestFileStream]);
 
   // When stream completes, capture the content and record mtime for polling
   const planMtimeRef = useRef(0);
   useEffect(() => {
     if (fileStream.state.status === 'complete' && planSelectedFile) {
       setPlanMarkdown(fileStream.state.content);
-
       planMtimeRef.current = Date.now();
+      setFileLoading(false);
+      setFileLoadError(null);
     }
   }, [fileStream.state.status, fileStream.state.content, planSelectedFile]);
 
   // Poll for file changes adaptively (3s when visible, paused when hidden, uses 304 Not Modified)
   useAdaptivePolling(
     useCallback(async () => {
-      if (!planSelectedFile || !connected || !planMarkdown || !planMtimeRef.current) return;
+      if (!planSelectedFile || !connected || fileLoading) return;
       try {
-        const result = await fetchFileContent(token, sessionId, planSelectedFile, planMtimeRef.current);
+        const result = await fetchFileContent(token, sessionId, planSelectedFile, planMtimeRef.current || undefined);
         if (result) {
           // File changed — update content
           setPlanMarkdown(result.content);
           planMtimeRef.current = result.mtime;
+          setFileLoadError(null);
         }
       } catch { /* ignore network errors */ }
-    }, [planSelectedFile, connected, planMarkdown, token, sessionId]),
-    { intervalMs: 3000, backgroundIntervalMs: 0, enabled: Boolean(planSelectedFile && connected && planMarkdown) },
+    }, [planSelectedFile, connected, fileLoading, token, sessionId]),
+    { intervalMs: 3000, backgroundIntervalMs: 0, enabled: Boolean(planSelectedFile && connected && !fileLoading) },
   );
 
   // Plan scroll position memory: filePath → scrollTop
@@ -243,6 +307,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     savePlanScrollPosition();
     setPlanSelectedFile(fullPath);
     setPlanMarkdown('');
+    setFileLoadError(null);
     planStreamedRef.current = null;
     if (isMobile) setMobileView('editor');
   }, [planSelectedFile, savePlanScrollPosition, isMobile]);
@@ -252,6 +317,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     if (planSelectedFile && (planSelectedFile === fullPath || planSelectedFile.startsWith(fullPath + '/'))) {
       setPlanSelectedFile(null);
       setPlanMarkdown('');
+      setFileLoadError(null);
       planStreamedRef.current = null;
       if (isMobile) setMobileView('browser');
     }
@@ -261,6 +327,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   const handlePlanFileCreate = useCallback((fullPath: string) => {
     setPlanSelectedFile(fullPath);
     setPlanMarkdown('');
+    setFileLoadError(null);
     planStreamedRef.current = null;
     if (isMobile) setMobileView('editor');
   }, [isMobile]);
@@ -274,6 +341,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   const handleContentSaved = useCallback((newContent: string, mtime: number) => {
     setPlanMarkdown(newContent);
     planMtimeRef.current = mtime;
+    setFileLoadError(null);
   }, []);
 
   // Handle close file — deselect current file (does NOT close the Plan panel)
@@ -281,6 +349,7 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
     savePlanScrollPosition();
     setPlanSelectedFile(null);
     setPlanMarkdown('');
+    setFileLoadError(null);
     planStreamedRef.current = null;
     if (isMobile) setMobileView('browser');
   }, [savePlanScrollPosition, isMobile]);
@@ -289,12 +358,15 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
   const handlePlanRefresh = useCallback(() => {
     if (!planSelectedFile || !connected) return;
     planStreamedRef.current = null;
-    setPlanMarkdown('');
-    fileStream.reset();
-    fileStream.startStream('content');
-    onRequestFileStream?.(planSelectedFile);
-    planStreamedRef.current = planSelectedFile;
-  }, [planSelectedFile, connected, fileStream, onRequestFileStream]);
+    setFileLoadError(null);
+    if (onRequestFileStream) {
+      fileStream.reset();
+      fileStream.startStream('content');
+      onRequestFileStream(planSelectedFile);
+      planStreamedRef.current = planSelectedFile;
+    }
+    loadPlanFile(planSelectedFile);
+  }, [planSelectedFile, connected, fileStream, onRequestFileStream, loadPlanFile]);
 
   // File browser width (resizable)
   const [fbWidth, setFbWidth] = useState(() => {
@@ -567,7 +639,32 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
                   </button>
                 )}
               </div>
-            ) : planSelectedFile && (!planMarkdown && (fileStream.state.status === 'streaming' || fileStream.state.status === 'idle')) ? (
+            ) : planSelectedFile && fileLoadError && !planMarkdown ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                gap: 12,
+                padding: '24px',
+                textAlign: 'center',
+              }}>
+                <div style={{ color: 'var(--accent-red)', fontSize: '13px', fontWeight: 600 }}>
+                  Failed to load {planSelectedFile.split('/').pop()}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '11px', maxWidth: '320px', lineHeight: 1.4 }}>
+                  {fileLoadError}
+                </div>
+                <button
+                  className="mecha-btn mecha-btn--cyan"
+                  onClick={() => loadPlanFile(planSelectedFile)}
+                  style={{ padding: '6px 14px', fontSize: '11px' }}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : planSelectedFile && (fileLoading || (!planMarkdown && (fileStream.state.status === 'streaming' || fileStream.state.status === 'idle'))) ? (
               <CenteredLoading label={`Loading ${planSelectedFile.split('/').pop()}...`} percent={fileStream.state.totalSize > 0 ? Math.round((fileStream.state.receivedBytes / fileStream.state.totalSize) * 100) : undefined} />
             ) : planSelectedFile ? (
               <PlanAnnotationRenderer
