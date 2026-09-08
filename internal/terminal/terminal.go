@@ -28,11 +28,33 @@ func BuildSessionName(token, sessionId string) string {
 	return base
 }
 
+// SanitizeWinsize clamps terminal window dimensions to safe operating boundaries.
+func SanitizeWinsize(cols, rows int) (int, int) {
+	if cols <= 0 {
+		cols = 80
+	} else if cols < 10 {
+		cols = 10
+	} else if cols > 1000 {
+		cols = 1000
+	}
+
+	if rows <= 0 {
+		rows = 24
+	} else if rows < 4 {
+		rows = 4
+	} else if rows > 1000 {
+		rows = 1000
+	}
+
+	return cols, rows
+}
+
 // Open initializes or reattaches to a TerminalSession behind the seam.
 // If tmux is available, it orchestrates tmux session creation or reattachment, returns the attached PTY session,
 // and sets resumed to true if the session previously existed.
 // If tmux is unavailable, it spawns a direct shell PTY session.
 func Open(sessionName, cwd string, cols, rows int, startCmd string) (Session, bool, error) {
+	cols, rows = SanitizeWinsize(cols, rows)
 	if IsTmuxAvailable() {
 		resumed := HasSession(sessionName)
 		if !resumed {

@@ -244,3 +244,55 @@ func TestDirectSessionScrollbackOverflow(t *testing.T) {
 		t.Errorf("scrollback content mismatch with expected tail")
 	}
 }
+
+func TestSanitizeWinsize(t *testing.T) {
+	tests := []struct {
+		inCols, inRows   int
+		outCols, outRows int
+	}{
+		{0, 0, 80, 24},
+		{-10, -5, 80, 24},
+		{5, 2, 10, 4},
+		{2000, 3000, 1000, 1000},
+		{120, 40, 120, 40},
+		{10, 4, 10, 4},
+		{1000, 1000, 1000, 1000},
+	}
+
+	for _, tc := range tests {
+		c, r := SanitizeWinsize(tc.inCols, tc.inRows)
+		if c != tc.outCols || r != tc.outRows {
+			t.Errorf("SanitizeWinsize(%d, %d) = (%d, %d); want (%d, %d)",
+				tc.inCols, tc.inRows, c, r, tc.outCols, tc.outRows)
+		}
+	}
+}
+
+func TestDirectSessionAutoReapOnExit(t *testing.T) {
+	tempDir := t.TempDir()
+	sessName := "test-auto-reap-session"
+
+	sess, err := startDirect(sessName, tempDir, 80, 24, "exit 0")
+	if err != nil {
+		if errors.Is(err, pty.ErrUnsupported) || runtime.GOOS == "windows" {
+			t.Skipf("skipping direct pty test on unsupported platform (%s): %v", runtime.GOOS, err)
+		}
+		t.Fatalf("startDirect failed: %v", err)
+	}
+
+	// Shell runs 'exit 0' and immediately terminates.
+	// Asynchronous reaper should invoke Close(), marking session dead and unregistering from registry.
+	deadline := time.Now().Add(3 * time.Second)
+	reaped := false
+	for time.Now().Before(deadline) {
+		if !sess.IsAlive() && registry.get(sessName) == nil {
+			reaped = true
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if !reaped {
+		t.Errorf("expected session %s to be auto-reaped and unregistered after shell exit", sessName)
+	}
+}

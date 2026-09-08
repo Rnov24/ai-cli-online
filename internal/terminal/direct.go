@@ -128,12 +128,14 @@ type directSession struct {
 	ptmx        *os.File
 	cmd         *exec.Cmd
 	closed      bool
+	closeOnce   sync.Once
 	scrollback  bytes.Buffer
 }
 
 const maxScrollbackBytes = 64 * 1024
 
 func startDirect(sessionName, cwd string, cols, rows int, customCmd string) (*directSession, error) {
+	cols, rows = SanitizeWinsize(cols, rows)
 	shell := resolveDefaultShell()
 	var c *exec.Cmd
 	if customCmd != "" {
@@ -162,6 +164,14 @@ func startDirect(sessionName, cwd string, cols, rows int, customCmd string) (*di
 		cmd:         c,
 	}
 	registry.register(ds)
+
+	// Asynchronously reap child process upon termination to prevent zombie accumulation
+	// and automatically unregister dead sessions on natural exit
+	go func() {
+		_ = c.Wait()
+		_ = ds.Close()
+	}()
+
 	return ds, nil
 }
 
@@ -206,6 +216,7 @@ func (s *directSession) Resize(cols, rows int) error {
 	if s.closed {
 		return os.ErrClosed
 	}
+	cols, rows = SanitizeWinsize(cols, rows)
 	return pty.Setsize(s.ptmx, &pty.Winsize{
 		Rows: uint16(rows),
 		Cols: uint16(cols),
@@ -219,17 +230,17 @@ func (s *directSession) Scrollback() string {
 }
 
 func (s *directSession) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed {
-		return nil
-	}
-	s.closed = true
-	registry.unregister(s.sessionName)
-	_ = s.ptmx.Close()
-	if s.cmd != nil && s.cmd.Process != nil {
-		_ = s.cmd.Process.Kill()
-	}
+	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		s.closed = true
+		s.mu.Unlock()
+
+		registry.unregister(s.sessionName)
+		_ = s.ptmx.Close()
+		if s.cmd != nil && s.cmd.Process != nil {
+			_ = s.cmd.Process.Kill()
+		}
+	})
 	return nil
 }
 

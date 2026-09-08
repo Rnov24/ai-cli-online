@@ -64,6 +64,7 @@ func ConfigureSession(name string) {
 }
 
 func CreateSession(name string, cols, rows int, cwd, startCmd string) error {
+	cols, rows = SanitizeWinsize(cols, rows)
 	args := []string{
 		"new-session",
 		"-d",
@@ -235,9 +236,11 @@ type tmuxSession struct {
 	ptmx        *os.File
 	cmd         *exec.Cmd
 	closed      bool
+	closeOnce   sync.Once
 }
 
 func attachTmux(sessionName string, cols, rows int) (*tmuxSession, error) {
+	cols, rows = SanitizeWinsize(cols, rows)
 	c := exec.Command("tmux", "-S", SocketPath, "attach-session", "-t", "="+sessionName)
 	c.Env = sanitizedEnv()
 
@@ -249,11 +252,19 @@ func attachTmux(sessionName string, cols, rows int) (*tmuxSession, error) {
 		return nil, fmt.Errorf("failed to attach pty: %w", err)
 	}
 
-	return &tmuxSession{
+	ts := &tmuxSession{
 		sessionName: sessionName,
 		ptmx:        ptmx,
 		cmd:         c,
-	}, nil
+	}
+
+	// Asynchronously reap tmux attach-session process upon exit to prevent zombie accumulation
+	go func() {
+		_ = c.Wait()
+		_ = ts.Close()
+	}()
+
+	return ts, nil
 }
 
 func (s *tmuxSession) SessionName() string {
@@ -283,6 +294,7 @@ func (s *tmuxSession) Resize(cols, rows int) error {
 	if s.closed {
 		return os.ErrClosed
 	}
+	cols, rows = SanitizeWinsize(cols, rows)
 	ResizeSession(s.sessionName, cols, rows)
 	return pty.Setsize(s.ptmx, &pty.Winsize{
 		Rows: uint16(rows),
@@ -295,16 +307,16 @@ func (s *tmuxSession) Scrollback() string {
 }
 
 func (s *tmuxSession) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed {
-		return nil
-	}
-	s.closed = true
-	_ = s.ptmx.Close()
-	if s.cmd != nil && s.cmd.Process != nil {
-		_ = s.cmd.Process.Kill()
-	}
+	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		s.closed = true
+		s.mu.Unlock()
+
+		_ = s.ptmx.Close()
+		if s.cmd != nil && s.cmd.Process != nil {
+			_ = s.cmd.Process.Kill()
+		}
+	})
 	return nil
 }
 
