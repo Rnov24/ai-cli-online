@@ -16,6 +16,7 @@ import {
   CopyIcon,
   ScrollIcon,
   TabsIcon,
+  ChevronRightIcon,
 } from './icons';
 
 function formatRelativeTime(timestamp?: number): string {
@@ -516,7 +517,12 @@ function ConversationCard({
             title="Resume conversation in Chat view"
             style={{ fontSize: '9px', padding: '2px 8px', fontWeight: 700 }}
           >
-            {isResuming ? 'LOADING...' : isActive ? 'CONTINUE' : '▶ RESUME'}
+            {isResuming ? 'LOADING...' : isActive ? 'CONTINUE' : (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <ChevronRightIcon size={9} />
+                <span>RESUME</span>
+              </span>
+            )}
           </button>
         </div>
       </div>

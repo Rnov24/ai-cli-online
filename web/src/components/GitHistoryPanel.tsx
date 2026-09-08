@@ -5,6 +5,7 @@ import { fetchWorkspaceMode } from '../api/workspaces';
 import type { CommitInfo, RefInfo } from '../api/git';
 import { computeLanes, LANE_COLORS } from '../utils/gitGraph';
 import type { LaneNode, Connection } from '../utils/gitGraph';
+import { HomeIcon, GitBranchIcon } from './icons';
 
 interface GitHistoryPanelProps {
   sessionId: string;
@@ -730,7 +731,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
             fontSize: '22px',
             marginBottom: '14px',
           }}>
-            {isHome ? '🏠' : '🌿'}
+            {isHome ? <HomeIcon size={24} color="var(--accent-amber-bright)" /> : <GitBranchIcon size={24} color="var(--accent-green-bright)" />}
           </div>
 
           <div style={{

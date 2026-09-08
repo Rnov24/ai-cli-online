@@ -41,6 +41,7 @@ describe('SVG Icon System', () => {
     { name: 'TargetIcon', Component: Icons.TargetIcon },
     { name: 'StethoscopeIcon', Component: Icons.StethoscopeIcon },
     { name: 'ShieldIcon', Component: Icons.ShieldIcon },
+    { name: 'AlertTriangleIcon', Component: Icons.AlertTriangleIcon },
     { name: 'ScrollIcon', Component: Icons.ScrollIcon },
     { name: 'TabsIcon', Component: Icons.TabsIcon },
     { name: 'RocketIcon', Component: Icons.RocketIcon },

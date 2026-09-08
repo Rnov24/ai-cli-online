@@ -1,6 +1,6 @@
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
-import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon } from './icons';
+import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon, MinusIcon, PlusIcon } from './icons';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -123,9 +123,11 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                   className="mecha-btn"
                   onClick={() => setFontSize(Math.max(10, fontSize - 1))}
                   disabled={fontSize <= 10}
+                  aria-label="Decrease font size"
+                  title="Decrease font size"
                   style={{ minWidth: '32px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  A−
+                  <MinusIcon size={12} />
                 </button>
                 <span style={{
                   fontFamily: 'var(--font-mono)',
@@ -141,9 +143,11 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                   className="mecha-btn"
                   onClick={() => setFontSize(Math.min(24, fontSize + 1))}
                   disabled={fontSize >= 24}
+                  aria-label="Increase font size"
+                  title="Increase font size"
                   style={{ minWidth: '32px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  A+
+                  <PlusIcon size={12} />
                 </button>
               </div>
             </div>

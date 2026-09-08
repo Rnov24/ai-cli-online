@@ -8,6 +8,10 @@ import {
   LogoutIcon,
   CloseIcon,
   PuzzleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ActivityIcon,
+  TabsIcon,
 } from './icons';
 
 interface NavigationRailProps {
@@ -111,24 +115,24 @@ export function NavigationRail({
               <CloseIcon size={14} />
             </button>
           ) : (
-            <button
-              onClick={onToggleExpanded}
-              title={expanded ? 'Collapse Rail' : 'Expand Rail'}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                padding: '4px',
-                borderRadius: '2px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {expanded ? '◀' : '▶'}
-            </button>
+              <button
+                onClick={onToggleExpanded}
+                title={expanded ? 'Collapse Rail' : 'Expand Rail'}
+                aria-label={expanded ? 'Collapse Rail' : 'Expand Rail'}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {expanded ? <ChevronLeftIcon size={12} /> : <ChevronRightIcon size={12} />}
+              </button>
           )}
         </div>
 
@@ -150,12 +154,10 @@ export function NavigationRail({
             transition: 'all 0.15s ease',
           }}
         >
-          <span style={{
-            fontSize: '14px',
-            color: activePanel === 'chat' ? 'var(--accent-amber-bright)' : 'var(--text-secondary)',
-          }}>
-            ◉
-          </span>
+          <ActivityIcon
+            size={14}
+            color={activePanel === 'chat' ? 'var(--accent-amber-bright)' : 'var(--text-secondary)'}
+          />
           {isExpanded && (
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
@@ -213,7 +215,10 @@ export function NavigationRail({
               transition: 'all 0.15s ease',
             }}
           >
-            <span style={{ fontSize: '13px' }}>▣</span>
+            <TabsIcon
+              size={14}
+              color={sidebarOpen ? 'var(--accent-amber-bright)' : 'var(--text-secondary)'}
+            />
             {isExpanded && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600 }}>SESSIONS</span>

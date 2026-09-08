@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlanPanel } from './PlanPanel';
 import { WorkspaceFilesPanel } from './WorkspaceFilesPanel';
 import { GitHistoryPanel } from './GitHistoryPanel';
+import { ChevronRightIcon } from './icons';
 import type { SystemStatus } from 'ai-cli-online-shared';
 
 interface ContextPanelProps {
@@ -81,14 +82,13 @@ export const ContextPanel = React.memo(function ContextPanel({
         </div>
         <button
           onClick={onClose}
-          title="Collapse context panel"
+          title="Close Context Panel"
+          aria-label="Close Context Panel"
           style={{
             background: 'none',
             border: 'none',
             color: 'var(--text-secondary)',
             cursor: 'pointer',
-            fontSize: '16px',
-            lineHeight: 1,
             minWidth: '32px',
             minHeight: '32px',
             display: 'flex',
@@ -97,7 +97,7 @@ export const ContextPanel = React.memo(function ContextPanel({
             borderRadius: '2px',
           }}
         >
-          ➔
+          <ChevronRightIcon size={14} />
         </button>
       </div>
 

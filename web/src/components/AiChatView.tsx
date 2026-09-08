@@ -13,6 +13,9 @@ import {
   TrashIcon,
   CodeIcon,
   ShieldIcon,
+  CloseIcon,
+  AlertTriangleIcon,
+  ChevronRightIcon,
 } from './icons';
 import { fetchSessionJournal, TurnJournalItem } from '../api/journal';
 import { exportSessionToHtml } from '../utils/exportHtml';
@@ -1827,7 +1830,10 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
-                  <span style={{ color: 'var(--accent-red, #ef4444)', fontWeight: 700 }}>⚠️ TURN INTERRUPTED</span>
+                  <span style={{ color: 'var(--accent-red, #ef4444)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertTriangleIcon size={12} />
+                    <span>TURN INTERRUPTED</span>
+                  </span>
                   <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     "{interruptedTurn.prompt}"
                   </span>
@@ -2134,9 +2140,10 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               textareaRef.current?.focus();
             }}
             title="Prepend agy CLI"
-            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px' }}
+            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
           >
-            agy ▶
+            <span>agy</span>
+            <ChevronRightIcon size={9} />
           </button>
           <button
             className="mecha-btn"
@@ -2162,9 +2169,10 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               }
             }}
             title="Paste from clipboard"
-            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px' }}
+            style={{ padding: '3px 8px', fontSize: '10px', minHeight: '26px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            📋 PASTE
+            <ClipboardIcon size={12} />
+            <span>PASTE</span>
           </button>
         </div>
       )}
@@ -2349,15 +2357,19 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                     <button
                       onClick={() => handleRemoveQueued(qIdx)}
                       title="Remove from queue"
+                      aria-label="Remove from queue"
                       style={{
                         background: 'none',
                         border: 'none',
                         color: 'var(--accent-red)',
                         cursor: 'pointer',
-                        fontSize: '10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '1px',
                       }}
                     >
-                      ✕
+                      <CloseIcon size={10} />
                     </button>
                   </div>
                 </div>
@@ -2518,9 +2530,11 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                           fontSize: '11px',
                           display: 'inline-flex',
                           alignItems: 'center',
+                          gap: '4px',
                         }}
                       >
-                        ⚡ STEER
+                        <BoltIcon size={12} />
+                        <span>STEER</span>
                       </button>
                     </>
                   )}

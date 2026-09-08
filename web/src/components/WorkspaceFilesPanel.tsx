@@ -356,7 +356,7 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                         opacity: 0.7,
                       }}
                     >
-                      ✕
+                      <CloseIcon size={11} />
                     </button>
                   </div>
                 </div>
@@ -386,8 +386,9 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
               fontWeight: 600,
               color: 'var(--text-secondary)',
             }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                📄 {selectedFile.split('/').pop()}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <FileIcon size={12} />
+                <span>{selectedFile.split('/').pop()}</span>
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {isEditing ? (

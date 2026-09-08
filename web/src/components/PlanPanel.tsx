@@ -10,7 +10,7 @@ import { fetchFileContent } from '../api/docs';
 import { fetchWorkspaceMode } from '../api/workspaces';
 import { fetchPlugins } from '../api/plugins';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
-import { FolderIcon, EditIcon, ClipboardIcon } from './icons';
+import { FolderIcon, EditIcon, ClipboardIcon, ChevronRightIcon } from './icons';
 
 interface PlanPanelProps {
   sessionId: string;
@@ -628,10 +628,11 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
           ) : (
             <button className="pane-btn" onClick={handleAutoStart}
               disabled={!connected || taskMeta.status === 'complete' || taskMeta.status === 'cancelled'}
-              style={{ color: 'var(--accent-green)', fontWeight: 500, fontSize: 11,
+              style={{ color: 'var(--accent-green)', fontWeight: 500, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4,
                 ...((!connected || taskMeta.status === 'complete' || taskMeta.status === 'cancelled') ? { opacity: 0.4 } : {}) }}
               title="Start auto mode for this task">
-              Auto ▶
+              <span>Auto</span>
+              <ChevronRightIcon size={9} />
             </button>
           )}
           {taskMeta.completed_steps > 0 && (

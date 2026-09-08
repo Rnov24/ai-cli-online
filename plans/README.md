@@ -23,6 +23,7 @@ honor its STOP conditions, and update your row when done.
 | [013](013-repository-hygiene-and-legacy-server-retirement.md) | Repository Hygiene & Legacy Server Workspace Retirement | P2 | S | — | DONE |
 | [014](014-high-frequency-stream-batching-and-conversation-index-performance.md) | High-Frequency Stream Batching & Conversation Index Performance | P2 | M | — | DONE |
 | [015](015-task-pipeline-lifecycle-completeness-and-responsive-resilience.md) | Task Pipeline Lifecycle Completeness and Responsive Resilience | P2 | S | — | DONE |
+| [016](016-global-antislop-glyph-and-svg-icon-modernization.md) | Global Antislop Glyph & SVG Icon Modernization | P2 | S | 015 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
