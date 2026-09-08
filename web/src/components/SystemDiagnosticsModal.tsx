@@ -46,10 +46,30 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
     enabled: isOpen,
   });
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="System Diagnostics"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       style={{
         position: 'fixed',
         top: 0,
@@ -242,20 +262,20 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>RSS Memory:</span>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: status.server.memory.rssMb <= 15 ? 'var(--accent-green-bright)' : 'var(--accent-amber-bright)' }}>
-                      {status.server.memory.rssMb} MB
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: (status.server?.memory?.rssMb ?? 0) <= 15 ? 'var(--accent-green-bright)' : 'var(--accent-amber-bright)' }}>
+                      {status.server?.memory?.rssMb ?? '-'} MB
                     </div>
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Heap Allocated:</span>
                     <div style={{ fontSize: '14px', fontWeight: 700 }}>
-                      {status.server.memory.heapUsedMb} MB
+                      {status.server?.memory?.heapUsedMb ?? '-'} MB
                     </div>
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Idle State:</span>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: status.server.idle ? 'var(--accent-cyan-bright)' : 'var(--accent-amber-bright)' }}>
-                      {status.server.idle ? 'IDLE (GC checkpointed)' : 'ACTIVE'}
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: status.server?.idle ? 'var(--accent-cyan-bright)' : 'var(--accent-amber-bright)' }}>
+                      {status.server?.idle ? 'IDLE (GC checkpointed)' : 'ACTIVE'}
                     </div>
                   </div>
                 </div>
@@ -274,22 +294,22 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Server PID:</span> {status.server.pid}
+                    <span style={{ color: 'var(--text-muted)' }}>Server PID:</span> {status.server?.pid ?? '-'}
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Server Uptime:</span> {status.server.uptime}s
+                    <span style={{ color: 'var(--text-muted)' }}>Server Uptime:</span> {status.server?.uptime ?? '-'}s
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Platform:</span> {status.platform.os} ({status.platform.arch})
+                    <span style={{ color: 'var(--text-muted)' }}>Platform:</span> {status.platform?.os ?? '-'} ({status.platform?.arch ?? '-'})
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Go Runtime:</span> {status.platform.nodeVersion}
+                    <span style={{ color: 'var(--text-muted)' }}>Go Runtime:</span> {status.platform?.nodeVersion ?? '-'}
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Tmux Available:</span> {status.tmux.available ? 'YES' : 'NO (Direct PTY)'}
+                    <span style={{ color: 'var(--text-muted)' }}>Tmux Available:</span> {status.tmux?.available ? 'YES' : 'NO (Direct PTY)'}
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Antigravity CLI (agy):</span> {status.agy.available ? 'CONNECTED' : 'STANDBY'}
+                    <span style={{ color: 'var(--text-muted)' }}>Antigravity CLI (agy):</span> {status.agy?.available ? 'CONNECTED' : 'STANDBY'}
                   </div>
                 </div>
               </div>
@@ -320,10 +340,10 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
                     >
                       <div>
                         <div style={{ fontWeight: 700, color: 'var(--text-bright)' }}>
-                          {proc.sessionName} [{proc.mode.toUpperCase()}]
+                          {proc.sessionName || 'Session'} [{String(proc.mode || 'pty').toUpperCase()}]
                         </div>
                         <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
-                          CWD: {proc.cwd}
+                          CWD: {proc.cwd || '-'}
                         </div>
                       </div>
                       <span

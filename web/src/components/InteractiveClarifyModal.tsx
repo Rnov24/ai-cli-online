@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { ToolCall } from 'ai-cli-online-shared';
 import { ShieldIcon, HelpIcon, CloseIcon } from './icons';
 
@@ -6,6 +6,12 @@ interface InteractiveClarifyModalProps {
   toolCall: ToolCall;
   onSubmit: (response: string) => void;
   onDismiss: () => void;
+}
+
+interface QuestionItem {
+  question: string;
+  options: string[];
+  is_multi_select?: boolean;
 }
 
 export function InteractiveClarifyModal({
@@ -16,15 +22,40 @@ export function InteractiveClarifyModal({
   const isQuestion = toolCall.name === 'ask_question';
   const isPermission = toolCall.name === 'ask_permission' || toolCall.name.includes('permission');
 
-  // Parse parameters
-  const questions = (toolCall.args?.questions as Array<{
-    question: string;
-    options: string[];
-    is_multi_select?: boolean;
-  }>) || [];
+  // Parse parameters with dual-schema support (multi questions array OR single question+options)
+  const questions: QuestionItem[] = useMemo(() => {
+    if (Array.isArray(toolCall.args?.questions) && toolCall.args.questions.length > 0) {
+      return toolCall.args.questions.map((q: any) => ({
+        question: typeof q.question === 'string' ? q.question : String(q.title || q.prompt || 'Question'),
+        options: Array.isArray(q.options) ? q.options.map(String) : [],
+        is_multi_select: Boolean(q.is_multi_select),
+      }));
+    }
+    if (typeof toolCall.args?.question === 'string') {
+      const opts = Array.isArray(toolCall.args.options) ? toolCall.args.options.map(String) : [];
+      return [{
+        question: toolCall.args.question,
+        options: opts,
+        is_multi_select: Boolean(toolCall.args.is_multi_select),
+      }];
+    }
+    return [];
+  }, [toolCall.args]);
 
   const [selectedOptions, setSelectedOptions] = useState<Record<number, string[]>>({});
   const [customText, setCustomText] = useState('');
+
+  // Global Escape keydown listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onDismiss();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onDismiss]);
 
   const toggleOption = (qIdx: number, opt: string, isMulti?: boolean) => {
     setSelectedOptions((prev) => {
@@ -58,6 +89,14 @@ export function InteractiveClarifyModal({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isPermission ? 'Security Tool Approval Request' : 'Assistant Clarification Required'}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onDismiss();
+        }
+      }}
       style={{
         position: 'fixed',
         top: 0,
@@ -182,6 +221,25 @@ export function InteractiveClarifyModal({
               <div style={{ fontSize: '13px', color: 'var(--text-bright, #f0f6fc)', marginBottom: '8px' }}>
                 The assistant is requesting permission to execute:
               </div>
+              {Boolean(toolCall.args?.CommandLine || toolCall.args?.command) && (
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>COMMAND:</div>
+                  <pre
+                    style={{
+                      backgroundColor: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border)',
+                      padding: '8px 10px',
+                      borderRadius: '5px',
+                      fontSize: '12px',
+                      color: 'var(--accent-amber-bright, #f59e0b)',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {String(toolCall.args?.CommandLine || toolCall.args?.command)}
+                  </pre>
+                </div>
+              )}
               <pre
                 style={{
                   backgroundColor: 'var(--bg-tertiary)',
@@ -191,6 +249,7 @@ export function InteractiveClarifyModal({
                   fontSize: '11px',
                   color: 'var(--accent-amber-bright, #f59e0b)',
                   overflowX: 'auto',
+                  maxHeight: '200px',
                 }}
               >
                 {JSON.stringify(toolCall.args, null, 2)}
@@ -218,7 +277,19 @@ export function InteractiveClarifyModal({
               type="text"
               value={customText}
               onChange={(e) => setCustomText(e.target.value)}
-              placeholder="Type instruction or custom choice..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (isPermission) {
+                    onSubmit(customText.trim() ? `Allow: ${customText.trim()}` : 'Allow permission');
+                    onDismiss();
+                  } else {
+                    handleSendQuestionResponse();
+                    onDismiss();
+                  }
+                }
+              }}
+              placeholder="Type instruction or custom choice... (Press Enter to submit)"
               style={{
                 width: '100%',
                 padding: '8px 10px',
