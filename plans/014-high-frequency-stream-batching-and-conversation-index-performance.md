@@ -134,10 +134,10 @@ During active AI generation, SSE text chunks arrive from the Go runner at high f
 
 ## Done criteria
 
-- [ ] `npm test` exits 0.
-- [ ] `go test -v ./internal/routes/...` exits 0.
-- [ ] Chat streaming batches chunks to 60fps RAF windows instead of per-packet updates.
-- [ ] `ListConversations` does not scan unbounded JSON lines across all historical files.
+- [x] `npm test` exits 0.
+- [x] `go test -v ./internal/routes/...` exits 0.
+- [x] Chat streaming batches chunks to 60fps RAF windows instead of per-packet updates.
+- [x] `ListConversations` does not scan unbounded JSON lines across all historical files.
 
 ## STOP conditions
 

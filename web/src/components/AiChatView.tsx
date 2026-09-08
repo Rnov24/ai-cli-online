@@ -67,6 +67,21 @@ try {
   }
 } catch {}
 
+const safeRequestAnimationFrame = (callback: FrameRequestCallback): number => {
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    return window.requestAnimationFrame(callback);
+  }
+  return setTimeout(() => callback(Date.now()), 16) as unknown as number;
+};
+
+const safeCancelAnimationFrame = (handle: number) => {
+  if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+    window.cancelAnimationFrame(handle);
+  } else {
+    clearTimeout(handle);
+  }
+};
+
 interface AiChatViewProps {
   sessionId: string;
   token: string;
@@ -290,10 +305,43 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const currentSessionIdRef = useRef<string>(sessionId);
   const isAtBottomRef = useRef(true);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const pendingDeltaRef = useRef<string>('');
+  const rafFlushTimerRef = useRef<number | null>(null);
+
+  const flushPendingDeltas = useCallback((targetAssistantId: string) => {
+    if (rafFlushTimerRef.current !== null) {
+      safeCancelAnimationFrame(rafFlushTimerRef.current);
+      rafFlushTimerRef.current = null;
+    }
+    const deltaToFlush = pendingDeltaRef.current;
+    if (!deltaToFlush) return;
+    pendingDeltaRef.current = '';
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === targetAssistantId
+          ? { ...m, content: m.content + deltaToFlush }
+          : m,
+      ),
+    );
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rafFlushTimerRef.current !== null) {
+        safeCancelAnimationFrame(rafFlushTimerRef.current);
+        rafFlushTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Synchronize when switching active session
   useEffect(() => {
     currentSessionIdRef.current = sessionId;
+    if (rafFlushTimerRef.current !== null) {
+      safeCancelAnimationFrame(rafFlushTimerRef.current);
+      rafFlushTimerRef.current = null;
+    }
+    pendingDeltaRef.current = '';
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -697,13 +745,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     if (text === '/help' || text === '/guide') {
       window.dispatchEvent(new CustomEvent('agy:open-help-guide', { detail: { tab: 'quickstart' } }));
       const helpText = [
-        '### 💡 AGY Online — Help & Feature Guide',
+        '### 💡 AGY Online: Help & Feature Guide',
         '',
         'The interactive **Help & Feature Guide** modal has been opened. You can also press **`?`** or click **`[? HELP]`** in the header anytime.',
         '',
         '#### ⚡ Dual Persona Operational Modes:',
-        '- **🏠 Personal Home (`~`)**: *🤖 Agentic Assistant* — Runs daily assistant tasks, timers, diagnostics, and workspace routing (`/goal`, `/schedule`, `/learn`, `/doctor`, `/workspace`).',
-        '- **💻 Project Workspaces**: *⚡ Coding Agent* — Full software engineering lifecycle with the 13-skill task pipeline (`/plan`, `/verify`, `/exec`, `/review`, `/auto`, `/merge`, `/report`).',
+        '- **🏠 Personal Home (`~`)**: *🤖 Agentic Assistant*. Runs daily assistant tasks, timers, diagnostics, and workspace routing (`/goal`, `/schedule`, `/learn`, `/doctor`, `/workspace`).',
+        '- **💻 Project Workspaces**: *⚡ Coding Agent*. Full software engineering lifecycle with the 13-skill task pipeline (`/plan`, `/verify`, `/exec`, `/review`, `/auto`, `/merge`, `/report`).',
         '',
         '#### ⌨️ Essential Keyboard Shortcuts:',
         '- `⌘K` / `Ctrl+K`: Global Command Palette with category filters (`SKILLS`, `WORKSPACES`, `PANELS`, `SYSTEM`)',
@@ -887,7 +935,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
           const sysMsg: ChatMessage = {
             id: `cmd_sys_${Date.now()}`,
             role: 'assistant',
-            content: `**[PERSONA SWITCH]** Active agent persona set to **${matched.name}** (\`${matched.id}\`).\n\n> *${matched.role}* — ${matched.description}`,
+            content: `**[PERSONA SWITCH]** Active agent persona set to **${matched.name}** (\`${matched.id}\`).\n\n> *${matched.role}*: ${matched.description}`,
             timestamp: Date.now(),
             status: 'done',
           };
@@ -917,7 +965,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         const listText = [
           '### 📁 Workspace Registry & Agent Mode',
           '',
-          `**Personal Home (\`~\`)**: \`${wsData.home}\` — *🤖 Agentic Assistant*`,
+          `**Personal Home (\`~\`)**: \`${wsData.home}\` (*🤖 Agentic Assistant*)`,
           '',
           '**Registered Project Workspaces**:',
           ...wsData.workspaces
@@ -1141,14 +1189,25 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               );
             } else if (data.event === 'chunk' && data.delta) {
               setAgentState('EXECUTING');
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, content: m.content + data.delta, turnStatus: 'running' }
-                    : m,
-                ),
-              );
+              pendingDeltaRef.current += data.delta;
+
+              if (rafFlushTimerRef.current === null) {
+                rafFlushTimerRef.current = safeRequestAnimationFrame(() => {
+                  rafFlushTimerRef.current = null;
+                  const deltaToFlush = pendingDeltaRef.current;
+                  if (!deltaToFlush) return;
+                  pendingDeltaRef.current = '';
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId
+                        ? { ...m, content: m.content + deltaToFlush, turnStatus: 'running' }
+                        : m,
+                    ),
+                  );
+                });
+              }
             } else if (data.event === 'thinking' && data.thinking) {
+              flushPendingDeltas(assistantId);
               setAgentState('THINKING');
               setMessages((prev) =>
                 prev.map((m) =>
@@ -1158,6 +1217,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 ),
               );
             } else if (data.event === 'tool' && data.tool_call) {
+              flushPendingDeltas(assistantId);
               setAgentState('EXECUTING');
               const tc: ToolCall = {
                 id: data.tool_call.id || `tool_${Date.now()}`,
@@ -1189,6 +1249,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 }),
               );
             } else if (data.event === 'error') {
+              flushPendingDeltas(assistantId);
               setAgentState('ERROR');
               setActiveClarifyToolCall(null);
               const errContent =
@@ -1216,6 +1277,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 });
               }
             } else if (data.event === 'done') {
+              flushPendingDeltas(assistantId);
               setAgentState('COMPLETED');
               setActiveClarifyToolCall(null);
               setMessages((prev) =>
@@ -1258,7 +1320,9 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
           }
         }
       }
+      flushPendingDeltas(assistantId);
     } catch (err: unknown) {
+      flushPendingDeltas(assistantId);
       if ((err as Error).name !== 'AbortError') {
         const errorMsg = (err as Error).message || 'Failed to connect to AGY service.';
         setAgentState('ERROR');
@@ -1280,6 +1344,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         }
       }
     } finally {
+      flushPendingDeltas(assistantId);
       if (currentSessionIdRef.current === sessionAtStart) {
         setIsStreaming(false);
         abortControllerRef.current = null;
@@ -1451,7 +1516,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               flexShrink: 0,
               cursor: 'pointer',
             }}
-            title={`Active Persona: ${activePersona?.name || (isHome ? 'Agentic Assistant' : 'Coding Agent')} — Click or press ⌥A to switch`}
+            title={`Active Persona: ${activePersona?.name || (isHome ? 'Agentic Assistant' : 'Coding Agent')} (Click or press ⌥A to switch)`}
           >
             <span>
               {activePersona?.icon === 'code' ? (

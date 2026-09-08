@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -101,6 +103,23 @@ func (h *ConversationsHandler) ListConversations(w http.ResponseWriter, r *http.
 		return
 	}
 
+	limit := 30
+	if lStr := r.URL.Query().Get("limit"); lStr != "" {
+		if l, err := strconv.Atoi(lStr); err == nil && l > 0 {
+			if l > 100 {
+				limit = 100
+			} else {
+				limit = l
+			}
+		}
+	}
+	offset := 0
+	if oStr := r.URL.Query().Get("offset"); oStr != "" {
+		if o, err := strconv.Atoi(oStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
 	entries, err := os.ReadDir(brainDir)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -108,8 +127,14 @@ func (h *ConversationsHandler) ListConversations(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var results []ConversationSummary
+	type convCandidate struct {
+		cid     string
+		logFile string
+		modTime time.Time
+		size    int64
+	}
 
+	var candidates []convCandidate
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -125,50 +150,137 @@ func (h *ConversationsHandler) ListConversations(w http.ResponseWriter, r *http.
 			continue
 		}
 
-		updatedAt := fi.ModTime().UnixMilli()
+		candidates = append(candidates, convCandidate{
+			cid:     cid,
+			logFile: logFile,
+			modTime: fi.ModTime(),
+			size:    fi.Size(),
+		})
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].modTime.After(candidates[j].modTime)
+	})
+
+	if offset >= len(candidates) {
+		candidates = nil
+	} else {
+		candidates = candidates[offset:]
+		if limit < len(candidates) {
+			candidates = candidates[:limit]
+		}
+	}
+
+	results := make([]ConversationSummary, 0, len(candidates))
+
+	for _, cand := range candidates {
+		updatedAt := cand.modTime.UnixMilli()
 		createdAt := updatedAt
 		firstPrompt := ""
 		lastResponse := ""
 		turnCount := 0
 
-		file, err := os.Open(logFile)
+		file, err := os.Open(cand.logFile)
 		if err == nil {
-			scanner := bufio.NewScanner(file)
-			// Allow up to 1MB line buffer for large model responses
-			buf := make([]byte, 64*1024)
-			scanner.Buffer(buf, 1024*1024)
+			if cand.size <= 32*1024 {
+				scanner := bufio.NewScanner(file)
+				buf := make([]byte, 64*1024)
+				scanner.Buffer(buf, 1024*1024)
 
-			isFirstLine := true
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if line == "" {
-					continue
-				}
-
-				var raw TranscriptRawItem
-				if err := json.Unmarshal([]byte(line), &raw); err != nil {
-					continue
-				}
-
-				if isFirstLine && raw.CreatedAt != "" {
-					if t, err := time.Parse(time.RFC3339, raw.CreatedAt); err == nil {
-						createdAt = t.UnixMilli()
+				isFirstLine := true
+				for scanner.Scan() {
+					line := strings.TrimSpace(scanner.Text())
+					if line == "" {
+						continue
 					}
-					isFirstLine = false
-				}
 
-				if raw.Type == "USER_INPUT" {
-					turnCount++
-					if firstPrompt == "" {
-						firstPrompt = extractUserPrompt(raw.Content)
+					var raw TranscriptRawItem
+					if err := json.Unmarshal([]byte(line), &raw); err != nil {
+						continue
 					}
-				} else if raw.Type == "PLANNER_RESPONSE" {
-					if raw.Content != "" {
-						preview := strings.TrimSpace(raw.Content)
-						if len(preview) > 160 {
-							preview = preview[:160] + "..."
+
+					if isFirstLine && raw.CreatedAt != "" {
+						if t, err := time.Parse(time.RFC3339, raw.CreatedAt); err == nil {
+							createdAt = t.UnixMilli()
 						}
-						lastResponse = preview
+						isFirstLine = false
+					}
+
+					if raw.Type == "USER_INPUT" {
+						turnCount++
+						if firstPrompt == "" {
+							firstPrompt = extractUserPrompt(raw.Content)
+						}
+					} else if raw.Type == "PLANNER_RESPONSE" {
+						if raw.Content != "" {
+							preview := strings.TrimSpace(raw.Content)
+							if len(preview) > 160 {
+								preview = preview[:160] + "..."
+							}
+							lastResponse = preview
+						}
+					}
+				}
+			} else {
+				// Large log file: bounded head read (up to 50 lines)
+				scanner := bufio.NewScanner(file)
+				buf := make([]byte, 64*1024)
+				scanner.Buffer(buf, 1024*1024)
+
+				isFirstLine := true
+				lineCount := 0
+				for scanner.Scan() && lineCount < 50 {
+					lineCount++
+					line := strings.TrimSpace(scanner.Text())
+					if line == "" {
+						continue
+					}
+
+					var raw TranscriptRawItem
+					if err := json.Unmarshal([]byte(line), &raw); err != nil {
+						continue
+					}
+
+					if isFirstLine && raw.CreatedAt != "" {
+						if t, err := time.Parse(time.RFC3339, raw.CreatedAt); err == nil {
+							createdAt = t.UnixMilli()
+						}
+						isFirstLine = false
+					}
+
+					if raw.Type == "USER_INPUT" {
+						turnCount++
+						if firstPrompt == "" {
+							firstPrompt = extractUserPrompt(raw.Content)
+						}
+					}
+				}
+
+				// Read tail block (last 8KB) to extract lastResponse preview without reading middle turns
+				tailOffset := cand.size - 8192
+				if tailOffset < 0 {
+					tailOffset = 0
+				}
+				tailBuf := make([]byte, 8192)
+				n, err := file.ReadAt(tailBuf, tailOffset)
+				if err == nil || err == io.EOF {
+					tailLines := strings.Split(string(tailBuf[:n]), "\n")
+					for i := len(tailLines) - 1; i >= 0; i-- {
+						tLine := strings.TrimSpace(tailLines[i])
+						if tLine == "" {
+							continue
+						}
+						var raw TranscriptRawItem
+						if err := json.Unmarshal([]byte(tLine), &raw); err == nil {
+							if raw.Type == "PLANNER_RESPONSE" && raw.Content != "" {
+								preview := strings.TrimSpace(raw.Content)
+								if len(preview) > 160 {
+									preview = preview[:160] + "..."
+								}
+								lastResponse = preview
+								break
+							}
+						}
 					}
 				}
 			}
@@ -176,11 +288,11 @@ func (h *ConversationsHandler) ListConversations(w http.ResponseWriter, r *http.
 		}
 
 		if firstPrompt == "" {
-			firstPrompt = "Conversation " + cid[:min(8, len(cid))]
+			firstPrompt = "Conversation " + cand.cid[:min(8, len(cand.cid))]
 		}
 
 		results = append(results, ConversationSummary{
-			ID:        cid,
+			ID:        cand.cid,
 			Title:     firstPrompt,
 			Preview:   lastResponse,
 			UpdatedAt: updatedAt,
@@ -188,10 +300,6 @@ func (h *ConversationsHandler) ListConversations(w http.ResponseWriter, r *http.
 			TurnCount: turnCount,
 		})
 	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].UpdatedAt > results[j].UpdatedAt
-	})
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{

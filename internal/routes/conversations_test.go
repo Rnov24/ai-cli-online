@@ -2,11 +2,13 @@ package routes
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/huacheng/ai-cli-online/internal/config"
 )
@@ -120,3 +122,128 @@ func TestConversationsHandler(t *testing.T) {
 		t.Errorf("expected folder to be deleted")
 	}
 }
+
+func TestConversationsHandler_Pagination(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "fake-home-pagination-*")
+	if err != nil {
+		t.Fatalf("failed to create temp home: %v", err)
+	}
+	defer os.RemoveAll(tmpHome)
+
+	oldHome := os.Getenv("HOME")
+	oldUserProfile := os.Getenv("USERPROFILE")
+	defer func() {
+		os.Setenv("HOME", oldHome)
+		os.Setenv("USERPROFILE", oldUserProfile)
+	}()
+	os.Setenv("HOME", tmpHome)
+	os.Setenv("USERPROFILE", tmpHome)
+
+	fakeBrain := filepath.Join(tmpHome, ".gemini", "antigravity-cli", "brain")
+
+	// Create 7 conversations with distinct mod times
+	for i := 1; i <= 7; i++ {
+		cid := fmt.Sprintf("conv-page-%02d", i)
+		convDir := filepath.Join(fakeBrain, cid, ".system_generated", "logs")
+		if err := os.MkdirAll(convDir, 0755); err != nil {
+			t.Fatalf("failed to create dir: %v", err)
+		}
+		transcript := fmt.Sprintf(`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-0%dT10:00:00Z","content":"Prompt %d"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-0%dT10:01:00Z","content":"Answer %d"}`, i, i, i, i)
+		logPath := filepath.Join(convDir, "transcript.jsonl")
+		if err := os.WriteFile(logPath, []byte(transcript), 0644); err != nil {
+			t.Fatalf("failed to write transcript: %v", err)
+		}
+		// Set distinct modification time
+		mtime := time.Date(2026, 9, i, 10, 0, 0, 0, time.UTC)
+		if err := os.Chtimes(logPath, mtime, mtime); err != nil {
+			t.Fatalf("failed to set chtimes: %v", err)
+		}
+	}
+
+	cfg := &config.Config{AuthToken: "test-token"}
+	handler := NewConversationsHandler(NewAuthHelper(cfg))
+
+	// 1. Test ?limit=3
+	req := httptest.NewRequest("GET", "/api/agy/conversations?limit=3", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	w := httptest.NewRecorder()
+	handler.ListConversations(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resPage1 struct {
+		Ok            bool                  `json:"ok"`
+		Conversations []ConversationSummary `json:"conversations"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resPage1); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if len(resPage1.Conversations) != 3 {
+		t.Fatalf("expected 3 items for limit=3, got %d", len(resPage1.Conversations))
+	}
+	// Verify descending order: conv-page-07 should be first
+	if resPage1.Conversations[0].ID != "conv-page-07" {
+		t.Errorf("expected first item to be conv-page-07, got %s", resPage1.Conversations[0].ID)
+	}
+
+	// 2. Test ?limit=3&offset=3
+	req2 := httptest.NewRequest("GET", "/api/agy/conversations?limit=3&offset=3", nil)
+	req2.Header.Set("Authorization", "Bearer test-token")
+	w2 := httptest.NewRecorder()
+	handler.ListConversations(w2, req2)
+
+	var resPage2 struct {
+		Ok            bool                  `json:"ok"`
+		Conversations []ConversationSummary `json:"conversations"`
+	}
+	if err := json.NewDecoder(w2.Body).Decode(&resPage2); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if len(resPage2.Conversations) != 3 {
+		t.Fatalf("expected 3 items for page 2, got %d", len(resPage2.Conversations))
+	}
+	if resPage2.Conversations[0].ID != "conv-page-04" {
+		t.Errorf("expected first item of page 2 to be conv-page-04, got %s", resPage2.Conversations[0].ID)
+	}
+
+	// 3. Test ?offset=6 (should have 1 item left)
+	req3 := httptest.NewRequest("GET", "/api/agy/conversations?offset=6", nil)
+	req3.Header.Set("Authorization", "Bearer test-token")
+	w3 := httptest.NewRecorder()
+	handler.ListConversations(w3, req3)
+
+	var resPage3 struct {
+		Ok            bool                  `json:"ok"`
+		Conversations []ConversationSummary `json:"conversations"`
+	}
+	if err := json.NewDecoder(w3.Body).Decode(&resPage3); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if len(resPage3.Conversations) != 1 {
+		t.Fatalf("expected 1 item for offset=6, got %d", len(resPage3.Conversations))
+	}
+	if resPage3.Conversations[0].ID != "conv-page-01" {
+		t.Errorf("expected last item to be conv-page-01, got %s", resPage3.Conversations[0].ID)
+	}
+
+	// 4. Test out-of-bounds offset
+	req4 := httptest.NewRequest("GET", "/api/agy/conversations?offset=100", nil)
+	req4.Header.Set("Authorization", "Bearer test-token")
+	w4 := httptest.NewRecorder()
+	handler.ListConversations(w4, req4)
+
+	var resEmpty struct {
+		Ok            bool                  `json:"ok"`
+		Conversations []ConversationSummary `json:"conversations"`
+	}
+	if err := json.NewDecoder(w4.Body).Decode(&resEmpty); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if len(resEmpty.Conversations) != 0 {
+		t.Fatalf("expected 0 items for offset=100, got %d", len(resEmpty.Conversations))
+	}
+}
+
