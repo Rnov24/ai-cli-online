@@ -199,6 +199,22 @@ const HOME_STARTER_OPERATIONS = [
 
 type AgentState = 'IDLE' | 'THINKING' | 'EXECUTING' | 'COMPLETED' | 'ERROR';
 
+export function safeSaveChatMessages(sessionId: string, msgs: ChatMessage[]) {
+  if (!sessionId) return;
+  const key = `chat-messages-${sessionId}`;
+  try {
+    localStorage.setItem(key, JSON.stringify(msgs));
+  } catch {
+    // Quota exceeded: retry with truncated history (latest 50 messages)
+    try {
+      const truncated = msgs.slice(-50);
+      localStorage.setItem(key, JSON.stringify(truncated));
+    } catch {
+      // Ignore if storage is completely full or unavailable
+    }
+  }
+}
+
 export function AiChatView({ sessionId, token, externalCommand, onStatsChange }: AiChatViewProps) {
   const tabs = useStore((s) => s.tabs);
   const activeTabId = useStore((s) => s.activeTabId);
@@ -472,13 +488,19 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     });
   }, [messages.length, totalToolCalls, totalTokens, onStatsChange]);
 
+  // Debounced, quota-resilient message persistence
   useEffect(() => {
-    try {
-      localStorage.setItem(`chat-messages-${sessionId}`, JSON.stringify(messages));
-    } catch {
-      // quota exceeded
-    }
+    // Throttle persistence during high-frequency streaming (1000ms vs 200ms)
+    const delay = isStreaming ? 1000 : 200;
+    const timer = setTimeout(() => {
+      safeSaveChatMessages(sessionId, messages);
+    }, delay);
 
+    return () => clearTimeout(timer);
+  }, [messages, isStreaming, sessionId]);
+
+  // Auto-scroll decoupled from storage writes
+  useEffect(() => {
     if (isAtBottomRef.current) {
       const raf = requestAnimationFrame(() => {
         scrollToBottom(false);
@@ -487,7 +509,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     } else {
       setShowJumpToLatest(true);
     }
-  }, [messages, scrollToBottom, sessionId]);
+  }, [messages, scrollToBottom]);
 
   // Handle external commands from TaskPipelineBar, PlanPanel, etc.
   useEffect(() => {
@@ -623,9 +645,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
     const newTabId = addTab(newTabName);
     const newTab = useStore.getState().tabs.find((t) => t.id === newTabId);
     const newSessId = newTab?.terminalIds[0] || newTabId;
-    try {
-      localStorage.setItem(`chat-messages-${newSessId}`, JSON.stringify(forkedHistory));
-    } catch {}
+    safeSaveChatMessages(newSessId, forkedHistory);
     switchTab(newTabId);
   };
 
@@ -1390,7 +1410,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
       if (Array.isArray(custom.detail.messages)) {
         setMessages(custom.detail.messages);
-        localStorage.setItem(`chat-messages-${sessionId}`, JSON.stringify(custom.detail.messages));
+        safeSaveChatMessages(sessionId, custom.detail.messages);
       }
       setInterruptedTurn(null);
       setTimeout(() => {
@@ -1876,12 +1896,14 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               </div>
             )}
 
-            {messages.map((msg, idx) => {
-              const isUser = msg.role === 'user';
-              if (!isUser) {
-                const turnIndex = messages.slice(0, idx + 1).filter((m) => m.role === 'assistant').length - 1;
-                return (
-                  <div
+            {(() => {
+              let assistantTurnCounter = 0;
+              return messages.map((msg) => {
+                const isUser = msg.role === 'user';
+                if (!isUser) {
+                  const turnIndex = assistantTurnCounter++;
+                  return (
+                    <div
                     key={msg.id}
                     style={{
                       width: '100%',
@@ -1984,7 +2006,8 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                   </div>
                 </div>
               );
-            })}
+            });
+          })()}
           </>
         )}
         <div ref={messagesEndRef} style={{ height: '1px', flexShrink: 0 }} />
