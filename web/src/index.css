@@ -36,8 +36,12 @@
   --bg-elevated: #171b20;         /* Elevated surface / popovers / menus */
   --bg-hover: #1f242b;            /* Hover highlight */
   --bg-active: #252b34;
+  --bg-card: #121519;
+  --bg-surface: #0d0f12;
+  --bg-input: #08090b;
 
   --border: #252a31;              /* Precision technical border */
+  --border-color: #252a31;
   --border-subtle: #191c22;       /* Subdued technical boundary */
   --border-strong: #363c46;
   --border-active: #f59e0b;       /* Active amber border */
@@ -96,8 +100,12 @@
   --bg-elevated: #ffffff;
   --bg-hover: #e2e8f0;
   --bg-active: #cbd5e1;
+  --bg-card: #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-input: #f0f2f5;
 
   --border: #cbd5e1;
+  --border-color: #cbd5e1;
   --border-subtle: #e2e8f0;
   --border-strong: #94a3b8;
   --border-active: #d97706;

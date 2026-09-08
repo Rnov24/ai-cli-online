@@ -740,7 +740,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({ sessionId, token 
             marginBottom: '8px',
             letterSpacing: '0.5px',
           }}>
-            {isHome ? 'Home Directory — Personal Space' : (error || 'Not a git repository')}
+            {isHome ? 'Home Directory: Personal Space' : (error || 'Not a git repository')}
           </div>
 
           <p style={{

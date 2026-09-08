@@ -224,10 +224,10 @@ describe('PersonaSelectorModal', { timeout: 20000 }, () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('+ CUSTOM PERSONA')).toBeInTheDocument();
+      expect(screen.getByText('CUSTOM PERSONA')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('+ CUSTOM PERSONA'));
+    fireEvent.click(screen.getByText('CUSTOM PERSONA'));
 
     fireEvent.change(screen.getByPlaceholderText(/ID: e.g./i), { target: { value: 'tech-lead' } });
     fireEvent.change(screen.getByPlaceholderText(/Name: e.g./i), { target: { value: 'Tech Lead' } });

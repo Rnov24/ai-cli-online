@@ -335,8 +335,8 @@ export function PluginsModal({
               gap: '6px',
             }}
           >
-            <PlusIcon size={12} />
-            <span>{showInstallCard ? 'CANCEL INSTALL' : '+ INSTALL PLUGIN'}</span>
+            {showInstallCard ? <CloseIcon size={12} /> : <PlusIcon size={12} />}
+            <span>{showInstallCard ? 'CANCEL INSTALL' : 'INSTALL PLUGIN'}</span>
           </button>
 
           <button

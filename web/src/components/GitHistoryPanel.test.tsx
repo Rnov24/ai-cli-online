@@ -121,7 +121,7 @@ describe('GitHistoryPanel', () => {
     render(<GitHistoryPanel sessionId="t1" token="test-token" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Home Directory — Personal Space')).toBeInTheDocument();
+      expect(screen.getByText('Home Directory: Personal Space')).toBeInTheDocument();
     });
     expect(screen.getByText(/Agentic Assistant/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Switch to a Project Workspace/i })).toBeInTheDocument();

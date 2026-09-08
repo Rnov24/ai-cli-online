@@ -45,8 +45,8 @@ describe('CommandPalette', () => {
     const wsBtn = screen.getByRole('button', { name: 'WORKSPACES' });
     fireEvent.click(wsBtn);
 
-    expect(screen.getByText(/\/workspace — Inspect Registered Workspaces/i)).toBeInTheDocument();
-    expect(screen.getByText(/\/workspace home — Switch to Agentic Assistant/i)).toBeInTheDocument();
+    expect(screen.getByText(/\/workspace: Inspect Registered Workspaces/i)).toBeInTheDocument();
+    expect(screen.getByText(/\/workspace home: Switch to Agentic Assistant/i)).toBeInTheDocument();
     // Non-workspace items should not appear in this category
     expect(screen.queryByText(/Toggle Theme/i)).not.toBeInTheDocument();
   });
@@ -57,7 +57,7 @@ describe('CommandPalette', () => {
     render(<CommandPalette isOpen={true} onClose={onClose} onExecuteCommand={onExecute} />);
 
     // Find and click /goal command
-    const goalItem = screen.getByText(/\/goal — Autonomous Long-Running Goal/i);
+    const goalItem = screen.getByText(/\/goal: Autonomous Long-Running Goal/i);
     fireEvent.click(goalItem);
 
     expect(onExecute).toHaveBeenCalledWith('/goal ');

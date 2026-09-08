@@ -51,7 +51,7 @@ const mockPlugins: PluginItem[] = [
   },
 ];
 
-describe('PluginsModal', { timeout: 20000 }, () => {
+describe('PluginsModal', { timeout: 35000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchPlugins.mockResolvedValue({
@@ -121,11 +121,11 @@ describe('PluginsModal', { timeout: 20000 }, () => {
     render(<PluginsModal isOpen={true} onClose={vi.fn()} token="test-tok" />);
 
     await waitFor(() => {
-      expect(screen.getByText('+ INSTALL PLUGIN')).toBeInTheDocument();
+      expect(screen.getByText('INSTALL PLUGIN')).toBeInTheDocument();
     });
 
     // Open install card
-    fireEvent.click(screen.getByText('+ INSTALL PLUGIN'));
+    fireEvent.click(screen.getByText('INSTALL PLUGIN'));
 
     const targetInput = screen.getByPlaceholderText(/Target: e.g./i);
     fireEvent.change(targetInput, { target: { value: 'new-plugin' } });

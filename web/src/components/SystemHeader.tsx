@@ -237,7 +237,7 @@ export const SystemHeader = React.memo(function SystemHeader({
           onClick={() => {
             window.dispatchEvent(new CustomEvent('agy:insert-command', { detail: { cmd: '/model ' } }));
           }}
-          title="Active Model: Gemini 3.8 — Click to switch model (/model)"
+          title="Active Model: Gemini 3.8 (Click to switch model: /model)"
           style={{
             fontSize: '9px',
             padding: '2px 6px',

@@ -230,8 +230,8 @@ describe('SkillsManagementModal', { timeout: 20000 }, () => {
       expect(screen.getByText('/deploy-staging')).toBeInTheDocument();
     });
 
-    // Click "+ New Skill"
-    const newSkillBtn = screen.getByRole('button', { name: /\+ New Skill/i });
+    // Click "New Skill"
+    const newSkillBtn = screen.getByRole('button', { name: /New Skill/i });
     fireEvent.click(newSkillBtn);
 
     // Form inputs

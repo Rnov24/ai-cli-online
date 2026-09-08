@@ -382,8 +382,8 @@ export function SkillsManagementModal({
                 whiteSpace: 'nowrap',
               }}
             >
-              <PlusIcon size={12} />
-              <span>{showScaffold ? 'Close Form' : '+ New Skill'}</span>
+              {showScaffold ? <CloseIcon size={12} /> : <PlusIcon size={12} />}
+              <span>{showScaffold ? 'Close Form' : 'New Skill'}</span>
             </button>
           </div>
         </div>

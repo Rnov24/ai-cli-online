@@ -233,7 +233,7 @@ export function PersonaSelectorModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--bg-elevated, #161b26)',
+            backgroundColor: 'var(--bg-surface, #161b26)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -386,8 +386,8 @@ export function PersonaSelectorModal({
               gap: '6px',
             }}
           >
-            <PlusIcon size={12} />
-            <span>{showCreateForm ? 'CANCEL' : '+ CUSTOM PERSONA'}</span>
+            {showCreateForm ? <CloseIcon size={12} /> : <PlusIcon size={12} />}
+            <span>{showCreateForm ? 'CANCEL' : 'CUSTOM PERSONA'}</span>
           </button>
         </div>
 
@@ -668,7 +668,7 @@ export function PersonaSelectorModal({
                           width: '28px',
                           height: '28px',
                           borderRadius: '6px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                          backgroundColor: 'var(--bg-input, rgba(255, 255, 255, 0.05))',
                           border: `1px solid ${persona.color || 'var(--accent-blue, #3b82f6)'}`,
                           display: 'flex',
                           alignItems: 'center',
@@ -746,7 +746,8 @@ export function PersonaSelectorModal({
                             fontSize: '9px',
                             padding: '1px 5px',
                             borderRadius: '3px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            backgroundColor: 'var(--bg-input, rgba(255, 255, 255, 0.05))',
+                            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.05))',
                             color: 'var(--text-muted, #64748b)',
                             fontFamily: 'var(--font-mono, monospace)',
                           }}
@@ -814,6 +815,21 @@ export function PersonaSelectorModal({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive && !isSwitching) {
+                          e.currentTarget.style.borderColor = 'var(--accent-cyan, #00f0ff)';
+                          e.currentTarget.style.color = 'var(--accent-cyan, #00f0ff)';
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 240, 255, 0.12)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive && !isSwitching) {
+                          e.currentTarget.style.borderColor = 'var(--border-color, #232a3b)';
+                          e.currentTarget.style.color = 'var(--text-primary, #e2e8f0)';
+                          e.currentTarget.style.backgroundColor = 'var(--bg-input, #0f1219)';
+                        }
                       }}
                     >
                       {isActive ? (
