@@ -135,6 +135,23 @@ func Open(dataDir string) (*DB, error) {
 		created_at INTEGER NOT NULL,
 		updated_at INTEGER NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS task_auto (
+		session_name TEXT PRIMARY KEY,
+		task_dir TEXT NOT NULL UNIQUE,
+		status TEXT DEFAULT 'running',
+		max_iterations INTEGER DEFAULT 20,
+		timeout_minutes INTEGER DEFAULT 30,
+		iteration_count INTEGER DEFAULT 0,
+		recovery_count_step INTEGER DEFAULT 0,
+		recovery_count_total INTEGER DEFAULT 0,
+		last_capture_hash TEXT DEFAULT '',
+		stall_count INTEGER DEFAULT 0,
+		quota_wait_since TEXT DEFAULT '',
+		started_at TEXT,
+		last_signal_at TEXT
+	);
+	CREATE INDEX IF NOT EXISTS idx_task_auto_task_dir ON task_auto(task_dir);
 	`
 	if _, err := sqlDb.Exec(schema); err != nil {
 		sqlDb.Close()

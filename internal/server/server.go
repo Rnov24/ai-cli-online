@@ -49,6 +49,7 @@ func (s *Server) Start() error {
 	skillsH := routes.NewSkillsHandler(auth, s.db)
 	plugH := routes.NewPluginsHandler(auth)
 	personaH := routes.NewPersonasHandler(auth, s.db)
+	autoH := routes.NewTaskAutoHandler(auth, s.db)
 	sysH := routes.NewSystemHandler(auth)
 	hub := ws.InitHub(s.cfg)
 
@@ -61,6 +62,12 @@ func (s *Server) Start() error {
 
 	// Auto-seed default Home and project workspaces
 	s.seedDefaultWorkspaces()
+
+	// Autonomous Task Lifecycle (ai-cli-task /auto)
+	mux.HandleFunc("POST /api/sessions/{sessionId}/task-auto", autoH.StartTaskAuto)
+	mux.HandleFunc("DELETE /api/sessions/{sessionId}/task-auto", autoH.StopTaskAuto)
+	mux.HandleFunc("GET /api/sessions/{sessionId}/task-auto", autoH.GetTaskAutoStatus)
+	mux.HandleFunc("GET /api/task-auto/lookup", autoH.LookupTaskAuto)
 
 	// AGY CLI Conversations
 	mux.HandleFunc("GET /api/agy/conversations", convH.ListConversations)

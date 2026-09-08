@@ -4,6 +4,7 @@ import { BoltIcon, ChevronRightIcon } from './icons';
 interface TaskPipelineBarProps {
   currentModule?: string;
   onRunSkill: (command: string) => void;
+  onOpenAutoModal?: (moduleName?: string) => void;
 }
 
 const STEPS = [
@@ -17,7 +18,7 @@ const STEPS = [
   { id: 'report', num: '08', label: 'REPT', cmd: '/report', title: 'Generate completion report (/report)' },
 ];
 
-export function TaskPipelineBar({ currentModule = '', onRunSkill }: TaskPipelineBarProps) {
+export function TaskPipelineBar({ currentModule = '', onRunSkill, onOpenAutoModal }: TaskPipelineBarProps) {
   const [moduleInput, setModuleInput] = useState(currentModule);
 
   const handleStepClick = (cmd: string) => {
@@ -26,6 +27,20 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill }: TaskPipeline
       onRunSkill(`${cmd} ${target}`);
     } else {
       onRunSkill(cmd);
+    }
+  };
+
+  const handleAutoClick = () => {
+    const target = moduleInput.trim() || currentModule;
+    if (target) {
+      onRunSkill(`/auto ${target}`);
+    } else {
+      onRunSkill('/auto');
+    }
+    if (onOpenAutoModal) {
+      onOpenAutoModal(target);
+    } else {
+      window.dispatchEvent(new CustomEvent('agy:open-auto-task', { detail: { module: target } }));
     }
   };
 
@@ -153,7 +168,7 @@ export function TaskPipelineBar({ currentModule = '', onRunSkill }: TaskPipeline
         </button>
         <button
           className="mecha-btn mecha-btn--primary"
-          onClick={() => handleStepClick('/auto')}
+          onClick={handleAutoClick}
           title="Trigger full autonomous task loop (/auto)"
           aria-label="Trigger autonomous task loop"
           style={{

@@ -383,9 +383,9 @@ export function PlanPanel({ sessionId, token, connected, onRequestFileStream, on
 
   // Auto start handler
   const handleAutoStart = useCallback(() => {
-    if (!currentModule || !onSendToTerminal) return;
-    onSendToTerminal(`/auto AiTasks/${currentModule.name}`);
-  }, [currentModule, onSendToTerminal]);
+    const mod = currentModule ? currentModule.name : '';
+    window.dispatchEvent(new CustomEvent('agy:open-auto-task', { detail: { module: mod } }));
+  }, [currentModule]);
 
   return (
     <div style={{

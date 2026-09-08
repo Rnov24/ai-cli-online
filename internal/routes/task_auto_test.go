@@ -1,0 +1,201 @@
+package routes
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/huacheng/ai-cli-online/internal/config"
+	"github.com/huacheng/ai-cli-online/internal/db"
+)
+
+func TestTaskAutoHandler(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ai-cli-task-auto-routes-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	database, err := db.Open(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	cfg := &config.Config{AuthToken: "test-secret-token"}
+	auth := NewAuthHelper(cfg)
+	handler := NewTaskAutoHandler(auth, database)
+
+	validTaskDir := filepath.Join(tempDir, "AiTasks", "feature-test")
+	_ = os.MkdirAll(validTaskDir, 0755)
+
+	sessionId := "sess-auto-1"
+
+	t.Run("Unauthorized request returns 401", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/task-auto", nil)
+		w := httptest.NewRecorder()
+		handler.GetTaskAutoStatus(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	t.Run("Status returns running false initially", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/task-auto", nil)
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer test-secret-token")
+		w := httptest.NewRecorder()
+		handler.GetTaskAutoStatus(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		var resp map[string]any
+		_ = json.NewDecoder(w.Body).Decode(&resp)
+		if resp["running"] != false {
+			t.Errorf("Expected running=false, got %v", resp["running"])
+		}
+	})
+
+	t.Run("StartTaskAuto fails on non-existent task directory", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]any{
+			"taskDir": filepath.Join(tempDir, "AiTasks", "non-existent"),
+		})
+		req := httptest.NewRequest("POST", "/api/sessions/"+sessionId+"/task-auto", bytes.NewReader(body))
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer test-secret-token")
+		w := httptest.NewRecorder()
+		handler.StartTaskAuto(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400 Bad Request, got %d", w.Code)
+		}
+	})
+
+	t.Run("StartTaskAuto succeeds with valid directory", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]any{
+			"taskDir":        validTaskDir,
+			"maxIterations":  15,
+			"timeoutMinutes": 20,
+		})
+		req := httptest.NewRequest("POST", "/api/sessions/"+sessionId+"/task-auto", bytes.NewReader(body))
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer test-secret-token")
+		w := httptest.NewRecorder()
+		handler.StartTaskAuto(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		var resp map[string]any
+		_ = json.NewDecoder(w.Body).Decode(&resp)
+		if resp["ok"] != true || resp["taskDir"] != validTaskDir {
+			t.Errorf("Unexpected response: %+v", resp)
+		}
+	})
+
+	t.Run("StartTaskAuto returns 409 Conflict if already running", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]any{
+			"taskDir": validTaskDir,
+		})
+		req := httptest.NewRequest("POST", "/api/sessions/"+sessionId+"/task-auto", bytes.NewReader(body))
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer test-secret-token")
+		w := httptest.NewRecorder()
+		handler.StartTaskAuto(w, req)
+
+		if w.Code != http.StatusConflict {
+			t.Errorf("Expected 409 Conflict, got %d", w.Code)
+		}
+	})
+
+	t.Run("LookupTaskAuto finds active task", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/task-auto/lookup?taskDir="+validTaskDir, nil)
+		req.Header.Set("Authorization", "Bearer test-secret-token")
+		w := httptest.NewRecorder()
+		handler.LookupTaskAuto(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		var resp map[string]any
+		_ = json.NewDecoder(w.Body).Decode(&resp)
+		if resp["status"] != "running" {
+			t.Errorf("Expected status=running, got %v", resp["status"])
+		}
+	})
+
+	t.Run("GetTaskAutoStatus returns active task details and reads .auto-signal", func(t *testing.T) {
+		// Mock write .auto-signal into task directory
+		sigData := AutoSignalPayload{
+			Step:       "check",
+			Result:     "PASS",
+			Next:       "exec",
+			Checkpoint: "post-plan",
+			Iteration:  2,
+			Timestamp:  "2026-09-08T18:00:00Z",
+		}
+		sigBytes, _ := json.Marshal(sigData)
+		_ = os.WriteFile(filepath.Join(validTaskDir, ".auto-signal"), sigBytes, 0644)
+
+		req := httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/task-auto", nil)
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer test-secret-token")
+		w := httptest.NewRecorder()
+		handler.GetTaskAutoStatus(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+		var resp struct {
+			Running        bool               `json:"running"`
+			TaskDir        string             `json:"taskDir"`
+			MaxIterations  int                `json:"maxIterations"`
+			TimeoutMinutes int                `json:"timeoutMinutes"`
+			Signal         *AutoSignalPayload `json:"signal"`
+		}
+		_ = json.NewDecoder(w.Body).Decode(&resp)
+		if !resp.Running || resp.Signal == nil || resp.Signal.Step != "check" || resp.Signal.Result != "PASS" {
+			t.Errorf("Unexpected status response: %+v", resp)
+		}
+	})
+
+	t.Run("StopTaskAuto terminates auto loop and writes .auto-stop", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/api/sessions/"+sessionId+"/task-auto", nil)
+		req.SetPathValue("sessionId", sessionId)
+		req.Header.Set("Authorization", "Bearer test-secret-token")
+		w := httptest.NewRecorder()
+		handler.StopTaskAuto(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+
+		// Verify .auto-stop was written
+		stopPath := filepath.Join(validTaskDir, ".auto-stop")
+		stopBytes, err := os.ReadFile(stopPath)
+		if err != nil {
+			t.Fatalf("Expected .auto-stop file to exist: %v", err)
+		}
+		var stopPayload AutoStopPayload
+		if err := json.Unmarshal(stopBytes, &stopPayload); err != nil || stopPayload.Reason != "user_stop" {
+			t.Errorf("Unexpected stop payload: %s", string(stopBytes))
+		}
+
+		// Verify status now reports running = false
+		statusReq := httptest.NewRequest("GET", "/api/sessions/"+sessionId+"/task-auto", nil)
+		statusReq.SetPathValue("sessionId", sessionId)
+		statusReq.Header.Set("Authorization", "Bearer test-secret-token")
+		statusW := httptest.NewRecorder()
+		handler.GetTaskAutoStatus(statusW, statusReq)
+		var statusResp map[string]any
+		_ = json.NewDecoder(statusW.Body).Decode(&statusResp)
+		if statusResp["running"] != false {
+			t.Errorf("Expected running=false after stop, got %v", statusResp["running"])
+		}
+	})
+}

@@ -10,6 +10,7 @@ import { ContextPanel } from './components/ContextPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsModal, HelpGuideTab } from './components/ShortcutsModal';
 import { SettingsModal } from './components/SettingsModal';
+import { AutoTaskModal } from './components/AutoTaskModal';
 import { fetchSystemStatus } from './api/system';
 import { fetchCwd } from './api/files';
 import { useAdaptivePolling } from './hooks/useAdaptivePolling';
@@ -42,6 +43,8 @@ function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [autoTaskModalOpen, setAutoTaskModalOpen] = useState(false);
+  const [autoTaskModule, setAutoTaskModule] = useState('');
   const [helpGuideTab, setHelpGuideTab] = useState<HelpGuideTab>('quickstart');
 
   const handleOpenHelp = useCallback((tab: HelpGuideTab = 'quickstart') => {
@@ -57,6 +60,16 @@ function App() {
     window.addEventListener('agy:open-help-guide', onHelpEvent);
     return () => window.removeEventListener('agy:open-help-guide', onHelpEvent);
   }, [handleOpenHelp]);
+
+  useEffect(() => {
+    const onAutoTaskEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ module?: string }>;
+      setAutoTaskModule(custom.detail?.module || '');
+      setAutoTaskModalOpen(true);
+    };
+    window.addEventListener('agy:open-auto-task', onAutoTaskEvent);
+    return () => window.removeEventListener('agy:open-auto-task', onAutoTaskEvent);
+  }, []);
 
   // Active session details
   const activeTab = useMemo(() => tabs.find((t) => t.id === activeTabId), [tabs, activeTabId]);
@@ -205,6 +218,10 @@ function App() {
 
       // Esc: Close any active modal
       if (e.key === 'Escape') {
+        if (autoTaskModalOpen) {
+          setAutoTaskModalOpen(false);
+          return;
+        }
         if (commandPaletteOpen) {
           setCommandPaletteOpen(false);
           return;
@@ -227,6 +244,7 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
+    autoTaskModalOpen,
     commandPaletteOpen,
     shortcutsModalOpen,
     settingsModalOpen,
@@ -358,6 +376,16 @@ function App() {
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         systemStatus={systemStatus}
+      />
+
+      {/* Autonomous Task Loop Modal (⚡) */}
+      <AutoTaskModal
+        isOpen={autoTaskModalOpen}
+        onClose={() => setAutoTaskModalOpen(false)}
+        sessionId={primaryTerminalId}
+        token={token || ''}
+        initialTaskModule={autoTaskModule}
+        workspaceDir={cwd || undefined}
       />
     </div>
   );
