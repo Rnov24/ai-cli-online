@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchSystemStatus, fetchProcessList, fetchSystemLogs, ProcessItem, SystemLogEntry } from '../api/system';
 import type { SystemStatus } from 'ai-cli-online-shared';
 import { StethoscopeIcon, CloseIcon, BoltIcon, DesktopScreenIcon } from './icons';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface SystemDiagnosticsModalProps {
   token: string;
@@ -36,10 +37,14 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
   useEffect(() => {
     if (isOpen) {
       refreshData();
-      const timer = setInterval(refreshData, 5000);
-      return () => clearInterval(timer);
     }
   }, [isOpen, refreshData]);
+
+  useAdaptivePolling(refreshData, {
+    intervalMs: 5000,
+    backgroundIntervalMs: 0,
+    enabled: isOpen,
+  });
 
   if (!isOpen) return null;
 

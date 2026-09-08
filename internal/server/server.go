@@ -38,7 +38,8 @@ func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
 	auth := routes.NewAuthHelper(s.cfg)
-	sessH := routes.NewSessionHandler(auth, s.db)
+	autoH := routes.NewTaskAutoHandler(auth, s.db)
+	sessH := routes.NewSessionHandler(auth, s.db, autoH)
 	fileH := routes.NewFileHandler(auth)
 	editH := routes.NewEditorHandler(auth, s.db)
 	gitH := routes.NewGitHandler(auth)
@@ -49,7 +50,6 @@ func (s *Server) Start() error {
 	skillsH := routes.NewSkillsHandler(auth, s.db)
 	plugH := routes.NewPluginsHandler(auth)
 	personaH := routes.NewPersonasHandler(auth, s.db)
-	autoH := routes.NewTaskAutoHandler(auth, s.db)
 	sysH := routes.NewSystemHandler(auth)
 	hub := ws.InitHub(s.cfg)
 
@@ -59,6 +59,9 @@ func (s *Server) Start() error {
 			log.Printf("[server] Recovered %d uncompleted turns from previous session to interrupted state", recovered)
 		}
 	}
+
+	// Recover or reap running autonomous tasks from previous daemon run
+	autoH.RecoverOnStartup()
 
 	// Auto-seed default Home and project workspaces
 	s.seedDefaultWorkspaces()

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BoltIcon, CloseIcon, AlertTriangleIcon } from './icons';
 import { startTaskAuto, stopTaskAuto, getTaskAutoStatus } from '../api/taskAuto';
 import type { TaskAutoStatus } from '../api/taskAuto';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface AutoTaskModalProps {
   isOpen: boolean;
@@ -59,18 +60,18 @@ export function AutoTaskModal({
     }
   }, [token, sessionId]);
 
-  const pollTimerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   useEffect(() => {
-    if (!isOpen) return;
-
-    setLoading(true);
-    pollStatus().finally(() => setLoading(false));
-
-    pollTimerRef.current = setInterval(pollStatus, 2000);
-    return () => {
-      clearInterval(pollTimerRef.current);
-    };
+    if (isOpen) {
+      setLoading(true);
+      pollStatus().finally(() => setLoading(false));
+    }
   }, [isOpen, pollStatus]);
+
+  useAdaptivePolling(pollStatus, {
+    intervalMs: 2000,
+    backgroundIntervalMs: 0,
+    enabled: isOpen,
+  });
 
   // Keyboard escape
   useEffect(() => {

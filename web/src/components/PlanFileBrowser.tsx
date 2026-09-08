@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchFiles, touchFile, mkdirPath, deleteItem } from '../api/files';
 import type { FileEntry } from '../api/files';
 import { formatSize } from '../utils';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface PlanFileBrowserProps {
   sessionId: string;
@@ -66,15 +67,8 @@ export function PlanFileBrowser({ sessionId, token, planDir, selectedFile, onSel
     }
   }, [token, sessionId, currentDir]);
 
-  useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
-
-  // Poll every 5s
-  useEffect(() => {
-    const id = setInterval(loadFiles, 5000);
-    return () => clearInterval(id);
-  }, [loadFiles]);
+  // Poll every 5s with mobile adaptive backoff
+  useAdaptivePolling(loadFiles, { intervalMs: 5000, backgroundIntervalMs: 0 });
 
   // Relative path from planDir root for API calls (e.g. "PLAN" or "PLAN/sub")
   const relativeDir = useCallback(() => {

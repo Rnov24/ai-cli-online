@@ -164,3 +164,11 @@ func SendKeys(sessionName string, keys ...string) error {
 	}
 	return fmt.Errorf("session %s not found", sessionName)
 }
+
+// Exists checks whether a session is currently active in tmux or in the direct registry.
+func Exists(sessionName string) bool {
+	if IsTmuxAvailable() && HasSession(sessionName) {
+		return true
+	}
+	return registry.get(sessionName) != nil
+}

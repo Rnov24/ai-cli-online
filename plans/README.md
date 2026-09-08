@@ -26,6 +26,7 @@ honor its STOP conditions, and update your row when done.
 | [016](016-global-antislop-glyph-and-svg-icon-modernization.md) | Global Antislop Glyph & SVG Icon Modernization | P2 | S | 015 | DONE |
 | [017](017-native-task-auto-engine-and-lifecycle-monitoring.md) | Native Task Auto Engine and Lifecycle Monitoring | P1 | M | — | DONE |
 | [018](018-antigravity-path-resilience-and-task-loop-shortcuts.md) | Antigravity Path Resilience, Environment Ingestion, and Global Task Loop Shortcuts | P1 | S | 017 | DONE |
+| [019](019-task-auto-daemon-resilience-session-cascade-and-adaptive-polling.md) | Task-Auto Daemon Resilience, Full Lifecycle Session Cleanup, and Unified Mobile Adaptive Polling | P1 | M | 018 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -39,6 +40,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plans 012, 013, and 014 are independent**: Plan 012 repairs websocket concurrency and tarball generation; Plan 013 removes the legacy Node server workspace to eliminate 22 `npm audit` vulnerabilities; Plan 014 improves chat rendering and conversation list latency.
 - **Plan 017 implements the core autonomous task lifecycle loop**: Delivers native Go daemon endpoints (`POST/DELETE/GET /api/sessions/:id/task-auto`, `GET /api/task-auto/lookup`), SQLite `task_auto` state tracking, `.auto-signal` watching and `.auto-stop` enforcement, alongside the frontend `AutoTaskModal` and `TaskPipelineBar` integration.
 - **Plan 018 builds on Plan 017**: Adds deep system binary discovery for `agy` under `~/.gemini/antigravity-cli/bin/agy` and Termux, cleanses XML metadata from conversation titles, and adds the `Alt+A` global hotkey.
+- **Plan 019 builds on Plans 017 and 018**: Provides daemon reboot recovery for running tasks, cascades session deletion across DB/WebSockets/Watchers, and unifies mobile adaptive polling across all frontend panels.
 
 ## Findings considered and rejected
 

@@ -10,14 +10,16 @@ import (
 )
 
 type SessionHandler struct {
-	auth *AuthHelper
-	db   *db.DB
+	auth     *AuthHelper
+	db       *db.DB
+	taskAuto *TaskAutoHandler
 }
 
-func NewSessionHandler(auth *AuthHelper, database *db.DB) *SessionHandler {
+func NewSessionHandler(auth *AuthHelper, database *db.DB, taskAuto *TaskAutoHandler) *SessionHandler {
 	return &SessionHandler{
-		auth: auth,
-		db:   database,
+		auth:     auth,
+		db:       database,
+		taskAuto: taskAuto,
 	}
 }
 
@@ -49,8 +51,24 @@ func (s *SessionHandler) KillSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1. Terminate any running auto task and write .auto-stop
+	if s.taskAuto != nil {
+		s.taskAuto.CleanupSession(sessionName)
+	}
+
+	// 2. Disconnect active websocket connection if open
+	if hub := ws.GetHub(); hub != nil {
+		hub.CloseSession(sessionName)
+	}
+
+	// 3. Clean up database state (drafts, annotations)
+	if s.db != nil {
+		_ = s.db.DeleteDraft(sessionName)
+		_ = s.db.DeleteAnnotationsForSession(sessionName)
+	}
+
+	// 4. Kill tmux or direct PTY terminal session
 	_ = terminal.Kill(sessionName)
-	_ = s.db.DeleteDraft(sessionName)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})

@@ -12,6 +12,7 @@ import (
 	"github.com/huacheng/ai-cli-online/internal/config"
 	"github.com/huacheng/ai-cli-online/internal/db"
 	"github.com/huacheng/ai-cli-online/internal/idle"
+	"github.com/huacheng/ai-cli-online/internal/terminal"
 )
 
 func TestRoutes(t *testing.T) {
@@ -266,5 +267,82 @@ func TestWriteFileContent_PathValidation(t *testing.T) {
 	data, _ := os.ReadFile(validFile)
 	if string(data) != "updated content" {
 		t.Errorf("Expected 'updated content', got %q", string(data))
+	}
+}
+
+func TestKillSession_Cascade(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ai-cli-killsess-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	database, err := db.Open(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	cfg := &config.Config{
+		AuthToken:         "test-secret",
+		DefaultWorkingDir: tempDir,
+	}
+	auth := NewAuthHelper(cfg)
+	autoH := NewTaskAutoHandler(auth, database)
+	sessH := NewSessionHandler(auth, database, autoH)
+
+	sessionId := "sess-kill"
+	sessionName := terminal.BuildSessionName("test-secret", sessionId)
+	taskDirKill := filepath.Join(tempDir, "AiTasks", "kill-task")
+	_ = os.MkdirAll(taskDirKill, 0755)
+
+	_ = database.SaveDraft(sessionName, "test draft content")
+	_ = database.SaveAnnotation(sessionName, filepath.Join(tempDir, "sample.md"), `{"ann":1}`, 12345)
+	_ = database.UpsertTaskAuto(&db.TaskAutoRecord{
+		SessionName:    sessionName,
+		TaskDir:        taskDirKill,
+		Status:         "running",
+		MaxIterations:  10,
+		TimeoutMinutes: 10,
+	})
+
+	killReq := httptest.NewRequest(http.MethodDelete, "/api/sessions/"+sessionId, nil)
+	killReq.SetPathValue("sessionId", sessionId)
+	killReq.Header.Set("Authorization", "Bearer test-secret")
+	killW := httptest.NewRecorder()
+
+	sessH.KillSession(killW, killReq)
+
+	if killW.Code != http.StatusOK {
+		t.Fatalf("Expected 200 from KillSession, got %d: %s", killW.Code, killW.Body.String())
+	}
+
+	// Verify draft deleted
+	dContent, _ := database.GetDraft(sessionName)
+	if dContent != "" {
+		t.Errorf("Expected draft to be deleted, got: %q", dContent)
+	}
+
+	// Verify annotation deleted
+	annRes, _ := database.GetAnnotation(sessionName, filepath.Join(tempDir, "sample.md"))
+	if annRes != nil {
+		t.Errorf("Expected annotation to be deleted, got: %+v", annRes)
+	}
+
+	// Verify task auto deleted
+	autoRec, _ := database.GetTaskAuto(sessionName)
+	if autoRec != nil {
+		t.Errorf("Expected task auto record to be deleted, got: %+v", autoRec)
+	}
+
+	// Verify .auto-stop created with session_killed
+	stopBytes, err := os.ReadFile(filepath.Join(taskDirKill, ".auto-stop"))
+	if err != nil {
+		t.Fatalf("Expected .auto-stop file created on kill: %v", err)
+	}
+	var stopPayload AutoStopPayload
+	_ = json.Unmarshal(stopBytes, &stopPayload)
+	if stopPayload.Reason != "session_killed" {
+		t.Errorf("Expected reason session_killed, got: %s", stopPayload.Reason)
 	}
 }

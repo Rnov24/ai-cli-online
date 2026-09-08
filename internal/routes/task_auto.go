@@ -182,6 +182,72 @@ func (h *TaskAutoHandler) StopTaskAuto(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "stopped": true})
 }
 
+// CleanupSession cleans up auto task state, cancels watcher, and writes .auto-stop when a session is killed
+func (h *TaskAutoHandler) CleanupSession(sessionName string) {
+	h.cancelWatcher(sessionName)
+
+	if h.db != nil {
+		rec, err := h.db.GetTaskAuto(sessionName)
+		if err == nil && rec != nil {
+			stopPath := filepath.Join(rec.TaskDir, ".auto-stop")
+			stopData, _ := json.Marshal(AutoStopPayload{
+				Reason:    "session_killed",
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			})
+			_ = os.WriteFile(stopPath, stopData, 0644)
+			_ = os.Remove(filepath.Join(rec.TaskDir, ".auto-signal"))
+			_ = h.db.DeleteTaskAuto(sessionName)
+		}
+	}
+}
+
+// RecoverOnStartup cleans up dead session zombie tasks or resumes live session watchers
+func (h *TaskAutoHandler) RecoverOnStartup() {
+	if h.db == nil {
+		return
+	}
+
+	runningTasks, err := h.db.ListRunningTaskAuto()
+	if err != nil {
+		return
+	}
+
+	for _, rec := range runningTasks {
+		if !terminal.Exists(rec.SessionName) {
+			stopPath := filepath.Join(rec.TaskDir, ".auto-stop")
+			stopData, _ := json.Marshal(AutoStopPayload{
+				Reason:    "server_restart_session_dead",
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			})
+			_ = os.WriteFile(stopPath, stopData, 0644)
+			_ = os.Remove(filepath.Join(rec.TaskDir, ".auto-signal"))
+			_ = h.db.DeleteTaskAuto(rec.SessionName)
+			continue
+		}
+
+		startedTime, err := time.Parse(time.RFC3339, rec.StartedAt)
+		if err != nil {
+			startedTime = time.Now()
+		}
+
+		if time.Since(startedTime) >= time.Duration(rec.TimeoutMinutes)*time.Minute {
+			stopPath := filepath.Join(rec.TaskDir, ".auto-stop")
+			stopData, _ := json.Marshal(AutoStopPayload{
+				Reason:    "timeout",
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			})
+			_ = os.WriteFile(stopPath, stopData, 0644)
+			_ = os.Remove(filepath.Join(rec.TaskDir, ".auto-signal"))
+			_ = h.db.DeleteTaskAuto(rec.SessionName)
+			continue
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		h.registerWatcher(rec.SessionName, cancel)
+		go h.watchAutoLoop(ctx, rec.SessionName, rec.TaskDir, rec.MaxIterations, rec.TimeoutMinutes, startedTime)
+	}
+}
+
 // GET /api/sessions/{sessionId}/task-auto
 func (h *TaskAutoHandler) GetTaskAutoStatus(w http.ResponseWriter, r *http.Request) {
 	sessionId := r.PathValue("sessionId")

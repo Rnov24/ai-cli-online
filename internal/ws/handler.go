@@ -82,12 +82,18 @@ func (h *Hub) CountForTokenPrefix(prefix string) int {
 	return count
 }
 
+func (h *Hub) notifyConnectionCount() {
+	if mgr := idle.GetManager(); mgr != nil {
+		mgr.OnConnectionCountChange(len(h.connections))
+	}
+}
+
 func (h *Hub) setConn(sessionName string, conn *websocket.Conn) *websocket.Conn {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	old := h.connections[sessionName]
 	h.connections[sessionName] = conn
-	idle.GetManager().OnConnectionCountChange(len(h.connections))
+	h.notifyConnectionCount()
 	return old
 }
 
@@ -96,7 +102,21 @@ func (h *Hub) removeConn(sessionName string, conn *websocket.Conn) {
 	defer h.mu.Unlock()
 	if h.connections[sessionName] == conn {
 		delete(h.connections, sessionName)
-		idle.GetManager().OnConnectionCountChange(len(h.connections))
+		h.notifyConnectionCount()
+	}
+}
+
+func (h *Hub) CloseSession(sessionName string) {
+	h.mu.Lock()
+	conn, ok := h.connections[sessionName]
+	if ok {
+		delete(h.connections, sessionName)
+		h.notifyConnectionCount()
+	}
+	h.mu.Unlock()
+
+	if ok && conn != nil {
+		_ = conn.Close(websocket.StatusCode(4004), "Session terminated")
 	}
 }
 

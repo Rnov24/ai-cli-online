@@ -7,6 +7,7 @@ import {
   deleteConversation,
   ConversationSummary,
 } from '../api/conversations';
+import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 import {
   CheckIcon,
   CloseIcon,
@@ -586,11 +587,13 @@ export function SessionSidebar() {
     if (!sidebarOpen) return;
     loadConversations();
     fetchSessions();
-    const interval = setInterval(() => {
-      fetchSessions();
-    }, 10000);
-    return () => clearInterval(interval);
   }, [sidebarOpen, loadConversations, fetchSessions]);
+
+  useAdaptivePolling(fetchSessions, {
+    intervalMs: 10000,
+    backgroundIntervalMs: 0,
+    enabled: sidebarOpen,
+  });
 
   // Current active tab and active terminal
   const activeTab = useMemo(

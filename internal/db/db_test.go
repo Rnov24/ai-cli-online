@@ -58,6 +58,17 @@ func TestDBOperations(t *testing.T) {
 		t.Errorf("GetAnnotation failed: %v, got: %+v", err, ann)
 	}
 
+	fPath2 := filepath.Join(tempDir, "sample2.md")
+	_ = database.SaveAnnotation(sess, fPath2, annContent, 123456790)
+	if err := database.DeleteAnnotationsForSession(sess); err != nil {
+		t.Errorf("DeleteAnnotationsForSession failed: %v", err)
+	}
+	annAfter1, _ := database.GetAnnotation(sess, fPath)
+	annAfter2, _ := database.GetAnnotation(sess, fPath2)
+	if annAfter1 != nil || annAfter2 != nil {
+		t.Errorf("Expected annotations to be deleted, got ann1: %v, ann2: %v", annAfter1, annAfter2)
+	}
+
 	// 4. Workspaces
 	homePath := filepath.Join(tempDir, "home")
 	projPath := filepath.Join(tempDir, "project1")

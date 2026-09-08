@@ -257,6 +257,11 @@ func (d *DB) SaveAnnotation(sessionName, filePath, content string, updatedAt int
 	return err
 }
 
+func (d *DB) DeleteAnnotationsForSession(sessionName string) error {
+	_, err := d.db.Exec("DELETE FROM annotations WHERE session_name = ?", sessionName)
+	return err
+}
+
 // --- Workspace Methods ---
 
 func (d *DB) ListWorkspaces() ([]Workspace, error) {

@@ -198,4 +198,70 @@ func TestTaskAutoHandler(t *testing.T) {
 			t.Errorf("Expected running=false after stop, got %v", statusResp["running"])
 		}
 	})
+
+	t.Run("CleanupSession stops watcher, writes .auto-stop with session_killed, and deletes DB record", func(t *testing.T) {
+		sessionClean := "clean-sess-1"
+		taskDirClean := filepath.Join(tempDir, "AiTasks", "task-clean")
+		_ = os.MkdirAll(taskDirClean, 0755)
+
+		_ = database.UpsertTaskAuto(&db.TaskAutoRecord{
+			SessionName:    sessionClean,
+			TaskDir:        taskDirClean,
+			Status:         "running",
+			MaxIterations:  10,
+			TimeoutMinutes: 15,
+		})
+
+		handler.CleanupSession(sessionClean)
+
+		// Verify record is deleted
+		rec, _ := database.GetTaskAuto(sessionClean)
+		if rec != nil {
+			t.Errorf("Expected task auto record to be deleted, got %+v", rec)
+		}
+
+		// Verify .auto-stop reason is session_killed
+		stopBytes, err := os.ReadFile(filepath.Join(taskDirClean, ".auto-stop"))
+		if err != nil {
+			t.Fatalf("Expected .auto-stop file: %v", err)
+		}
+		var stopPayload AutoStopPayload
+		_ = json.Unmarshal(stopBytes, &stopPayload)
+		if stopPayload.Reason != "session_killed" {
+			t.Errorf("Expected reason session_killed, got %s", stopPayload.Reason)
+		}
+	})
+
+	t.Run("RecoverOnStartup reaps dead sessions and removes orphaned task locks", func(t *testing.T) {
+		sessionDead := "dead-nonexistent-session"
+		taskDirDead := filepath.Join(tempDir, "AiTasks", "task-dead")
+		_ = os.MkdirAll(taskDirDead, 0755)
+
+		_ = database.UpsertTaskAuto(&db.TaskAutoRecord{
+			SessionName:    sessionDead,
+			TaskDir:        taskDirDead,
+			Status:         "running",
+			MaxIterations:  10,
+			TimeoutMinutes: 15,
+		})
+
+		handler.RecoverOnStartup()
+
+		// Dead session record should be reaped from DB
+		rec, _ := database.GetTaskAuto(sessionDead)
+		if rec != nil {
+			t.Errorf("Expected dead session task to be reaped from DB, got %+v", rec)
+		}
+
+		// .auto-stop should have reason server_restart_session_dead
+		stopBytes, err := os.ReadFile(filepath.Join(taskDirDead, ".auto-stop"))
+		if err != nil {
+			t.Fatalf("Expected .auto-stop file for reaped dead session: %v", err)
+		}
+		var stopPayload AutoStopPayload
+		_ = json.Unmarshal(stopBytes, &stopPayload)
+		if stopPayload.Reason != "server_restart_session_dead" {
+			t.Errorf("Expected reason server_restart_session_dead, got %s", stopPayload.Reason)
+		}
+	})
 }
