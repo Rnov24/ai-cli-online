@@ -142,5 +142,57 @@ func ValidateNewPath(requested, baseCwd string) (string, error) {
 	if !isContainedIn(target, realBase) {
 		return "", errors.New("path traversal forbidden")
 	}
+
+	// Validate that any existing ancestor directory does not symlink outside baseCwd
+	curr := filepath.Dir(target)
+	for curr != "" && curr != "." && curr != "/" {
+		if realCurr, err := filepath.EvalSymlinks(curr); err == nil {
+			if !isContainedIn(realCurr, realBase) {
+				return "", errors.New("path traversal forbidden: ancestor symlink escapes base")
+			}
+			break
+		}
+		parent := filepath.Dir(curr)
+		if parent == curr {
+			break
+		}
+		curr = parent
+	}
+
 	return target, nil
 }
+
+// AtomicWriteFile writes data to a temporary file in the same directory and renames it
+// atomically to the target filePath to prevent file corruption on unexpected termination.
+func AtomicWriteFile(filePath string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	tmpFile, err := os.CreateTemp(dir, ".tmp-"+filepath.Base(filePath)+"-*")
+	if err != nil {
+		// Fallback to direct write if temp file cannot be created in directory
+		return os.WriteFile(filePath, data, perm)
+	}
+	tmpName := tmpFile.Name()
+	defer os.Remove(tmpName)
+
+	if err := tmpFile.Chmod(perm); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, filePath)
+}
+

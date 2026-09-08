@@ -31,6 +31,7 @@ honor its STOP conditions, and update your row when done.
 | [021](021-file-streaming-resilience-binary-preview-and-adaptive-sync.md) | Workspace File Streaming Resilience, Binary Media Preview, and Filesystem Adaptive Sync | P1 | M | 020 | DONE |
 | [022](022-global-keyboard-navigation-modal-accessibility-and-shortcut-unification.md) | Global Keyboard Navigation, Modal Accessibility, and Shortcut Unification | P1 | M | 021 | DONE |
 | [023](023-chat-stream-throttle-linear-turn-indexing-and-quota-resilience.md) | Chat Streaming High-Frequency Throttle, Linear Turn Indexing, and Quota-Resilient Persistence | P1 | M | 022 | DONE |
+| [024](024-atomic-file-replacement-symlink-guard-and-workspace-fallback.md) | Atomic File Replacement, Symlink Traversal Protection for New Paths, and Workspace Fallback Hardening | P1 | M | 023 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -49,6 +50,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 021 builds on Plan 020**: Eliminates tarball file descriptor leaks on large workspaces, enables base64 binary image encoding, and adds real-time directory polling and image preview.
 - **Plan 022 builds on Plan 021**: Eliminates the Alt+A shortcut collision between AutoTaskModal and PersonaSelectorModal, elevates modal shortcuts to App.tsx global scope, implements Escape key dismissal across all modals, and documents unified shortcuts.
 - **Plan 023 builds on Plan 022**: Eliminates synchronous main-thread blocking on streaming persistence, linearizes $O(N^2)$ message turn indexing to $O(N)$, and adds quota resilience.
+- **Plan 024 builds on Plan 023**: Implements atomic temporary-write file replacement, protects against symlink directory traversal in new paths, and hardens workspace fallback.
 
 ## Findings considered and rejected
 

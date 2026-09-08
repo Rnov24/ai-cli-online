@@ -268,6 +268,14 @@ func TestWriteFileContent_PathValidation(t *testing.T) {
 	if string(data) != "updated content" {
 		t.Errorf("Expected 'updated content', got %q", string(data))
 	}
+	var writeResp struct {
+		Ok    bool    `json:"ok"`
+		Mtime float64 `json:"mtime"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &writeResp)
+	if !writeResp.Ok || writeResp.Mtime <= 0 {
+		t.Errorf("Expected ok=true and positive mtime, got %+v", writeResp)
+	}
 }
 
 func TestKillSession_Cascade(t *testing.T) {

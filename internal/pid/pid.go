@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/huacheng/ai-cli-online/internal/files"
 )
 
 type ProcessInfo struct {
@@ -59,7 +61,7 @@ func RegisterPid(component string, port int) (*ProcessInfo, error) {
 	}
 
 	path := GetPidPath(component)
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	if err := files.AtomicWriteFile(path, data, 0600); err != nil {
 		return nil, err
 	}
 	return info, nil
@@ -126,7 +128,7 @@ func RegisterSpecificPid(component string, processPid int, port int) (*ProcessIn
 	}
 
 	path := GetPidPath(component)
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	if err := files.AtomicWriteFile(path, data, 0600); err != nil {
 		return nil, err
 	}
 	return info, nil

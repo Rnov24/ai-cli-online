@@ -156,7 +156,7 @@ func (e *EditorHandler) SaveTaskAnnotations(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := os.WriteFile(targetFile, data, 0644); err != nil {
+	if err := files.AtomicWriteFile(targetFile, data, 0644); err != nil {
 		http.Error(w, `{"error":"Failed to write annotation file"}`, http.StatusInternalServerError)
 		return
 	}
@@ -189,6 +189,12 @@ func (e *EditorHandler) WriteFileContent(w http.ResponseWriter, r *http.Request)
 	cwd := terminal.GetCwd(sessionName, e.auth.cfg.DefaultWorkingDir)
 	resolved, err := files.ValidatePath(req.Path, cwd)
 	if err != nil {
+		home, _ := os.UserHomeDir()
+		if home != "" {
+			resolved, err = files.ValidatePath(req.Path, home)
+		}
+	}
+	if err != nil {
 		http.Error(w, `{"error":"access denied: path outside workspace"}`, http.StatusForbidden)
 		return
 	}
@@ -199,7 +205,7 @@ func (e *EditorHandler) WriteFileContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := os.WriteFile(resolved, []byte(req.Content), 0644); err != nil {
+	if err := files.AtomicWriteFile(resolved, []byte(req.Content), 0644); err != nil {
 		http.Error(w, `{"error":"Failed to write file"}`, http.StatusInternalServerError)
 		return
 	}
