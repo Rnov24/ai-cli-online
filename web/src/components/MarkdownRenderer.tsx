@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { marked, type Tokens } from 'marked';
 import DOMPurify from 'dompurify';
 import Prism from 'prismjs';
@@ -118,13 +118,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
               <span class="code-block-lang">${language || 'text'}</span>
               <span class="code-block-lines">// ${lineCount}L</span>
             </div>
-            <button class="code-copy-btn" onclick="
-              const text = decodeURIComponent(this.closest('.code-block-wrapper').getAttribute('data-code'));
-              navigator.clipboard.writeText(text);
-              this.textContent = '✓ COPIED';
-              this.classList.add('copied');
-              setTimeout(() => { this.textContent = '[COPY]'; this.classList.remove('copied'); }, 2000);
-            ">[COPY]</button>
+            <button class="code-copy-btn" data-action="copy" aria-label="Copy code to clipboard">[COPY]</button>
           </div>
           <pre class="language-${language}"><code class="language-${language}">${numberedHtml}</code></pre>
         </div>
@@ -140,9 +134,36 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
 
     return DOMPurify.sanitize(raw, {
       ADD_TAGS: ['button', 'span', 'div'],
-      ADD_ATTR: ['onclick', 'data-code', 'class', 'style', 'aria-hidden'],
+      ADD_ATTR: ['data-code', 'data-action', 'class', 'style', 'aria-hidden'],
     });
   }, [content]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const btn = target?.closest<HTMLButtonElement>('.code-copy-btn');
+      if (!btn || !container.contains(btn)) return;
+
+      const wrapper = btn.closest<HTMLDivElement>('.code-block-wrapper');
+      const rawCode = wrapper?.getAttribute('data-code');
+      if (rawCode) {
+        const text = decodeURIComponent(rawCode);
+        navigator.clipboard.writeText(text).catch(() => {});
+        btn.textContent = '✓ COPIED';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = '[COPY]';
+          btn.classList.remove('copied');
+        }, 2000);
+      }
+    };
+
+    container.addEventListener('click', handleClick);
+    return () => container.removeEventListener('click', handleClick);
+  }, [html]);
 
   // Live Mermaid diagrams rendering
   useMermaidRender(containerRef, html, theme);

@@ -103,8 +103,8 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
           height: 'min(520px, calc(100dvh - 32px))',
           maxHeight: 'calc(100dvh - 32px)',
           zIndex: 'var(--z-modal, 710)',
-          backgroundColor: 'var(--bg-primary, #0d1117)',
-          border: '1px solid var(--border, #30363d)',
+          backgroundColor: 'var(--bg-primary)',
+          border: '1px solid var(--border)',
           borderRadius: '8px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           display: 'flex',
@@ -120,8 +120,8 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '10px 16px',
-            backgroundColor: 'var(--bg-secondary, #161b22)',
-            borderBottom: '1px solid var(--border, #30363d)',
+            backgroundColor: 'var(--bg-secondary)',
+            borderBottom: '1px solid var(--border)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -137,7 +137,7 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
               style={{
                 background: 'none',
                 border: 'none',
-                color: 'var(--text-muted, #8b949e)',
+                color: 'var(--text-muted)',
                 cursor: 'pointer',
                 fontSize: '11px',
               }}
@@ -151,7 +151,7 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
               style={{
                 background: 'none',
                 border: 'none',
-                color: 'var(--text-muted, #8b949e)',
+                color: 'var(--text-muted)',
                 cursor: 'pointer',
                 fontSize: '14px',
                 display: 'inline-flex',
@@ -167,8 +167,8 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
         <div
           style={{
             display: 'flex',
-            borderBottom: '1px solid var(--border, #30363d)',
-            backgroundColor: 'var(--bg-tertiary, #090d13)',
+            borderBottom: '1px solid var(--border)',
+            backgroundColor: 'var(--bg-tertiary)',
             padding: '0 8px',
           }}
         >
@@ -179,7 +179,7 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
               background: 'none',
               border: 'none',
               borderBottom: activeTab === 'health' ? '2px solid var(--accent-cyan-bright, #22d3ee)' : 'none',
-              color: activeTab === 'health' ? 'var(--text-bright, #f0f6fc)' : 'var(--text-muted, #8b949e)',
+              color: activeTab === 'health' ? 'var(--text-bright, #f0f6fc)' : 'var(--text-muted)',
               cursor: 'pointer',
               fontSize: '11px',
               fontWeight: 600,
@@ -194,7 +194,7 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
               background: 'none',
               border: 'none',
               borderBottom: activeTab === 'processes' ? '2px solid var(--accent-cyan-bright, #22d3ee)' : 'none',
-              color: activeTab === 'processes' ? 'var(--text-bright, #f0f6fc)' : 'var(--text-muted, #8b949e)',
+              color: activeTab === 'processes' ? 'var(--text-bright, #f0f6fc)' : 'var(--text-muted)',
               cursor: 'pointer',
               fontSize: '11px',
               fontWeight: 600,
@@ -209,7 +209,7 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
               background: 'none',
               border: 'none',
               borderBottom: activeTab === 'logs' ? '2px solid var(--accent-cyan-bright, #22d3ee)' : 'none',
-              color: activeTab === 'logs' ? 'var(--text-bright, #f0f6fc)' : 'var(--text-muted, #8b949e)',
+              color: activeTab === 'logs' ? 'var(--text-bright, #f0f6fc)' : 'var(--text-muted)',
               cursor: 'pointer',
               fontSize: '11px',
               fontWeight: 600,
@@ -226,9 +226,9 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
               <div
                 style={{
                   padding: '12px',
-                  backgroundColor: 'var(--bg-secondary, #161b22)',
+                  backgroundColor: 'var(--bg-secondary)',
                   borderRadius: '6px',
-                  border: '1px solid var(--border, #30363d)',
+                  border: '1px solid var(--border)',
                 }}
               >
                 <div style={{ color: 'var(--accent-green-bright, #10b981)', fontWeight: 700, marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -259,9 +259,9 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
               <div
                 style={{
                   padding: '12px',
-                  backgroundColor: 'var(--bg-secondary, #161b22)',
+                  backgroundColor: 'var(--bg-secondary)',
                   borderRadius: '6px',
-                  border: '1px solid var(--border, #30363d)',
+                  border: '1px solid var(--border)',
                 }}
               >
                 <div style={{ color: 'var(--accent-cyan-bright, #22d3ee)', fontWeight: 700, marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -304,8 +304,8 @@ export function SystemDiagnosticsModal({ token, isOpen, onClose }: SystemDiagnos
                       key={idx}
                       style={{
                         padding: '10px 12px',
-                        backgroundColor: 'var(--bg-secondary, #161b22)',
-                        border: '1px solid var(--border, #30363d)',
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border)',
                         borderRadius: '6px',
                         display: 'flex',
                         alignItems: 'center',

@@ -580,7 +580,7 @@ export const CommandPalette = React.memo(function CommandPalette({
                         color: item.category === 'SKILLS'
                           ? 'var(--accent-cyan-bright)'
                           : item.category === 'WORKSPACES'
-                            ? '#c084fc'
+                            ? 'var(--accent-purple)'
                             : item.category === 'PANELS'
                               ? 'var(--accent-green-bright)'
                               : 'var(--text-muted)',

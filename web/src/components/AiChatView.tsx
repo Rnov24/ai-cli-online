@@ -1441,10 +1441,10 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               borderRadius: '2px',
               letterSpacing: '0.5px',
               backgroundColor: activePersona?.color
-                ? 'rgba(255, 255, 255, 0.08)'
-                : isHome ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-              color: activePersona ? activePersona.color : (isHome ? '#c084fc' : '#60a5fa'),
-              border: `1px solid ${activePersona?.color || (isHome ? 'rgba(168, 85, 247, 0.35)' : 'rgba(59, 130, 246, 0.35)')}`,
+                ? 'var(--badge-overlay-bg)'
+                : isHome ? 'var(--accent-purple-subtle, rgba(168, 85, 247, 0.15))' : 'rgba(59, 130, 246, 0.15)',
+              color: activePersona ? activePersona.color : (isHome ? 'var(--accent-purple)' : 'var(--accent-blue)'),
+              border: `1px solid ${activePersona?.color || (isHome ? 'var(--accent-purple)' : 'var(--accent-blue)')}`,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
@@ -1661,7 +1661,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
               <span style={{
                 fontSize: '10px',
                 fontWeight: 700,
-                color: isHome ? '#c084fc' : 'var(--accent-amber-bright)',
+                color: isHome ? 'var(--accent-purple)' : 'var(--accent-amber-bright)',
                 letterSpacing: '1px',
               }}>
                 {isHome ? 'PERSONAL ASSISTANT READY' : 'AUTONOMOUS SYSTEM READY'}
@@ -2164,7 +2164,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                     borderRadius: '2px',
                     backgroundColor: 'var(--bg-primary)',
                     border: '1px solid var(--border)',
-                    color: sc.category === 'coding' ? 'var(--accent-cyan-bright)' : sc.category === 'assistant' ? '#c084fc' : 'var(--accent-amber-bright)',
+                    color: sc.category === 'coding' ? 'var(--accent-cyan-bright)' : sc.category === 'assistant' ? 'var(--accent-purple)' : 'var(--accent-amber-bright)',
                     fontWeight: 700,
                   }}>
                     {sc.category.toUpperCase()}

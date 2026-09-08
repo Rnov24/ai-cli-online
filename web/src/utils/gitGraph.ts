@@ -1,14 +1,14 @@
 import type { CommitInfo } from '../api/git';
 
 export const LANE_COLORS = [
-  '#0085d9', // blue (main branch)
-  '#d9008f', // magenta
-  '#3fb950', // green
-  '#d98500', // orange
-  '#a300d9', // purple
-  '#56d4dd', // cyan
-  '#e05050', // red
-  '#00d9a3', // teal
+  '#0284c7',
+  '#c026d3',
+  '#16a34a',
+  '#ea580c',
+  '#7c3aed',
+  '#0891b2',
+  '#dc2626',
+  '#0d9488',
 ];
 
 export interface Connection {

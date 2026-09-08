@@ -212,8 +212,8 @@ export function PersonaSelectorModal({
     >
       <div
         style={{
-          backgroundColor: 'var(--bg-card, #12151c)',
-          border: '1px solid var(--border-color, #232a3b)',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '8px',
           width: 'min(840px, calc(100vw - 24px))',
           maxHeight: 'min(680px, calc(100dvh - 32px))',
@@ -229,7 +229,7 @@ export function PersonaSelectorModal({
         <div
           style={{
             padding: '14px 18px',
-            borderBottom: '1px solid var(--border-color, #232a3b)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -245,7 +245,7 @@ export function PersonaSelectorModal({
                   fontSize: '13px',
                   fontWeight: 600,
                   letterSpacing: '1px',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               >
                 AGENT PERSONAS & OPERATIONAL ROLES
@@ -289,16 +289,16 @@ export function PersonaSelectorModal({
         <div
           style={{
             padding: '10px 18px',
-            borderBottom: '1px solid var(--border-color, #232a3b)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            backgroundColor: 'var(--bg-surface, #0f1219)',
+            backgroundColor: 'var(--bg-surface)',
             flexWrap: 'wrap',
           }}
         >
           {/* Category Tabs */}
-          <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-input, #0b0d13)', padding: '2px', borderRadius: '4px' }}>
+          <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-input)', padding: '2px', borderRadius: '4px' }}>
             {(['all', 'coding', 'assistant', 'custom'] as const).map((cat) => (
               <button
                 key={cat}
@@ -327,8 +327,8 @@ export function PersonaSelectorModal({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              backgroundColor: 'var(--bg-input, #0b0d13)',
-              border: '1px solid var(--border-color, #232a3b)',
+              backgroundColor: 'var(--bg-input)',
+              border: '1px solid var(--border-color)',
               borderRadius: '4px',
               padding: '4px 10px',
               flex: 1,
@@ -345,7 +345,7 @@ export function PersonaSelectorModal({
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: 'var(--text-primary, #e2e8f0)',
+                color: 'var(--text-primary)',
                 fontSize: '11px',
                 fontFamily: 'var(--font-mono, monospace)',
                 width: '100%',
@@ -398,7 +398,7 @@ export function PersonaSelectorModal({
             style={{
               padding: '16px 18px',
               backgroundColor: 'rgba(168, 85, 247, 0.05)',
-              borderBottom: '1px solid var(--border-color, #232a3b)',
+              borderBottom: '1px solid var(--border-color)',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px',
@@ -416,13 +416,13 @@ export function PersonaSelectorModal({
                 onChange={(e) => setCreateId(e.target.value)}
                 required
                 style={{
-                  backgroundColor: 'var(--bg-input, #0b0d13)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '4px',
                   padding: '6px 10px',
                   fontSize: '11px',
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               />
               <input
@@ -432,13 +432,13 @@ export function PersonaSelectorModal({
                 onChange={(e) => setCreateName(e.target.value)}
                 required
                 style={{
-                  backgroundColor: 'var(--bg-input, #0b0d13)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '4px',
                   padding: '6px 10px',
                   fontSize: '11px',
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               />
               <input
@@ -447,26 +447,26 @@ export function PersonaSelectorModal({
                 value={createRole}
                 onChange={(e) => setCreateRole(e.target.value)}
                 style={{
-                  backgroundColor: 'var(--bg-input, #0b0d13)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '4px',
                   padding: '6px 10px',
                   fontSize: '11px',
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               />
               <select
                 value={createIcon}
                 onChange={(e) => setCreateIcon(e.target.value)}
                 style={{
-                  backgroundColor: 'var(--bg-input, #0b0d13)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '4px',
                   padding: '6px 10px',
                   fontSize: '11px',
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               >
                 <option value="robot">Icon: Robot</option>
@@ -483,13 +483,13 @@ export function PersonaSelectorModal({
                 value={createColor}
                 onChange={(e) => setCreateColor(e.target.value)}
                 style={{
-                  backgroundColor: 'var(--bg-input, #0b0d13)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '4px',
                   padding: '6px 10px',
                   fontSize: '11px',
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               />
             </div>
@@ -500,13 +500,13 @@ export function PersonaSelectorModal({
               value={createDesc}
               onChange={(e) => setCreateDesc(e.target.value)}
               style={{
-                backgroundColor: 'var(--bg-input, #0b0d13)',
-                border: '1px solid var(--border-color, #232a3b)',
+                backgroundColor: 'var(--bg-input)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '4px',
                 padding: '6px 10px',
                 fontSize: '11px',
                 fontFamily: 'var(--font-mono, monospace)',
-                color: 'var(--text-primary, #e2e8f0)',
+                color: 'var(--text-primary)',
               }}
             />
 
@@ -517,13 +517,13 @@ export function PersonaSelectorModal({
               required
               rows={4}
               style={{
-                backgroundColor: 'var(--bg-input, #0b0d13)',
-                border: '1px solid var(--border-color, #232a3b)',
+                backgroundColor: 'var(--bg-input)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '4px',
                 padding: '8px 10px',
                 fontSize: '11px',
                 fontFamily: 'var(--font-mono, monospace)',
-                color: 'var(--text-primary, #e2e8f0)',
+                color: 'var(--text-primary)',
                 resize: 'vertical',
               }}
             />
@@ -537,13 +537,13 @@ export function PersonaSelectorModal({
                 style={{
                   flex: 1,
                   minWidth: '200px',
-                  backgroundColor: 'var(--bg-input, #0b0d13)',
-                  border: '1px solid var(--border-color, #232a3b)',
+                  backgroundColor: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '4px',
                   padding: '6px 10px',
                   fontSize: '11px',
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: 'var(--text-primary, #e2e8f0)',
+                  color: 'var(--text-primary)',
                 }}
               />
 
@@ -650,7 +650,7 @@ export function PersonaSelectorModal({
                     backgroundColor: 'var(--bg-elevated, #161b26)',
                     border: isActive
                       ? '1px solid var(--accent-cyan, #00f0ff)'
-                      : '1px solid var(--border-color, #232a3b)',
+                      : '1px solid var(--border-color)',
                     borderRadius: '6px',
                     padding: '14px',
                     display: 'flex',
@@ -684,7 +684,7 @@ export function PersonaSelectorModal({
                             style={{
                               fontSize: '12px',
                               fontWeight: 600,
-                              color: 'var(--text-primary, #e2e8f0)',
+                              color: 'var(--text-primary)',
                               fontFamily: 'var(--font-mono, monospace)',
                             }}
                           >
@@ -708,7 +708,7 @@ export function PersonaSelectorModal({
                             {persona.isPreset ? 'PRESET' : 'CUSTOM'}
                           </span>
                         </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-secondary, #94a3b8)' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
                           {persona.role}
                         </div>
                       </div>
@@ -732,7 +732,7 @@ export function PersonaSelectorModal({
                   </div>
 
                   {/* Description */}
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', lineHeight: '1.4' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                     {persona.description}
                   </div>
 
@@ -762,12 +762,12 @@ export function PersonaSelectorModal({
                     <div
                       style={{
                         padding: '8px 10px',
-                        backgroundColor: 'var(--bg-input, #0b0d13)',
-                        border: '1px solid var(--border-color, #232a3b)',
+                        backgroundColor: 'var(--bg-input)',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '4px',
                         fontSize: '10px',
                         fontFamily: 'var(--font-mono, monospace)',
-                        color: 'var(--text-secondary, #94a3b8)',
+                        color: 'var(--text-secondary)',
                         whiteSpace: 'pre-wrap',
                         maxHeight: '120px',
                         overflowY: 'auto',
@@ -802,11 +802,11 @@ export function PersonaSelectorModal({
                         borderRadius: '4px',
                         border: isActive
                           ? '1px solid var(--accent-cyan, #00f0ff)'
-                          : '1px solid var(--border-color, #232a3b)',
+                          : '1px solid var(--border-color)',
                         backgroundColor: isActive
                           ? 'rgba(0, 240, 255, 0.15)'
-                          : 'var(--bg-surface, #0f1219)',
-                        color: isActive ? 'var(--accent-cyan, #00f0ff)' : 'var(--text-primary, #e2e8f0)',
+                          : 'var(--bg-surface)',
+                        color: isActive ? 'var(--accent-cyan, #00f0ff)' : 'var(--text-primary)',
                         fontFamily: 'var(--font-mono, monospace)',
                         fontSize: '10px',
                         fontWeight: 600,

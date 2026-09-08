@@ -220,7 +220,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
               <div style={{
                 padding: '6px 10px',
                 borderRadius: '2px',
-                backgroundColor: '#050608',
+                backgroundColor: 'var(--bg-primary)',
                 border: '1px solid var(--border)',
                 color: 'var(--accent-green-bright)',
                 fontFamily: 'var(--font-mono)',
@@ -273,7 +273,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
                 margin: 0,
                 padding: '8px 10px',
                 borderRadius: '2px',
-                backgroundColor: '#050608',
+                backgroundColor: 'var(--bg-primary)',
                 border: '1px solid var(--border)',
                 color: toolCall.status === 'error' ? 'var(--accent-red)' : 'var(--text-primary)',
                 fontSize: '11px',

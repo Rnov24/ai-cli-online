@@ -269,7 +269,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                   padding: '1px 4px',
                   borderRadius: '2px',
                   background: isHome ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                  color: isHome ? '#c084fc' : '#60a5fa',
+                  color: isHome ? 'var(--accent-purple)' : 'var(--accent-blue)',
                   border: `1px solid ${isHome ? 'rgba(168, 85, 247, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
                 }}
               >
@@ -300,7 +300,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                 borderRadius: '4px',
                 background: 'rgba(239, 68, 68, 0.15)',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
+                color: 'var(--accent-red)',
                 fontSize: '11px',
               }}
             >
@@ -459,14 +459,14 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <FolderIcon size={13} color="var(--accent-blue, #60a5fa)" />
+                        <FolderIcon size={13} color="var(--accent-blue)" />
                         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-bright)' }}>
                           {ws.name}
                         </span>
                         <span
                           style={{
                             fontSize: '9px',
-                            color: 'var(--accent-blue, #60a5fa)',
+                            color: 'var(--accent-blue)',
                             fontWeight: 700,
                             padding: '1px 4px',
                             background: 'rgba(59, 130, 246, 0.1)',
@@ -481,7 +481,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {isActive && <CheckIcon size={14} color="var(--accent-blue, #60a5fa)" />}
+                      {isActive && <CheckIcon size={14} color="var(--accent-blue)" />}
                       <button
                         type="button"
                         onClick={(e) => handleDeleteWorkspace(e, ws.id)}

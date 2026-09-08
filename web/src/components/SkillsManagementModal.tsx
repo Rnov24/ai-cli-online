@@ -292,7 +292,7 @@ export function SkillsManagementModal({
                   onClick={() => setActiveScope(tab.id)}
                   style={{
                     background: active ? 'var(--accent-purple)' : 'var(--bg-primary)',
-                    color: active ? '#000' : 'var(--text-secondary)',
+                    color: active ? 'var(--btn-contrast-text)' : 'var(--text-secondary)',
                     border: '1px solid ' + (active ? 'var(--accent-purple)' : 'var(--border)'),
                     borderRadius: '4px',
                     padding: '4px 8px',
@@ -368,7 +368,7 @@ export function SkillsManagementModal({
               onClick={() => setShowScaffold(!showScaffold)}
               style={{
                 background: showScaffold ? 'var(--accent-amber-bright)' : 'var(--bg-primary)',
-                color: showScaffold ? '#000' : 'var(--accent-cyan)',
+                color: showScaffold ? 'var(--btn-contrast-text)' : 'var(--accent-cyan)',
                 border: '1px solid ' + (showScaffold ? 'var(--accent-amber-bright)' : 'var(--border)'),
                 borderRadius: '4px',
                 padding: '5px 10px',
@@ -517,7 +517,7 @@ export function SkillsManagementModal({
                 style={{
                   background: 'var(--accent-cyan)',
                   border: 'none',
-                  color: '#000',
+                  color: 'var(--btn-contrast-text)',
                   borderRadius: '4px',
                   padding: '5px 14px',
                   fontSize: '11px',
@@ -703,7 +703,7 @@ export function SkillsManagementModal({
                               background: 'var(--accent-purple)',
                               border: 'none',
                               borderRadius: '3px',
-                              color: '#000',
+                              color: 'var(--btn-contrast-text)',
                               padding: '3px 8px',
                               fontSize: '10px',
                               fontFamily: 'var(--font-mono)',
@@ -736,7 +736,7 @@ export function SkillsManagementModal({
                       style={{
                         fontSize: '10px',
                         fontFamily: 'var(--font-mono)',
-                        color: 'var(--text-muted, #666)',
+                        color: 'var(--text-muted)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',

@@ -181,11 +181,23 @@ func (f *FileHandler) DownloadCwd(w http.ResponseWriter, r *http.Request) {
 		if err != nil || rel == "." {
 			return nil
 		}
+
 		header, err := tar.FileInfoHeader(info, "")
 		if err != nil {
 			return nil
 		}
 		header.Name = rel
+
+		// Handle symlinks
+		if info.Mode()&os.ModeSymlink != 0 {
+			linkTarget, err := os.Readlink(path)
+			if err != nil {
+				return nil
+			}
+			header.Linkname = linkTarget
+			header.Size = 0
+			return tw.WriteHeader(header)
+		}
 
 		if err := tw.WriteHeader(header); err != nil {
 			return err
@@ -284,7 +296,12 @@ func (f *FileHandler) Rm(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Path string `json:"path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Path == "" || strings.Contains(req.Path, "..") {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
+		return
+	}
+	cleanReq := filepath.Clean(strings.TrimSpace(req.Path))
+	if cleanReq == "" || cleanReq == "." || cleanReq == "/" || cleanReq == "\\" || strings.Contains(req.Path, "..") {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
 		return
 	}
@@ -293,6 +310,12 @@ func (f *FileHandler) Rm(w http.ResponseWriter, r *http.Request) {
 	resolved, err := files.ValidatePath(req.Path, cwd)
 	if err != nil {
 		http.Error(w, `{"error":"Invalid path"}`, http.StatusBadRequest)
+		return
+	}
+
+	home, _ := os.UserHomeDir()
+	if resolved == cwd || resolved == filepath.Clean(cwd) || (home != "" && resolved == filepath.Clean(home)) {
+		http.Error(w, `{"error":"Cannot delete workspace or home directory root"}`, http.StatusBadRequest)
 		return
 	}
 

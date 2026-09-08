@@ -462,15 +462,15 @@ export function ShortcutsModal({
                     borderRadius: '4px',
                     backgroundColor: 'var(--bg-primary)',
                     border: '1px solid rgba(168, 85, 247, 0.3)',
-                    borderLeft: '4px solid #c084fc',
+                    borderLeft: '4px solid var(--accent-purple)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <HomeIcon size={16} color="#c084fc" />
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#c084fc' }}>
+                      <HomeIcon size={16} color="var(--accent-purple)" />
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-purple)' }}>
                         HOME DIRECTORY (~)
                       </span>
                     </div>
-                    <div style={{ fontSize: '10px', color: '#c084fc', fontWeight: 700, marginBottom: '8px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--accent-purple)', fontWeight: 700, marginBottom: '8px' }}>
                       MODE: AGENTIC ASSISTANT
                     </div>
                     <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '8px' }}>
@@ -487,15 +487,15 @@ export function ShortcutsModal({
                     borderRadius: '4px',
                     backgroundColor: 'var(--bg-primary)',
                     border: '1px solid rgba(59, 130, 246, 0.3)',
-                    borderLeft: '4px solid #60a5fa',
+                    borderLeft: '4px solid var(--accent-blue)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <FolderIcon size={16} color="#60a5fa" />
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#60a5fa' }}>
+                      <FolderIcon size={16} color="var(--accent-blue)" />
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-blue)' }}>
                         PROJECT WORKSPACE
                       </span>
                     </div>
-                    <div style={{ fontSize: '10px', color: '#60a5fa', fontWeight: 700, marginBottom: '8px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--accent-blue)', fontWeight: 700, marginBottom: '8px' }}>
                       MODE: CODING AGENT
                     </div>
                     <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '8px' }}>
@@ -603,7 +603,7 @@ export function ShortcutsModal({
                         cursor: 'pointer',
                         textTransform: 'uppercase',
                         backgroundColor: selectedCategory === cat ? 'var(--accent-amber-bright)' : 'var(--bg-primary)',
-                        color: selectedCategory === cat ? '#000' : 'var(--text-secondary)',
+                        color: selectedCategory === cat ? 'var(--btn-contrast-text)' : 'var(--text-secondary)',
                         border: '1px solid var(--border)',
                       }}
                     >
@@ -657,9 +657,9 @@ export function ShortcutsModal({
                                   : 'rgba(245, 158, 11, 0.15)',
                               color:
                                 item.persona === 'assistant'
-                                  ? '#c084fc'
+                                  ? 'var(--accent-purple)'
                                   : item.persona === 'coding'
-                                  ? '#60a5fa'
+                                  ? 'var(--accent-blue)'
                                   : 'var(--accent-amber-bright)',
                               border: '1px solid var(--border)',
                             }}
@@ -736,7 +736,7 @@ export function ShortcutsModal({
                   }}
                   style={{
                     backgroundColor: 'var(--accent-purple)',
-                    color: '#000',
+                    color: 'var(--btn-contrast-text)',
                     border: 'none',
                     borderRadius: '3px',
                     padding: '6px 12px',
