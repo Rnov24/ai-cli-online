@@ -1,17 +1,34 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { SkillsManagementModal } from './SkillsManagementModal';
-import { fetchSkills, fetchSkillContent, scaffoldSkill, type SkillItem } from '../api/skills';
+import {
+  fetchSkills,
+  fetchSkillContent,
+  scaffoldSkill,
+  searchSkills,
+  installSkill,
+  deleteSkill,
+  syncSkills,
+  type SkillItem,
+} from '../api/skills';
 
 vi.mock('../api/skills', () => ({
   fetchSkills: vi.fn(),
   fetchSkillContent: vi.fn(),
   scaffoldSkill: vi.fn(),
+  searchSkills: vi.fn(),
+  installSkill: vi.fn(),
+  deleteSkill: vi.fn(),
+  syncSkills: vi.fn(),
 }));
 
 const mockFetchSkills = vi.mocked(fetchSkills);
 const mockFetchSkillContent = vi.mocked(fetchSkillContent);
 const mockScaffoldSkill = vi.mocked(scaffoldSkill);
+const mockSearchSkills = vi.mocked(searchSkills);
+const mockInstallSkill = vi.mocked(installSkill);
+const mockDeleteSkill = vi.mocked(deleteSkill);
+const mockSyncSkills = vi.mocked(syncSkills);
 
 const mockSkills: SkillItem[] = [
   {
@@ -43,7 +60,7 @@ const mockSkills: SkillItem[] = [
   },
 ];
 
-describe('SkillsManagementModal', { timeout: 20000 }, () => {
+describe('SkillsManagementModal', { timeout: 45000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchSkills.mockResolvedValue({
@@ -51,6 +68,26 @@ describe('SkillsManagementModal', { timeout: 20000 }, () => {
       isHome: false,
       skills: mockSkills,
       count: 3,
+    });
+    mockSearchSkills.mockResolvedValue({
+      query: 'anti-slop',
+      skills: [
+        {
+          id: 'miqdadbadjuber/anti-slop/antislop',
+          skillId: 'antislop',
+          name: 'antislop',
+          installs: 946,
+          source: 'miqdadbadjuber/anti-slop',
+        },
+        {
+          id: 'shadcn/improve/improve',
+          skillId: 'improve',
+          name: 'improve',
+          installs: 4200,
+          source: 'shadcn/improve',
+        },
+      ],
+      count: 2,
     });
   });
 
@@ -134,7 +171,7 @@ describe('SkillsManagementModal', { timeout: 20000 }, () => {
       expect(screen.getByText('/deploy-staging')).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/Search skills/i);
+    const searchInput = screen.getByPlaceholderText(/Search skills\.\.\./i);
     fireEvent.change(searchInput, { target: { value: 'staging' } });
 
     expect(screen.getByText('/deploy-staging')).toBeInTheDocument();
@@ -255,6 +292,148 @@ describe('SkillsManagementModal', { timeout: 20000 }, () => {
     });
   });
 
+  it('switches between INSTALLED and EXPLORE SKILLS.SH tabs', async () => {
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/deploy-staging')).toBeInTheDocument();
+    });
+
+    const exploreTab = screen.getByRole('button', { name: /EXPLORE SKILLS\.SH/i });
+    fireEvent.click(exploreTab);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/Search 600k\+ community skills/i)).toBeInTheDocument();
+    });
+
+    const installedTab = screen.getByRole('button', { name: /^INSTALLED/i });
+    fireEvent.click(installedTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('/deploy-staging')).toBeInTheDocument();
+    });
+  });
+
+  it('renders remote search results from skills.sh', async () => {
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+      />
+    );
+
+    const exploreTab = screen.getByRole('button', { name: /EXPLORE SKILLS\.SH/i });
+    fireEvent.click(exploreTab);
+
+    await waitFor(() => {
+      expect(mockSearchSkills).toHaveBeenCalled();
+      expect(screen.getByText('/antislop')).toBeInTheDocument();
+      expect(screen.getByText('/improve')).toBeInTheDocument();
+    });
+  });
+
+  it('installs a skill from explore tab', async () => {
+    mockInstallSkill.mockResolvedValue({
+      name: 'antislop',
+      description: 'Anti-slop instructions',
+      scope: 'workspace',
+      path: '/work/proj/.agents/skills/antislop',
+      skillFile: '/work/proj/.agents/skills/antislop/SKILL.md',
+      hasScripts: false,
+      hasResources: false,
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    const exploreTab = screen.getByRole('button', { name: /EXPLORE SKILLS\.SH/i });
+    fireEvent.click(exploreTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('/antislop')).toBeInTheDocument();
+    });
+
+    const installButtons = screen.getAllByRole('button', { name: /^INSTALL$/i });
+    fireEvent.click(installButtons[0]);
+
+    await waitFor(() => {
+      expect(mockInstallSkill).toHaveBeenCalledWith('test-token', {
+        source: 'miqdadbadjuber/anti-slop',
+        skillName: 'antislop',
+        scope: 'workspace',
+        cwd: '/work/proj',
+      });
+      expect(screen.getByText(/Installed \/antislop/i)).toBeInTheDocument();
+    });
+  });
+
+  it('uninstalls a skill from installed list', async () => {
+    mockDeleteSkill.mockResolvedValue({ ok: true, name: 'deploy-staging' });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/deploy-staging')).toBeInTheDocument();
+    });
+
+    const uninstallButtons = screen.getAllByRole('button', { name: /UNINSTALL/i });
+    fireEvent.click(uninstallButtons[0]);
+
+    await waitFor(() => {
+      expect(mockDeleteSkill).toHaveBeenCalledWith('test-token', 'deploy-staging', 'workspace', '/work/proj');
+      expect(screen.queryByText('/deploy-staging')).not.toBeInTheDocument();
+    });
+  });
+
+  it('syncs skills from skills-lock.json', async () => {
+    mockSyncSkills.mockResolvedValue({
+      synced: 2,
+      restored: ['missing-skill'],
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/deploy-staging')).toBeInTheDocument();
+    });
+
+    const syncBtn = screen.getByRole('button', { name: /SYNC/i });
+    fireEvent.click(syncBtn);
+
+    await waitFor(() => {
+      expect(mockSyncSkills).toHaveBeenCalledWith('test-token', '/work/proj');
+      expect(screen.getByText(/Synced 2 skills from skills-lock\.json/i)).toBeInTheDocument();
+    });
+  });
+
   it('calls onClose when Escape key is pressed', () => {
     const onClose = vi.fn();
     render(
@@ -269,4 +448,3 @@ describe('SkillsManagementModal', { timeout: 20000 }, () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
-

@@ -81,6 +81,10 @@ func (s *Server) Start() error {
 	mux.HandleFunc("GET /api/skills", skillsH.ListSkills)
 	mux.HandleFunc("GET /api/skills/content", skillsH.GetSkillContent)
 	mux.HandleFunc("POST /api/skills/scaffold", skillsH.ScaffoldSkill)
+	mux.HandleFunc("GET /api/skills/search", skillsH.SearchSkills)
+	mux.HandleFunc("POST /api/skills/install", skillsH.InstallSkill)
+	mux.HandleFunc("DELETE /api/skills", skillsH.DeleteSkill)
+	mux.HandleFunc("POST /api/skills/sync", skillsH.SyncSkills)
 
 	// Plugins Management
 	mux.HandleFunc("GET /api/plugins", plugH.ListPlugins)

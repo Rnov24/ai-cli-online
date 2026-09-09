@@ -149,6 +149,16 @@ export const CommandPalette = React.memo(function CommandPalette({
       },
     },
     {
+      id: 'cmd-skills-find',
+      category: 'SKILLS',
+      title: 'Explore & Install Skills: skills.sh Registry',
+      desc: 'Browse, search, and 1-click install community agent skills from skills.sh',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-skills-modal', { detail: { view: 'explore' } }));
+        onClose();
+      },
+    },
+    {
       id: 'cmd-goal',
       category: 'SKILLS',
       title: '/goal: Autonomous Long-Running Goal',

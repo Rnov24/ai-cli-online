@@ -1,13 +1,21 @@
 package routes
 
 import (
+	"archive/tar"
 	"bufio"
+	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/huacheng/ai-cli-online/internal/db"
 	"github.com/huacheng/ai-cli-online/internal/persona"
@@ -46,6 +54,85 @@ type ScaffoldSkillRequest struct {
 	Cwd         string `json:"cwd"`
 }
 
+type RemoteSkillItem struct {
+	ID       string `json:"id"`
+	SkillID  string `json:"skillId"`
+	Name     string `json:"name"`
+	Source   string `json:"source"`
+	Installs int    `json:"installs"`
+}
+
+type SkillsSearchResponse struct {
+	Query  string            `json:"query"`
+	Skills []RemoteSkillItem `json:"skills"`
+	Count  int               `json:"count"`
+}
+
+type InstallSkillRequest struct {
+	Source    string `json:"source"`    // e.g. "miqdadbadjuber/anti-slop" or "shadcn/improve"
+	SkillName string `json:"skillName"` // e.g. "antislop", or empty to infer
+	Scope     string `json:"scope"`     // "workspace" or "global"
+	Cwd       string `json:"cwd"`
+}
+
+type SkillLockEntry struct {
+	Source       string `json:"source"`
+	SourceType   string `json:"sourceType"`
+	SkillPath    string `json:"skillPath"`
+	ComputedHash string `json:"computedHash"`
+}
+
+type SkillLockFile struct {
+	Version int                       `json:"version"`
+	Skills  map[string]SkillLockEntry `json:"skills"`
+}
+
+type SyncSkillsResponse struct {
+	Synced   int      `json:"synced"`
+	Restored []string `json:"restored"`
+	Errors   []string `json:"errors,omitempty"`
+}
+
+var validSkillNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+var curatedPopularSkills = []RemoteSkillItem{
+	{
+		ID:       "miqdadbadjuber/anti-slop/antislop",
+		SkillID:  "antislop",
+		Name:     "antislop",
+		Source:   "miqdadbadjuber/anti-slop",
+		Installs: 946,
+	},
+	{
+		ID:       "shadcn/improve/improve",
+		SkillID:  "improve",
+		Name:     "improve",
+		Source:   "shadcn/improve",
+		Installs: 4200,
+	},
+	{
+		ID:       "github/awesome-copilot/prd",
+		SkillID:  "prd",
+		Name:     "prd",
+		Source:   "github/awesome-copilot",
+		Installs: 1800,
+	},
+	{
+		ID:       "mattpocock/skills/to-tickets",
+		SkillID:  "to-tickets",
+		Name:     "to-tickets",
+		Source:   "mattpocock/skills",
+		Installs: 3100,
+	},
+	{
+		ID:       "cameronmcgear/git-commit/git-commit",
+		SkillID:  "git-commit",
+		Name:     "git-commit",
+		Source:   "cameronmcgear/git-commit",
+		Installs: 1250,
+	},
+}
+
 type SkillsHandler struct {
 	auth *AuthHelper
 	db   *db.DB
@@ -77,7 +164,7 @@ func parseSkillFrontmatter(content string) (name string, desc string, tags []str
 		trimmedLine := strings.TrimSpace(line)
 
 		if inDesc {
-			if strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "\t") {
+			if strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "	") {
 				descLines = append(descLines, strings.TrimSpace(line))
 				continue
 			}
@@ -86,14 +173,14 @@ func parseSkillFrontmatter(content string) (name string, desc string, tags []str
 
 		if strings.HasPrefix(trimmedLine, "name:") {
 			val := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "name:"))
-			name = strings.Trim(val, `"'`)
+			name = strings.Trim(val, "\"'`")
 		} else if strings.HasPrefix(trimmedLine, "description:") {
 			val := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "description:"))
 			if val == ">-" || val == "|" || val == ">" || val == "" {
 				inDesc = true
 				descLines = nil
 			} else {
-				desc = strings.Trim(val, `"'`)
+				desc = strings.Trim(val, "\"'`")
 			}
 		}
 	}
@@ -334,8 +421,6 @@ func (h *SkillsHandler) GetSkillContent(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-var validSkillNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
-
 // ScaffoldSkill handles POST /api/skills/scaffold to initialize a new SKILL.md template.
 func (h *SkillsHandler) ScaffoldSkill(w http.ResponseWriter, r *http.Request) {
 	if !h.auth.CheckAuth(r) {
@@ -379,13 +464,13 @@ func (h *SkillsHandler) ScaffoldSkill(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		http.Error(w, `{"error":"Failed to create skill directory: `+err.Error()+`"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error":"Failed to create skill directory: ` + err.Error() + `"}`, http.StatusInternalServerError)
 		return
 	}
 
 	skillFile := filepath.Join(targetDir, "SKILL.md")
 	if _, err := os.Stat(skillFile); err == nil {
-		http.Error(w, `{"error":"Skill `+name+` already exists"}`, http.StatusConflict)
+		http.Error(w, `{"error":"Skill ` + name + ` already exists"}`, http.StatusConflict)
 		return
 	}
 
@@ -407,7 +492,7 @@ func (h *SkillsHandler) ScaffoldSkill(w http.ResponseWriter, r *http.Request) {
 	}, "\n")
 
 	if err := os.WriteFile(skillFile, []byte(templateContent), 0644); err != nil {
-		http.Error(w, `{"error":"Failed to write SKILL.md: `+err.Error()+`"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error":"Failed to write SKILL.md: ` + err.Error() + `"}`, http.StatusInternalServerError)
 		return
 	}
 
@@ -421,5 +506,673 @@ func (h *SkillsHandler) ScaffoldSkill(w http.ResponseWriter, r *http.Request) {
 		SkillFile:    skillFile,
 		HasScripts:   false,
 		HasResources: false,
+	})
+}
+
+func loadSkillLock(lockPath string) (*SkillLockFile, error) {
+	data, err := os.ReadFile(lockPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &SkillLockFile{
+				Version: 1,
+				Skills:  make(map[string]SkillLockEntry),
+			}, nil
+		}
+		return nil, err
+	}
+	var lock SkillLockFile
+	if err := json.Unmarshal(data, &lock); err != nil {
+		return nil, err
+	}
+	if lock.Skills == nil {
+		lock.Skills = make(map[string]SkillLockEntry)
+	}
+	if lock.Version == 0 {
+		lock.Version = 1
+	}
+	return &lock, nil
+}
+
+func saveSkillLock(lockPath string, lock *SkillLockFile) error {
+	if lock.Skills == nil {
+		lock.Skills = make(map[string]SkillLockEntry)
+	}
+	if lock.Version == 0 {
+		lock.Version = 1
+	}
+	data, err := json.MarshalIndent(lock, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	dir := filepath.Dir(lockPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	tmpFile := fmt.Sprintf("%s.tmp.%d", lockPath, time.Now().UnixNano())
+	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpFile, lockPath)
+}
+
+func extractTarGz(r io.Reader, destDir string) error {
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		parts := strings.Split(header.Name, "/")
+		if len(parts) <= 1 {
+			continue
+		}
+		relPath := strings.Join(parts[1:], "/")
+		if relPath == "" {
+			continue
+		}
+
+		target := filepath.Join(destDir, relPath)
+		cleanTarget := filepath.Clean(target)
+		cleanDest := filepath.Clean(destDir)
+		if !strings.HasPrefix(cleanTarget, cleanDest) {
+			continue
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(cleanTarget, 0755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(cleanTarget), 0755); err != nil {
+				return err
+			}
+			f, err := os.OpenFile(cleanTarget, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return err
+			}
+			f.Close()
+		}
+	}
+	return nil
+}
+
+func (h *SkillsHandler) installSkillFromSource(source, skillName, scope, cwd string) (*SkillItem, error) {
+	source = strings.TrimSpace(source)
+	skillName = strings.TrimSpace(skillName)
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		scope = "workspace"
+	}
+
+	home, _ := os.UserHomeDir()
+	var targetParent string
+	var lockPath string
+
+	if scope == "global" {
+		if home == "" {
+			return nil, fmt.Errorf("unable to locate user home directory for global skill")
+		}
+		targetParent = filepath.Join(home, ".agents", "skills")
+		lockPath = filepath.Join(home, "skills-lock.json")
+	} else {
+		if cwd == "" {
+			cwd = home
+		}
+		cwd = filepath.Clean(cwd)
+		targetParent = filepath.Join(cwd, ".agents", "skills")
+		lockPath = filepath.Join(cwd, "skills-lock.json")
+	}
+
+	tmpDir, err := os.MkdirTemp("", "agy-skill-download-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cleanSource := strings.TrimPrefix(source, "https://github.com/")
+	cleanSource = strings.TrimPrefix(cleanSource, "http://github.com/")
+	cleanSource = strings.TrimPrefix(cleanSource, "git@github.com:")
+	cleanSource = strings.TrimSuffix(cleanSource, ".git")
+
+	var repoOwner, repoName string
+	var cloneURL string
+
+	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") || strings.HasPrefix(source, "file://") || filepath.IsAbs(source) {
+		cloneURL = source
+		parts := strings.Split(strings.TrimRight(cleanSource, "/"), "/")
+		if len(parts) > 0 {
+			repoName = parts[len(parts)-1]
+		}
+	} else {
+		parts := strings.Split(cleanSource, "/")
+		if len(parts) >= 2 {
+			repoOwner = parts[0]
+			repoName = parts[1]
+			cloneURL = fmt.Sprintf("https://github.com/%s/%s.git", repoOwner, repoName)
+			if skillName == "" && len(parts) >= 3 {
+				skillName = parts[2]
+			}
+		} else {
+			repoName = cleanSource
+			cloneURL = fmt.Sprintf("https://github.com/%s.git", cleanSource)
+		}
+	}
+
+	cloneSucceeded := false
+
+	// If source is a local directory, copy directly or clone
+	if fi, err := os.Stat(source); err == nil && fi.IsDir() {
+		copyErr := filepath.Walk(source, func(p string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(source, p)
+			if err != nil || rel == "." {
+				return nil
+			}
+			dest := filepath.Join(tmpDir, rel)
+			if info.IsDir() {
+				return os.MkdirAll(dest, 0755)
+			}
+			content, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			return os.WriteFile(dest, content, 0644)
+		})
+		if copyErr == nil {
+			cloneSucceeded = true
+		}
+	}
+
+	// 1. Try git clone
+	if !cloneSucceeded {
+		if gitPath, err := exec.LookPath("git"); err == nil && gitPath != "" {
+			cmd := exec.Command(gitPath, "clone", "--depth", "1", cloneURL, tmpDir)
+			if err := cmd.Run(); err == nil {
+				cloneSucceeded = true
+			}
+		}
+	}
+
+	// 2. Tarball fallback
+	if !cloneSucceeded && repoOwner != "" && repoName != "" {
+		tarURLs := []string{
+			fmt.Sprintf("https://codeload.github.com/%s/%s/tar.gz/refs/heads/main", repoOwner, repoName),
+			fmt.Sprintf("https://codeload.github.com/%s/%s/tar.gz/refs/heads/master", repoOwner, repoName),
+		}
+		client := &http.Client{Timeout: 30 * time.Second}
+		for _, tarURL := range tarURLs {
+			resp, err := client.Get(tarURL)
+			if err == nil && resp.StatusCode == http.StatusOK {
+				if err := extractTarGz(resp.Body, tmpDir); err == nil {
+					cloneSucceeded = true
+					resp.Body.Close()
+					break
+				}
+				resp.Body.Close()
+			} else if resp != nil {
+				resp.Body.Close()
+			}
+		}
+	}
+
+	if !cloneSucceeded {
+		return nil, fmt.Errorf("failed to download skill from %s (git clone and tarball fallback failed)", source)
+	}
+
+	// Locate SKILL.md
+	checkSkillFile := func(dir string) (string, bool) {
+		f1 := filepath.Join(dir, "SKILL.md")
+		if fi, err := os.Stat(f1); err == nil && !fi.IsDir() {
+			return f1, true
+		}
+		f2 := filepath.Join(dir, "skill.md")
+		if fi, err := os.Stat(f2); err == nil && !fi.IsDir() {
+			return f2, true
+		}
+		return "", false
+	}
+
+	var foundDir string
+	if skillName != "" {
+		candidates := []string{
+			filepath.Join(tmpDir, skillName),
+			filepath.Join(tmpDir, "skills", skillName),
+			filepath.Join(tmpDir, ".agents", "skills", skillName),
+		}
+		for _, c := range candidates {
+			if _, ok := checkSkillFile(c); ok {
+				foundDir = c
+				break
+			}
+		}
+
+		if foundDir == "" {
+			filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+				if err != nil || foundDir != "" {
+					return nil
+				}
+				if info.IsDir() && info.Name() == skillName {
+					if _, ok := checkSkillFile(path); ok {
+						foundDir = path
+						return nil
+					}
+				}
+				if !info.IsDir() && (info.Name() == "SKILL.md" || info.Name() == "skill.md") {
+					dir := filepath.Dir(path)
+					data, err := os.ReadFile(path)
+					if err == nil {
+						fmName, _, _ := parseSkillFrontmatter(string(data))
+						if fmName == skillName {
+							foundDir = dir
+							return nil
+						}
+					}
+				}
+				return nil
+			})
+		}
+
+		if foundDir == "" {
+			if _, ok := checkSkillFile(tmpDir); ok {
+				foundDir = tmpDir
+			}
+		}
+	} else {
+		if _, ok := checkSkillFile(tmpDir); ok {
+			foundDir = tmpDir
+		} else {
+			skillsSub := filepath.Join(tmpDir, "skills")
+			if entries, err := os.ReadDir(skillsSub); err == nil {
+				for _, e := range entries {
+					if e.IsDir() {
+						sub := filepath.Join(skillsSub, e.Name())
+						if _, ok := checkSkillFile(sub); ok {
+							foundDir = sub
+							skillName = e.Name()
+							break
+						}
+					}
+				}
+			}
+			if foundDir == "" {
+				filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+					if err != nil || foundDir != "" {
+						return nil
+					}
+					if !info.IsDir() && (info.Name() == "SKILL.md" || info.Name() == "skill.md") {
+						dir := filepath.Dir(path)
+						if filepath.Base(dir) != ".git" {
+							foundDir = dir
+							skillName = filepath.Base(dir)
+							return nil
+						}
+					}
+					return nil
+				})
+			}
+		}
+	}
+
+	if foundDir == "" {
+		return nil, fmt.Errorf("no SKILL.md found in %s", source)
+	}
+
+	srcSkillFile, ok := checkSkillFile(foundDir)
+	if !ok {
+		return nil, fmt.Errorf("no SKILL.md in directory %s", foundDir)
+	}
+
+	skillContentBytes, err := os.ReadFile(srcSkillFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read skill file: %w", err)
+	}
+	fmName, fmDesc, fmTags := parseSkillFrontmatter(string(skillContentBytes))
+	if skillName == "" {
+		if fmName != "" {
+			skillName = fmName
+		} else if repoName != "" {
+			skillName = repoName
+		} else {
+			skillName = filepath.Base(foundDir)
+		}
+	}
+	if fmDesc == "" {
+		fmDesc = "Custom " + scope + " skill (" + skillName + ")"
+	}
+
+	targetDir := filepath.Join(targetParent, skillName)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create target skill directory: %w", err)
+	}
+
+	err = filepath.Walk(foundDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(foundDir, path)
+		if err != nil || rel == "." {
+			return nil
+		}
+		if strings.HasPrefix(rel, ".git") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		destPath := filepath.Join(targetDir, rel)
+		if info.IsDir() {
+			return os.MkdirAll(destPath, 0755)
+		}
+
+		if strings.ToLower(info.Name()) == "skill.md" {
+			destPath = filepath.Join(filepath.Dir(destPath), "SKILL.md")
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(destPath, content, 0644)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to copy skill files: %w", err)
+	}
+
+	destSkillFile := filepath.Join(targetDir, "SKILL.md")
+	destBytes, err := os.ReadFile(destSkillFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read destination SKILL.md: %w", err)
+	}
+	hash := fmt.Sprintf("%x", sha256.Sum256(destBytes))
+
+	// Update skills-lock.json
+	lock, err := loadSkillLock(lockPath)
+	if err != nil {
+		lock = &SkillLockFile{Version: 1, Skills: make(map[string]SkillLockEntry)}
+	}
+	lock.Skills[skillName] = SkillLockEntry{
+		Source:       source,
+		SourceType:   "github",
+		SkillPath:    fmt.Sprintf("skills/%s/SKILL.md", skillName),
+		ComputedHash: hash,
+	}
+	_ = saveSkillLock(lockPath, lock)
+
+	hasScripts := false
+	if fi, err := os.Stat(filepath.Join(targetDir, "scripts")); err == nil && fi.IsDir() {
+		hasScripts = true
+	}
+	hasResources := false
+	if fi, err := os.Stat(filepath.Join(targetDir, "resources")); err == nil && fi.IsDir() {
+		hasResources = true
+	}
+
+	return &SkillItem{
+		Name:         skillName,
+		Description:  fmDesc,
+		Scope:        scope,
+		Path:         targetDir,
+		SkillFile:    destSkillFile,
+		HasScripts:   hasScripts,
+		HasResources: hasResources,
+		Tags:         fmTags,
+	}, nil
+}
+
+// SearchSkills handles GET /api/skills/search?q=<query>&limit=<limit>.
+func (h *SkillsHandler) SearchSkills(w http.ResponseWriter, r *http.Request) {
+	if !h.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	limit := strings.TrimSpace(r.URL.Query().Get("limit"))
+	if limit == "" {
+		limit = "20"
+	}
+
+	qParam := q
+	if qParam == "" {
+		qParam = "agent"
+	}
+
+	baseURL := os.Getenv("SKILLS_SH_SEARCH_URL")
+	if baseURL == "" {
+		baseURL = "https://skills.sh/api/search"
+	}
+
+	reqURL := fmt.Sprintf("%s?q=%s&limit=%s", baseURL, url.QueryEscape(qParam), url.QueryEscape(limit))
+
+	var remoteSkills []RemoteSkillItem
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(reqURL)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		var res struct {
+			Query  string            `json:"query"`
+			Skills []RemoteSkillItem `json:"skills"`
+			Count  int               `json:"count"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil && len(res.Skills) > 0 {
+			remoteSkills = res.Skills
+		}
+		resp.Body.Close()
+	} else if resp != nil {
+		resp.Body.Close()
+	}
+
+	if len(remoteSkills) == 0 {
+		qLower := strings.ToLower(q)
+		for _, item := range curatedPopularSkills {
+			if qLower == "" || qLower == "agent" || strings.Contains(strings.ToLower(item.Name), qLower) || strings.Contains(strings.ToLower(item.Source), qLower) {
+				remoteSkills = append(remoteSkills, item)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SkillsSearchResponse{
+		Query:  q,
+		Skills: remoteSkills,
+		Count:  len(remoteSkills),
+	})
+}
+
+// InstallSkill handles POST /api/skills/install.
+func (h *SkillsHandler) InstallSkill(w http.ResponseWriter, r *http.Request) {
+	if !h.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req InstallSkillRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	source := strings.TrimSpace(req.Source)
+	if source == "" {
+		http.Error(w, `{"error":"Missing skill source"}`, http.StatusBadRequest)
+		return
+	}
+
+	skillName := strings.TrimSpace(req.SkillName)
+	if skillName != "" && !validSkillNameRegex.MatchString(skillName) {
+		http.Error(w, `{"error":"Invalid skill name"}`, http.StatusBadRequest)
+		return
+	}
+
+	installed, err := h.installSkillFromSource(source, skillName, req.Scope, req.Cwd)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(installed)
+}
+
+// DeleteSkill handles DELETE /api/skills?name=<name>&scope=<scope>&cwd=<cwd>.
+func (h *SkillsHandler) DeleteSkill(w http.ResponseWriter, r *http.Request) {
+	if !h.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	scope := strings.TrimSpace(r.URL.Query().Get("scope"))
+	cwd := strings.TrimSpace(r.URL.Query().Get("cwd"))
+
+	if name == "" || !validSkillNameRegex.MatchString(name) {
+		http.Error(w, `{"error":"Invalid skill name"}`, http.StatusBadRequest)
+		return
+	}
+
+	home, _ := os.UserHomeDir()
+	if cwd == "" {
+		cwd = home
+	}
+	cwd = filepath.Clean(cwd)
+
+	var targetParent string
+	var lockPath string
+	if scope == "global" {
+		if home == "" {
+			http.Error(w, `{"error":"Unable to locate home directory"}`, http.StatusInternalServerError)
+			return
+		}
+		targetParent = filepath.Join(home, ".agents", "skills")
+		lockPath = filepath.Join(home, "skills-lock.json")
+	} else if scope == "builtin" {
+		http.Error(w, `{"error":"Builtin skills cannot be deleted"}`, http.StatusForbidden)
+		return
+	} else {
+		targetParent = filepath.Join(cwd, ".agents", "skills")
+		lockPath = filepath.Join(cwd, "skills-lock.json")
+	}
+
+	targetDir := filepath.Join(targetParent, name)
+	cleanTarget := filepath.Clean(targetDir)
+	cleanParent := filepath.Clean(targetParent)
+
+	// Guard against path traversal
+	if filepath.Dir(cleanTarget) != cleanParent {
+		http.Error(w, `{"error":"Invalid skill path"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Guard against deleting builtin
+	if strings.Contains(cleanTarget, "builtin") {
+		http.Error(w, `{"error":"Builtin skills cannot be deleted"}`, http.StatusForbidden)
+		return
+	}
+
+	if err := os.RemoveAll(cleanTarget); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"Failed to remove skill directory: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	// Remove from skills-lock.json if present
+	if lock, err := loadSkillLock(lockPath); err == nil {
+		if _, exists := lock.Skills[name]; exists {
+			delete(lock.Skills, name)
+			_ = saveSkillLock(lockPath, lock)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":   true,
+		"name": name,
+	})
+}
+
+// SyncSkills handles POST /api/skills/sync.
+func (h *SkillsHandler) SyncSkills(w http.ResponseWriter, r *http.Request) {
+	if !h.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	cwd := strings.TrimSpace(r.URL.Query().Get("cwd"))
+	if r.Body != nil {
+		var req struct {
+			Cwd string `json:"cwd"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.Cwd != "" {
+			cwd = req.Cwd
+		}
+	}
+
+	home, _ := os.UserHomeDir()
+	if cwd == "" {
+		cwd = home
+	}
+	cwd = filepath.Clean(cwd)
+
+	lockPath := filepath.Join(cwd, "skills-lock.json")
+	lock, err := loadSkillLock(lockPath)
+	if err != nil || len(lock.Skills) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(SyncSkillsResponse{
+			Synced:   0,
+			Restored: []string{},
+		})
+		return
+	}
+
+	var restored []string
+	var errs []string
+	synced := 0
+
+	for skillName, entry := range lock.Skills {
+		synced++
+		skillDir := filepath.Join(cwd, ".agents", "skills", skillName)
+		skillFile := filepath.Join(skillDir, "SKILL.md")
+		skillFileLower := filepath.Join(skillDir, "skill.md")
+
+		missing := false
+		if _, err := os.Stat(skillFile); os.IsNotExist(err) {
+			if _, err2 := os.Stat(skillFileLower); os.IsNotExist(err2) {
+				missing = true
+			}
+		}
+
+		if missing {
+			_, err := h.installSkillFromSource(entry.Source, skillName, "workspace", cwd)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("%s: %v", skillName, err))
+			} else {
+				restored = append(restored, skillName)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SyncSkillsResponse{
+		Synced:   synced,
+		Restored: restored,
+		Errors:   errs,
 	})
 }
