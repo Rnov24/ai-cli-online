@@ -14,6 +14,10 @@ export interface SkillsPayload {
   isHome: boolean;
   skills: SkillItem[];
   count: number;
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
 }
 
 export interface SkillContentPayload {
@@ -44,6 +48,18 @@ export interface SkillsSearchResponse {
   query: string;
   skills: RemoteSkillItem[];
   count: number;
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+}
+
+export interface FetchSkillsOptions {
+  cwd?: string;
+  page?: number;
+  limit?: number;
+  scope?: 'all' | 'workspace' | 'global' | 'builtin';
+  q?: string;
 }
 
 export interface InstallSkillPayload {
@@ -59,8 +75,28 @@ export interface SyncSkillsResponse {
   errors?: string[];
 }
 
-export async function fetchSkills(token: string, cwd?: string): Promise<SkillsPayload> {
-  const url = cwd ? `/api/skills?cwd=${encodeURIComponent(cwd)}` : '/api/skills';
+export async function fetchSkills(
+  token: string,
+  cwdOrOptions?: string | FetchSkillsOptions
+): Promise<SkillsPayload> {
+  let url = '/api/skills';
+  const params = new URLSearchParams();
+
+  if (typeof cwdOrOptions === 'string') {
+    if (cwdOrOptions.trim()) params.set('cwd', cwdOrOptions.trim());
+  } else if (cwdOrOptions) {
+    if (cwdOrOptions.cwd?.trim()) params.set('cwd', cwdOrOptions.cwd.trim());
+    if (cwdOrOptions.page && cwdOrOptions.page > 0) params.set('page', String(cwdOrOptions.page));
+    if (cwdOrOptions.limit && cwdOrOptions.limit > 0) params.set('limit', String(cwdOrOptions.limit));
+    if (cwdOrOptions.scope && cwdOrOptions.scope !== 'all') params.set('scope', cwdOrOptions.scope);
+    if (cwdOrOptions.q?.trim()) params.set('q', cwdOrOptions.q.trim());
+  }
+
+  const qs = params.toString();
+  if (qs) {
+    url += `?${qs}`;
+  }
+
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -101,16 +137,24 @@ export async function scaffoldSkill(token: string, data: ScaffoldSkillPayload): 
 }
 
 
-export async function searchSkills(token: string, query: string, limit: number = 20): Promise<SkillsSearchResponse> {
-  const url = `/api/skills/search?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit.toString())}`;
-  const res = await fetch(url, {
+export async function searchSkills(
+  token: string,
+  query: string,
+  limit: number = 20,
+  page: number = 1
+): Promise<SkillsSearchResponse> {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set('q', query.trim());
+  params.set('limit', String(limit));
+  if (page > 1) params.set('page', String(page));
+
+  const res = await fetch(`/api/skills/search?${params.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `Failed to search skills: ${res.statusText}`);
+    throw new Error(`Failed to search skills: ${res.statusText}`);
   }
   return res.json();
 }

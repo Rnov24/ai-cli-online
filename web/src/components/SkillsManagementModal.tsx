@@ -23,6 +23,8 @@ import {
   HomeIcon,
   TrashIcon,
   SyncIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from './icons';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
@@ -44,6 +46,150 @@ const POPULAR_CATEGORIES = [
   'DevOps',
 ];
 
+interface PaginationToolbarProps {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  onPageChange: (newPage: number) => void;
+  onPageSizeChange: (newPageSize: number) => void;
+}
+
+function PaginationToolbar({
+  page,
+  pageSize,
+  total,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
+}: PaginationToolbarProps) {
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = total === 0 ? 0 : Math.min(total, page * pageSize);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '8px 16px',
+        backgroundColor: 'var(--bg-secondary)',
+        borderTop: '1px solid var(--border)',
+        minHeight: '44px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            color: 'var(--text-secondary)',
+            fontWeight: 500,
+          }}
+        >
+          {total === 0 ? 'SHOWING 0 OF 0 SKILLS' : `SHOWING ${start}-${end} OF ${total} SKILLS`}
+        </span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>|</span>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            color: 'var(--text-secondary)',
+            fontWeight: 500,
+          }}
+        >
+          PAGE {page} OF {totalPages}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <select
+          value={pageSize}
+          onChange={(e) => {
+            onPageSizeChange(Number(e.target.value));
+          }}
+          aria-label="Items per page"
+          style={{
+            padding: '4px 8px',
+            height: '32px',
+            backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <option value={10}>10 / page</option>
+          <option value={15}>15 / page</option>
+          <option value={25}>25 / page</option>
+          <option value={50}>50 / page</option>
+        </select>
+
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          aria-label="Previous page"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 10px',
+            height: '32px',
+            minHeight: '32px',
+            backgroundColor: page <= 1 ? 'transparent' : 'var(--bg-primary)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            color: page <= 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            fontWeight: 700,
+            cursor: page <= 1 ? 'not-allowed' : 'pointer',
+            opacity: page <= 1 ? 0.5 : 1,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <ChevronLeftIcon size={12} />
+          <span>PREV</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          aria-label="Next page"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 10px',
+            height: '32px',
+            minHeight: '32px',
+            backgroundColor: page >= totalPages ? 'transparent' : 'var(--bg-primary)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            color: page >= totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            fontWeight: 700,
+            cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+            opacity: page >= totalPages ? 0.5 : 1,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <span>NEXT</span>
+          <ChevronRightIcon size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SkillsManagementModal({
   isOpen,
   onClose,
@@ -57,6 +203,12 @@ export function SkillsManagementModal({
   const [isHome, setIsHome] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [installedPage, setInstalledPage] = useState<number>(1);
+  const [installedPageSize, setInstalledPageSize] = useState<number>(15);
+
+  const [explorePage, setExplorePage] = useState<number>(1);
+  const [explorePageSize, setExplorePageSize] = useState<number>(10);
 
   const [activeScope, setActiveScope] = useState<'all' | 'workspace' | 'global' | 'builtin'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -121,16 +273,7 @@ export function SkillsManagementModal({
     return () => window.removeEventListener('agy:open-skills-modal', handleOpenEvent);
   }, []);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
+
 
   // Load installed skills
   const loadSkills = () => {
@@ -202,6 +345,80 @@ export function SkillsManagementModal({
       return true;
     });
   }, [skills, activeScope, searchQuery]);
+
+  // Reset pagination on filter / query changes
+  useEffect(() => {
+    setInstalledPage(1);
+  }, [activeScope, searchQuery]);
+
+  useEffect(() => {
+    setExplorePage(1);
+  }, [exploreQuery]);
+
+  // Clamp pagination if total items shrink
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredSkills.length / installedPageSize));
+    if (installedPage > maxPage) {
+      setInstalledPage(maxPage);
+    }
+  }, [filteredSkills.length, installedPageSize, installedPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(remoteSkills.length / explorePageSize));
+    if (explorePage > maxPage) {
+      setExplorePage(maxPage);
+    }
+  }, [remoteSkills.length, explorePageSize, explorePage]);
+
+  const totalInstalled = filteredSkills.length;
+  const totalInstalledPages = Math.max(1, Math.ceil(totalInstalled / installedPageSize));
+  const paginatedSkills = useMemo(() => {
+    const start = (installedPage - 1) * installedPageSize;
+    return filteredSkills.slice(start, start + installedPageSize);
+  }, [filteredSkills, installedPage, installedPageSize]);
+
+  const totalExplore = remoteSkills.length;
+  const totalExplorePages = Math.max(1, Math.ceil(totalExplore / explorePageSize));
+  const paginatedRemoteSkills = useMemo(() => {
+    const start = (explorePage - 1) * explorePageSize;
+    return remoteSkills.slice(start, start + explorePageSize);
+  }, [remoteSkills, explorePage, explorePageSize]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+      if (!isInput) {
+        if (e.key === '[') {
+          e.preventDefault();
+          if (activeView === 'installed') {
+            setInstalledPage((p) => Math.max(1, p - 1));
+          } else {
+            setExplorePage((p) => Math.max(1, p - 1));
+          }
+        } else if (e.key === ']') {
+          e.preventDefault();
+          if (activeView === 'installed') {
+            setInstalledPage((p) => Math.min(totalInstalledPages, p + 1));
+          } else {
+            setExplorePage((p) => Math.min(totalExplorePages, p + 1));
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose, activeView, totalInstalledPages, totalExplorePages]);
 
   const handleCopyCmd = (skillName: string) => {
     const cmd = `/${skillName}`;
@@ -857,7 +1074,7 @@ export function SkillsManagementModal({
                     No skills matching the selected criteria.
                   </div>
                 ) : (
-                  filteredSkills.map((skill) => {
+                  paginatedSkills.map((skill) => {
                     const isWorkspace = skill.scope === 'workspace';
                     const isGlobal = skill.scope === 'global';
 
@@ -1182,6 +1399,18 @@ export function SkillsManagementModal({
                 </div>
               )}
             </div>
+
+            <PaginationToolbar
+              page={installedPage}
+              pageSize={installedPageSize}
+              total={totalInstalled}
+              totalPages={totalInstalledPages}
+              onPageChange={setInstalledPage}
+              onPageSizeChange={(newSize) => {
+                setInstalledPageSize(newSize);
+                setInstalledPage(1);
+              }}
+            />
           </>
         )}
 
@@ -1385,7 +1614,7 @@ export function SkillsManagementModal({
                   No skills found on skills.sh for &ldquo;{exploreQuery}&rdquo;.
                 </div>
               ) : (
-                remoteSkills.map((remote) => {
+                paginatedRemoteSkills.map((remote) => {
                   const isInstalled = skills.some((s) => s.name.toLowerCase() === (remote.skillId || remote.name).toLowerCase());
                   const isInstalling = installingSkillId === remote.id;
 
@@ -1497,6 +1726,18 @@ export function SkillsManagementModal({
                 })
               )}
             </div>
+
+            <PaginationToolbar
+              page={explorePage}
+              pageSize={explorePageSize}
+              total={totalExplore}
+              totalPages={totalExplorePages}
+              onPageChange={setExplorePage}
+              onPageSizeChange={(newSize) => {
+                setExplorePageSize(newSize);
+                setExplorePage(1);
+              }}
+            />
           </div>
         )}
       </div>
