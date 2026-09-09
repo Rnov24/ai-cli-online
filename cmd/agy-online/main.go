@@ -22,13 +22,14 @@ import (
 	"github.com/huacheng/agy-online/internal/pid"
 	"github.com/huacheng/agy-online/internal/server"
 	"github.com/huacheng/agy-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/tunnel"
 )
 
 const AppVersion = "3.1.0-go"
 
 func main() {
 	if len(os.Args) < 2 {
-		runServer(false, 0)
+		runServer(false, 0, false)
 		return
 	}
 
@@ -40,8 +41,18 @@ func main() {
 		fs.BoolVar(daemon, "daemon", false, "Run in background daemon mode")
 		port := fs.Int("p", 0, "Server port")
 		fs.IntVar(port, "port", 0, "Server port")
+		autoTunnel := fs.Bool("t", false, "Auto-start Cloudflare Tunnel")
+		fs.BoolVar(autoTunnel, "tunnel", false, "Auto-start Cloudflare Tunnel")
 		_ = fs.Parse(os.Args[2:])
-		runStart(*daemon, *port)
+		runStart(*daemon, *port, *autoTunnel)
+
+	case "tunnel":
+		fs := flag.NewFlagSet("tunnel", flag.ExitOnError)
+		port := fs.Int("p", 0, "Server port to tunnel")
+		fs.IntVar(port, "port", 0, "Server port to tunnel")
+		token := fs.String("token", "", "Cloudflare Zero Trust tunnel token")
+		_ = fs.Parse(os.Args[2:])
+		runTunnel(fs.Args(), *port, *token)
 
 	case "stop":
 		runStop()
@@ -50,10 +61,12 @@ func main() {
 		fs := flag.NewFlagSet("restart", flag.ExitOnError)
 		port := fs.Int("p", 0, "Server port")
 		fs.IntVar(port, "port", 0, "Server port")
+		autoTunnel := fs.Bool("t", false, "Auto-start Cloudflare Tunnel")
+		fs.BoolVar(autoTunnel, "tunnel", false, "Auto-start Cloudflare Tunnel")
 		_ = fs.Parse(os.Args[2:])
 		runStop()
 		time.Sleep(1 * time.Second)
-		runStart(true, *port)
+		runStart(true, *port, *autoTunnel)
 
 	case "status":
 		runStatus()
@@ -72,7 +85,7 @@ func main() {
 
 	default:
 		// Unknown subcommand, fallback to normal start
-		runServer(false, 0)
+		runServer(false, 0, false)
 	}
 }
 
@@ -83,22 +96,24 @@ Usage:
   ai-cli-online [command] [options]
 
 Commands:
-  start [-d] [-p port]   Start AGY Online server (-d for background daemon)
-  status                 Show running status, PID, memory, and services
-  stop                   Stop running server daemon
-  restart [-p port]      Restart running server daemon
-  install-boot           Configure auto-start on system boot (Windows Startup / Termux)
-  uninstall-boot         Remove auto-start configuration
-  version                Print version
+  start [-d] [-t] [-p port] Start AGY Online server (-d daemon, -t auto-tunnel)
+  tunnel [status|start|stop] Manage Cloudflare Remote Tunnel
+  status                    Show running status, PID, memory, and services
+  stop                      Stop running server daemon
+  restart [-p port]         Restart running server daemon
+  install-boot              Configure auto-start on system boot (Windows Startup / Termux)
+  uninstall-boot            Remove auto-start configuration
+  version                   Print version
 
 Options:
-  -d, --daemon           Run in background daemon mode
-  -p, --port <number>    Set server port (default: 3001)
-  -h, --help             Show help
+  -d, --daemon              Run in background daemon mode
+  -t, --tunnel              Automatically start Cloudflare Quick Tunnel on startup
+  -p, --port <number>       Set server port (default: 3001)
+  -h, --help                Show help
 `, AppVersion)
 }
 
-func runStart(daemon bool, portOverride int) {
+func runStart(daemon bool, portOverride int, autoTunnel bool) {
 	if daemon {
 		// Check if already running
 		if existing, err := pid.ReadPid("server"); err == nil && existing != nil {
@@ -125,6 +140,9 @@ func runStart(daemon bool, portOverride int) {
 		if portOverride > 0 {
 			args = append(args, "-p", strconv.Itoa(portOverride))
 		}
+		if autoTunnel {
+			args = append(args, "--tunnel")
+		}
 
 		cmd := exec.Command(self, args...)
 		cmd.Stdout = outFile
@@ -142,10 +160,10 @@ func runStart(daemon bool, portOverride int) {
 		return
 	}
 
-	runServer(true, portOverride)
+	runServer(true, portOverride, autoTunnel)
 }
 
-func runServer(registerPid bool, portOverride int) {
+func runServer(registerPid bool, portOverride int, autoTunnel bool) {
 	cfg := config.LoadConfig()
 	if portOverride > 0 {
 		cfg.Port = portOverride
@@ -197,8 +215,154 @@ func runServer(registerPid bool, portOverride int) {
 		os.Exit(0)
 	}()
 
+	if autoTunnel {
+		go func() {
+			time.Sleep(1 * time.Second)
+			log.Println("[tunnel] Starting Cloudflare Quick Tunnel...")
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			if !srv.TunnelManager().Status().Installed {
+				log.Println("[tunnel] cloudflared binary not found; auto-installing...")
+				if err := srv.TunnelManager().Install(ctx); err != nil {
+					log.Printf("[tunnel] Auto-installation failed: %v", err)
+					return
+				}
+				log.Println("[tunnel] cloudflared installed successfully.")
+			}
+			st, err := srv.TunnelManager().Start(ctx, "quick", "", cfg.Port)
+			if err != nil {
+				log.Printf("[tunnel] Failed to start tunnel: %v", err)
+			} else if st.Url != "" {
+				log.Printf("[tunnel] Cloudflare Tunnel established: %s", st.Url)
+				fmt.Printf("\n>>> Cloudflare Public Ingress URL: %s <<<\n\n", st.Url)
+			}
+		}()
+	}
+
 	if err := srv.Start(); err != nil && err != context.Canceled {
 		log.Fatalf("[server] Fatal error: %v", err)
+	}
+}
+
+func runTunnel(args []string, portOverride int, token string) {
+	action := "status"
+	if len(args) > 0 {
+		action = args[0]
+	}
+
+	mgr := tunnel.NewManager()
+
+	switch action {
+	case "help", "--help", "-h":
+		fmt.Println("Usage: agy-online tunnel [status|start|stop|install] [options]")
+		fmt.Println("\nCommands:")
+		fmt.Println("  status            Show current Cloudflare Tunnel state and URL")
+		fmt.Println("  start             Launch Cloudflare Tunnel (Quick or Named mode)")
+		fmt.Println("  stop              Terminate running Cloudflare Tunnel process")
+		fmt.Println("  install           Download and install standalone cloudflared binary")
+		fmt.Println("\nOptions:")
+		fmt.Println("  --quick           Force ephemeral quick tunnel mode (default)")
+		fmt.Println("  --token <string>  Cloudflare Zero Trust named tunnel token")
+		fmt.Println("  --port <int>      Target local port to proxy (default: 3001)")
+		return
+
+	case "install":
+		fmt.Println("Downloading and installing cloudflared...")
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		if err := mgr.Install(ctx); err != nil {
+			log.Fatalf("Installation failed: %v", err)
+		}
+		fmt.Println("✔ cloudflared installed successfully!")
+		st := mgr.Status()
+		fmt.Printf("Binary path: %s\n", st.BinPath)
+		if st.Version != "" {
+			fmt.Printf("Version:     %s\n", st.Version)
+		}
+
+	case "start":
+		if !mgr.Status().Installed {
+			fmt.Println("cloudflared is not installed. Auto-installing now...")
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			defer cancel()
+			if err := mgr.Install(ctx); err != nil {
+				log.Fatalf("Auto-installation failed: %v", err)
+			}
+			fmt.Println("✔ Installed cloudflared.")
+		}
+
+		port := portOverride
+		if port <= 0 {
+			cfg := config.LoadConfig()
+			port = cfg.Port
+		}
+		if port <= 0 {
+			port = 3001
+		}
+
+		mode := "quick"
+		if token != "" {
+			mode = "token"
+		}
+
+		fmt.Printf("Starting Cloudflare Tunnel in %s mode (target: http://127.0.0.1:%d)...\n", mode, port)
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+
+		st, err := mgr.Start(ctx, mode, token, port)
+		if err != nil {
+			log.Fatalf("Failed to start tunnel: %v", err)
+		}
+
+		if st.Url != "" {
+			fmt.Println("\n==================================================")
+			fmt.Println("  Cloudflare Tunnel ACTIVE")
+			fmt.Println("==================================================")
+			fmt.Printf("  Public URL:  %s\n", st.Url)
+			fmt.Printf("  Target Port: %d\n", port)
+			fmt.Printf("  PID:         %d\n", st.Pid)
+			fmt.Println("==================================================")
+		} else {
+			fmt.Printf("Tunnel process spawned (PID: %d). Establishing connection...\n", st.Pid)
+		}
+
+		// Keep running in foreground until interrupt
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		<-sigChan
+		fmt.Println("\nStopping tunnel...")
+		_ = mgr.Stop()
+		fmt.Println("✔ Tunnel stopped cleanly.")
+
+	case "stop":
+		if err := mgr.Stop(); err != nil {
+			log.Fatalf("Failed to stop tunnel: %v", err)
+		}
+		fmt.Println("✔ Cloudflare Tunnel stopped.")
+
+	case "status":
+		fallthrough
+	default:
+		st := mgr.Status()
+		fmt.Println("==================================================")
+		fmt.Println("  Cloudflare Tunnel Status")
+		fmt.Println("==================================================")
+		fmt.Printf("  Installed: %v\n", st.Installed)
+		if st.Installed {
+			fmt.Printf("  Binary:    %s\n", st.BinPath)
+			if st.Version != "" {
+				fmt.Printf("  Version:   %s\n", st.Version)
+			}
+		}
+		fmt.Printf("  Running:   %v\n", st.Running)
+		if st.Running {
+			fmt.Printf("  Mode:      %s\n", st.Mode)
+			if st.Url != "" {
+				fmt.Printf("  URL:       %s\n", st.Url)
+			}
+			fmt.Printf("  PID:       %d\n", st.Pid)
+		}
+		fmt.Println("==================================================")
 	}
 }
 

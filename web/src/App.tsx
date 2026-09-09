@@ -12,6 +12,7 @@ import { ShortcutsModal, HelpGuideTab } from './components/ShortcutsModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AutoTaskModal } from './components/AutoTaskModal';
 import { AccountSwitcherModal } from './components/AccountSwitcherModal';
+import { TunnelModal } from './components/TunnelModal';
 import { fetchSystemStatus } from './api/system';
 import { fetchCwd } from './api/files';
 import { useAdaptivePolling } from './hooks/useAdaptivePolling';
@@ -46,12 +47,21 @@ function App() {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [autoTaskModalOpen, setAutoTaskModalOpen] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
+  const [tunnelModalOpen, setTunnelModalOpen] = useState(false);
   const [autoTaskModule, setAutoTaskModule] = useState('');
   const [helpGuideTab, setHelpGuideTab] = useState<HelpGuideTab>('quickstart');
 
   const handleOpenHelp = useCallback((tab: HelpGuideTab = 'quickstart') => {
     setHelpGuideTab(tab);
     setShortcutsModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const onOpenTunnelEvent = () => {
+      setTunnelModalOpen(true);
+    };
+    window.addEventListener('agy:open-tunnel-modal', onOpenTunnelEvent);
+    return () => window.removeEventListener('agy:open-tunnel-modal', onOpenTunnelEvent);
   }, []);
 
   useEffect(() => {
@@ -445,6 +455,13 @@ function App() {
         token={token || ''}
         initialTaskModule={autoTaskModule}
         workspaceDir={cwd || undefined}
+      />
+
+      {/* Cloudflare Tunnel Remote Ingress Modal (🌐) */}
+      <TunnelModal
+        isOpen={tunnelModalOpen}
+        onClose={() => setTunnelModalOpen(false)}
+        token={token || ''}
       />
     </div>
   );

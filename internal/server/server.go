@@ -16,14 +16,16 @@ import (
 	"github.com/huacheng/agy-online/internal/db"
 	"github.com/huacheng/agy-online/internal/idle"
 	"github.com/huacheng/agy-online/internal/routes"
+	"github.com/huacheng/agy-online/internal/tunnel"
 	"github.com/huacheng/agy-online/internal/ws"
 )
 
 type Server struct {
-	cfg      *config.Config
-	db       *db.DB
-	staticFS fs.FS
-	httpSrv  *http.Server
+	cfg       *config.Config
+	db        *db.DB
+	staticFS  fs.FS
+	httpSrv   *http.Server
+	tunnelMgr *tunnel.Manager
 }
 
 func NewServer(cfg *config.Config, database *db.DB, staticFS fs.FS) *Server {
@@ -53,6 +55,8 @@ func (s *Server) Start() error {
 	personaH := routes.NewPersonasHandler(auth, s.db)
 	sysH := routes.NewSystemHandler(auth)
 	agyProfH := routes.NewAgyProfilesHandler(auth)
+	s.tunnelMgr = tunnel.NewManager()
+	tunnelH := routes.NewTunnelHandler(auth, s.tunnelMgr, s.cfg.Port)
 	hub := ws.InitHub(s.cfg)
 
 	// Cleanly mark any orphaned active turns as interrupted on server start
@@ -129,6 +133,12 @@ func (s *Server) Start() error {
 	mux.HandleFunc("GET /api/system/status", sysH.HandleSystemStatus)
 	mux.HandleFunc("GET /api/system/processes", sysH.HandleProcessList)
 	mux.HandleFunc("GET /api/system/logs", sysH.HandleSystemLogs)
+
+	// Cloudflare Tunneling
+	mux.HandleFunc("GET /api/tunnel/status", tunnelH.GetStatus)
+	mux.HandleFunc("POST /api/tunnel/start", tunnelH.Start)
+	mux.HandleFunc("POST /api/tunnel/stop", tunnelH.Stop)
+	mux.HandleFunc("POST /api/tunnel/install", tunnelH.Install)
 
 	// Auth
 	mux.HandleFunc("POST /api/auth/login", auth.HandleLogin)
@@ -269,10 +279,17 @@ type ioReadSeeker interface {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.tunnelMgr != nil {
+		_ = s.tunnelMgr.Stop()
+	}
 	if s.httpSrv != nil {
 		return s.httpSrv.Shutdown(ctx)
 	}
 	return nil
+}
+
+func (s *Server) TunnelManager() *tunnel.Manager {
+	return s.tunnelMgr
 }
 
 func (s *Server) seedDefaultWorkspaces() {

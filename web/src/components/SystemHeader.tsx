@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { useStore } from '../store';
 import type { SystemStatus } from 'agy-online-shared';
 import { WorkspaceSelector } from './WorkspaceSelector';
-import { MenuIcon, SearchIcon, SettingsIcon } from './icons';
+import { MenuIcon, SearchIcon, SettingsIcon, GlobeIcon } from './icons';
 
 interface SystemHeaderProps {
   systemStatus: SystemStatus | null;
@@ -278,6 +278,28 @@ export const SystemHeader = React.memo(function SystemHeader({
             {latency !== null ? `${latency}ms` : '--'}
           </span>
         </div>
+
+        {/* Cloudflare Remote Ingress Tunnel Modal Trigger */}
+        <button
+          className="mecha-btn"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('agy:open-tunnel-modal'));
+          }}
+          title="Cloudflare Remote Ingress Tunnel (Access from Mobile/Outside Networks)"
+          aria-label="Open cloudflare remote ingress tunnel"
+          style={{
+            padding: '2px 7px',
+            fontSize: '10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: 'var(--accent-cyan-bright)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          <GlobeIcon size={11} />
+          <span className="desktop-only" style={{ fontSize: '9px', fontWeight: 600 }}>TUNNEL</span>
+        </button>
 
         {/* Interactive Help & Feature Guide Trigger */}
         <button

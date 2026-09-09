@@ -14,6 +14,7 @@ import {
   TabsIcon,
   BoltIcon,
   RobotIcon,
+  GlobeIcon,
 } from './icons';
 
 interface NavigationRailProps {
@@ -420,6 +421,34 @@ export function NavigationRail({
         >
           <RobotIcon size={14} />
           {isExpanded && <span style={{ fontSize: '11px' }}>PERSONAS</span>}
+        </button>
+
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('agy:open-tunnel-modal'));
+            if (mobileOpen) onCloseMobile();
+          }}
+          title="Cloudflare Remote Ingress Tunnel"
+          aria-label="Open cloudflare remote ingress tunnel"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: mobileOpen ? '10px 14px' : (isExpanded ? '6px 10px' : '8px 0'),
+            minHeight: mobileOpen ? '42px' : 'auto',
+            justifyContent: isExpanded ? 'flex-start' : 'center',
+            borderRadius: '2px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--accent-cyan-bright)',
+            cursor: 'pointer',
+            marginBottom: '2px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <GlobeIcon size={14} />
+          {isExpanded && <span style={{ fontSize: '11px' }}>TUNNEL</span>}
         </button>
 
         <button

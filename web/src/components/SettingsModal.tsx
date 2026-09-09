@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import type { SystemStatus } from 'agy-online-shared';
-import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon, MinusIcon, PlusIcon, UserIcon } from './icons';
+import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon, MinusIcon, PlusIcon, UserIcon, GlobeIcon } from './icons';
 import { fetchAgyProfiles } from '../api/agyProfiles';
 
 interface SettingsModalProps {
@@ -239,6 +239,49 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
               </div>
             </div>
           )}
+
+          {/* Cloudflare Tunnel Remote Ingress */}
+          <div style={{
+            padding: '12px',
+            backgroundColor: 'var(--bg-tertiary)',
+            border: '1px solid var(--border)',
+            borderRadius: '3px',
+          }}>
+            <div style={{
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              color: 'var(--accent-cyan-bright)',
+              marginBottom: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+              <GlobeIcon size={12} />
+              CLOUDFLARE TUNNEL &amp; REMOTE INGRESS //
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                  Encrypted Remote Edge Ingress
+                </div>
+                <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                  Connect from mobile or outside networks without port forwarding or public IP addresses.
+                </div>
+              </div>
+              <button
+                className="mecha-btn"
+                onClick={() => {
+                  onClose();
+                  window.dispatchEvent(new CustomEvent('agy:open-tunnel-modal'));
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-cyan-bright)' }}
+              >
+                <GlobeIcon size={12} /> CONFIGURE TUNNEL →
+              </button>
+            </div>
+          </div>
 
           {/* Authentication & Session Reset */}
           <div style={{

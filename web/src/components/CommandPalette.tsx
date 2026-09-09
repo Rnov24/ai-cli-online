@@ -409,6 +409,17 @@ export const CommandPalette = React.memo(function CommandPalette({
       },
     },
     {
+      id: 'open-tunnel',
+      category: 'SYSTEM',
+      title: 'Cloudflare Tunnel: Remote Edge Ingress (/tunnel)',
+      desc: 'Connect remotely from mobile devices or external networks via cloudflared',
+      shortcut: '/tunnel',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-tunnel-modal'));
+        onClose();
+      },
+    },
+    {
       id: 'open-settings',
       category: 'SYSTEM',
       title: 'System Settings',

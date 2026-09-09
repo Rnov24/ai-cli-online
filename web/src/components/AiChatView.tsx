@@ -117,6 +117,7 @@ const SLASH_COMMANDS: SlashCommandItem[] = [
   { cmd: '/doctor', desc: 'Run system diagnostics and health check', category: 'assistant' },
   { cmd: '/diagnostics', desc: 'Open System Health & Process Supervision Modal', category: 'assistant' },
   { cmd: '/subagents', desc: 'Seek, inspect, and monitor active and past subagents', category: 'assistant' },
+  { cmd: '/tunnel', desc: 'Manage Cloudflare Tunnel remote ingress and public URL', category: 'assistant' },
   { cmd: '/browser', desc: 'Browser automation and web search', category: 'assistant' },
   { cmd: '/agents', desc: 'List and switch available agents & personas', category: 'assistant' },
 
@@ -799,6 +800,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
     if (text === '/subagents') {
       setShowSubagentsModal(true);
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    if (text === '/tunnel') {
+      window.dispatchEvent(new CustomEvent('agy:open-tunnel-modal'));
       setInputText('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
       return;
@@ -1647,7 +1655,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             {(['compact', 'verbose', 'minimal'] as VerbosityMode[]).map((mode) => (
               <button
                 key={mode}
-                data-testid={`verbosity-${mode}`}
+                data-testid={mode === 'compact' ? 'mode-worklog' : mode === 'verbose' ? 'mode-transparent' : 'mode-final'}
                 aria-label={`verbosity-mode-${mode}`}
                 onClick={() => handleVerbosityChange(mode)}
                 title={`Switch chat verbosity mode to ${mode}`}
@@ -1666,7 +1674,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                 }}
               >
                 <span>{mode === 'compact' ? <ClipboardIcon size={11} /> : mode === 'verbose' ? <BoltIcon size={11} /> : <TargetIcon size={11} />}</span>
-                <span className="mobile-hide">{mode.toUpperCase()}</span>
+                <span className="mobile-hide">{mode === 'compact' ? 'LOG' : mode === 'verbose' ? 'STREAM' : 'FINAL'}</span>
               </button>
             ))}
           </div>
