@@ -366,6 +366,9 @@ function App() {
           onOpenHelp={() => handleOpenHelp('quickstart')}
         />
 
+        {/* Primary Left Navigation & Session Management Sidebar */}
+        <SessionSidebar />
+
         {/* Central Command Stream / Terminal Split Container */}
         <main style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <SplitPaneContainer />
@@ -385,9 +388,6 @@ function App() {
           totalTokens={sessionStats.totalTokens}
           onExecuteCommand={() => {}}
         />
-
-        {/* Legacy tabs & tmux session management sidebar (if toggled) */}
-        <SessionSidebar />
       </div>
 
       {/* Tab bar at bottom */}
