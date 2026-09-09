@@ -51,6 +51,7 @@ func (s *Server) Start() error {
 	plugH := routes.NewPluginsHandler(auth)
 	personaH := routes.NewPersonasHandler(auth, s.db)
 	sysH := routes.NewSystemHandler(auth)
+	agyProfH := routes.NewAgyProfilesHandler(auth)
 	hub := ws.InitHub(s.cfg)
 
 	// Cleanly mark any orphaned active turns as interrupted on server start
@@ -76,6 +77,17 @@ func (s *Server) Start() error {
 	mux.HandleFunc("GET /api/agy/conversations", convH.ListConversations)
 	mux.HandleFunc("GET /api/agy/conversations/{id}/messages", convH.GetConversationMessages)
 	mux.HandleFunc("DELETE /api/agy/conversations/{id}", convH.DeleteConversation)
+
+	// AGY Google Auth Account Profiles
+	mux.HandleFunc("GET /api/agy/profiles", agyProfH.ListProfiles)
+	mux.HandleFunc("POST /api/agy/profiles/switch", agyProfH.SwitchProfile)
+	mux.HandleFunc("POST /api/agy/profiles/save", agyProfH.SaveProfile)
+	mux.HandleFunc("POST /api/agy/profiles/import", agyProfH.ImportProfile)
+	mux.HandleFunc("POST /api/agy/profiles/rename", agyProfH.RenameProfile)
+	mux.HandleFunc("DELETE /api/agy/profiles/{name}", agyProfH.DeleteProfile)
+	mux.HandleFunc("POST /api/agy/profiles/auth/start", agyProfH.StartAuth)
+	mux.HandleFunc("POST /api/agy/profiles/auth/submit", agyProfH.SubmitAuthCode)
+	mux.HandleFunc("POST /api/agy/profiles/auth/cancel", agyProfH.CancelAuth)
 
 	// Skills Management
 	mux.HandleFunc("GET /api/skills", skillsH.ListSkills)

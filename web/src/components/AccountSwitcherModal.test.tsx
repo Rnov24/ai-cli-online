@@ -2,12 +2,25 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { AccountSwitcherModal } from './AccountSwitcherModal';
 import * as authApi from '../api/auth';
+import * as agyApi from '../api/agyProfiles';
 import * as accountStorage from '../utils/accountStorage';
 import { useStore } from '../store';
 
 vi.mock('../api/auth', () => ({
   login: vi.fn(),
   verify: vi.fn(),
+}));
+
+vi.mock('../api/agyProfiles', () => ({
+  fetchAgyProfiles: vi.fn(),
+  switchAgyProfile: vi.fn(),
+  saveCurrentAgyProfile: vi.fn(),
+  importAgyProfile: vi.fn(),
+  renameAgyProfile: vi.fn(),
+  deleteAgyProfile: vi.fn(),
+  startAgyAuth: vi.fn(),
+  submitAgyAuthCode: vi.fn(),
+  cancelAgyAuth: vi.fn(),
 }));
 
 describe('AccountSwitcherModal', () => {
@@ -28,6 +41,27 @@ describe('AccountSwitcherModal', () => {
       ok: true,
       session_prefix: 'ai-cli-online-',
     });
+
+    vi.mocked(agyApi.fetchAgyProfiles).mockResolvedValue({
+      current: 'default',
+      profiles: [
+        { name: 'default', isActive: true, updatedAt: 1700000000000, hasToken: true },
+        { name: 'work-corp', isActive: false, updatedAt: 1700000100000, hasToken: true },
+      ],
+    });
+
+    vi.mocked(agyApi.switchAgyProfile).mockResolvedValue({ ok: true, current: 'work-corp' });
+    vi.mocked(agyApi.saveCurrentAgyProfile).mockResolvedValue({ ok: true, current: 'personal' });
+    vi.mocked(agyApi.renameAgyProfile).mockResolvedValue({ ok: true });
+    vi.mocked(agyApi.deleteAgyProfile).mockResolvedValue({ ok: true });
+    vi.mocked(agyApi.startAgyAuth).mockResolvedValue({
+      flowId: 'flow-test-123',
+      profileName: 'new-account',
+      authUrl: 'https://accounts.google.com/o/oauth2/auth?test=1',
+      manualTerminalCommand: 'bash scripts/agy-profile.sh add new-account',
+    });
+    vi.mocked(agyApi.submitAgyAuthCode).mockResolvedValue({ ok: true, current: 'new-account' });
+    vi.mocked(agyApi.importAgyProfile).mockResolvedValue({ ok: true, current: 'pasted-profile' });
   });
 
   afterEach(() => {
@@ -39,92 +73,109 @@ describe('AccountSwitcherModal', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders modal and saved accounts when isOpen is true', () => {
-    accountStorage.saveAccount('current-token-123', 'Active Profile');
-    accountStorage.saveAccount('other-token-456', 'Work VPS');
-
+  it('renders Google Antigravity header and active profile when isOpen is true', async () => {
     render(<AccountSwitcherModal isOpen={true} onClose={mockOnClose} />);
 
-    expect(screen.getByText('SWITCH ACCOUNT / PROFILE')).toBeDefined();
-    expect(screen.getByText('Active Profile')).toBeDefined();
-    expect(screen.getByText('Work VPS')).toBeDefined();
-    expect(screen.getByText('ACTIVE')).toBeDefined();
+    expect(screen.getByText(/GOOGLE ANTIGRAVITY \(AGY\) ACCOUNTS \/\//i)).toBeDefined();
+    expect(screen.getByText(/◈ ACTIVE GOOGLE IDENTITY/i)).toBeDefined();
+
+    await waitFor(() => {
+      expect(screen.getByText('work-corp')).toBeDefined();
+      expect(screen.getByText('ACTIVE')).toBeDefined();
+    });
   });
 
-  it('switches to selected account', async () => {
-    accountStorage.saveAccount('current-token-123', 'Active Profile');
-    accountStorage.saveAccount('other-token-456', 'Work VPS');
-
+  it('switches Google Antigravity profile when clicking SWITCH', async () => {
     render(<AccountSwitcherModal isOpen={true} onClose={mockOnClose} />);
 
-    const switchBtn = screen.getByRole('button', { name: 'Switch' });
+    await waitFor(() => {
+      expect(screen.getByText('work-corp')).toBeDefined();
+    });
+
+    const switchBtn = screen.getByRole('button', { name: 'SWITCH' });
     fireEvent.click(switchBtn);
 
     await waitFor(() => {
-      expect(authApi.login).toHaveBeenCalledWith('other-token-456');
-      expect(mockSetToken).toHaveBeenCalledWith('other-token-456');
-      expect(mockOnClose).toHaveBeenCalled();
+      expect(agyApi.switchAgyProfile).toHaveBeenCalledWith('work-corp', 'current-token-123');
     });
   });
 
-  it('allows renaming an account', async () => {
-    accountStorage.saveAccount('test-token', 'Old Name');
-
+  it('allows quick saving the current active account as a named profile', async () => {
     render(<AccountSwitcherModal isOpen={true} onClose={mockOnClose} />);
-
-    const renameBtn = screen.getByLabelText('Rename Old Name');
-    fireEvent.click(renameBtn);
-
-    const input = screen.getByDisplayValue('Old Name');
-    fireEvent.change(input, { target: { value: 'New Custom Name' } });
-    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
     await waitFor(() => {
-      expect(screen.getByText('New Custom Name')).toBeDefined();
+      expect(screen.getByText('work-corp')).toBeDefined();
     });
-  });
 
-  it('allows removing an account', async () => {
-    accountStorage.saveAccount('to-delete', 'Temporary Account');
+    const openSaveBtn = screen.getByRole('button', { name: /Save Current Active Account as New Named Profile/i });
+    fireEvent.click(openSaveBtn);
 
-    render(<AccountSwitcherModal isOpen={true} onClose={mockOnClose} />);
+    const input = screen.getByPlaceholderText('e.g. personal, work-laptop');
+    fireEvent.change(input, { target: { value: 'personal' } });
 
-    expect(screen.getByText('Temporary Account')).toBeDefined();
-
-    const deleteBtn = screen.getByLabelText('Remove Temporary Account');
-    fireEvent.click(deleteBtn);
+    const saveBtn = screen.getByRole('button', { name: 'Save' });
+    fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(screen.queryByText('Temporary Account')).toBeNull();
+      expect(agyApi.saveCurrentAgyProfile).toHaveBeenCalledWith('personal', 'current-token-123');
     });
   });
 
-  it('allows adding and connecting a new account token', async () => {
+  it('handles the Google Auth Helper flow with link generation and code submission', async () => {
     render(<AccountSwitcherModal isOpen={true} onClose={mockOnClose} />);
 
-    const addToggleBtn = screen.getByRole('button', { name: /Add Another Account/i });
-    fireEvent.click(addToggleBtn);
+    // Open OAuth Link Helper tab
+    const oauthTabBtn = screen.getByRole('button', { name: 'OAuth Link Helper' });
+    fireEvent.click(oauthTabBtn);
 
-    const tokenInput = screen.getByPlaceholderText('Enter token string');
-    const nameInput = screen.getByPlaceholderText('e.g. Work Laptop, VPS');
+    const nameInput = screen.getByPlaceholderText('e.g. enterprise-work, secondary-gmail');
+    fireEvent.change(nameInput, { target: { value: 'new-account' } });
 
-    fireEvent.change(tokenInput, { target: { value: 'new-shiny-token' } });
-    fireEvent.change(nameInput, { target: { value: 'Staging Server' } });
-
-    const submitBtn = screen.getByRole('button', { name: 'Connect Profile' });
-    fireEvent.click(submitBtn);
+    const genLinkBtn = screen.getByRole('button', { name: 'Generate Google Auth Link' });
+    fireEvent.click(genLinkBtn);
 
     await waitFor(() => {
-      expect(authApi.login).toHaveBeenCalledWith('new-shiny-token');
-      expect(mockSetToken).toHaveBeenCalledWith('new-shiny-token');
-      expect(mockOnClose).toHaveBeenCalled();
+      expect(agyApi.startAgyAuth).toHaveBeenCalledWith('new-account', 'current-token-123');
+      expect(screen.getByRole('button', { name: /Open Google Sign-In Page/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Copy Link/i })).toBeDefined();
+    });
+
+    // Enter authorization code
+    const codeInput = screen.getByPlaceholderText('Paste authorization code from Google');
+    fireEvent.change(codeInput, { target: { value: '4/0AZV...' } });
+
+    const completeBtn = screen.getByRole('button', { name: 'Complete Sign-In & Activate' });
+    fireEvent.click(completeBtn);
+
+    await waitFor(() => {
+      expect(agyApi.submitAgyAuthCode).toHaveBeenCalledWith('flow-test-123', 'new-account', '4/0AZV...', 'current-token-123');
     });
   });
 
-  it('handles disconnect / logout', () => {
+  it('handles Direct Token Paste tab', async () => {
     render(<AccountSwitcherModal isOpen={true} onClose={mockOnClose} />);
 
-    const logoutBtn = screen.getByRole('button', { name: /Disconnect \/ Logout/i });
+    const pasteTabBtn = screen.getByRole('button', { name: 'Direct Token Paste' });
+    fireEvent.click(pasteTabBtn);
+
+    const nameInput = screen.getByPlaceholderText('e.g. work, vertex-account');
+    const tokenTextarea = screen.getByPlaceholderText(/Paste \{"token":\{"access_token":"ya29\.\.\."\}\}/i);
+
+    fireEvent.change(nameInput, { target: { value: 'pasted-profile' } });
+    fireEvent.change(tokenTextarea, { target: { value: '{"token":{"access_token":"ya29.xyz"}}' } });
+
+    const importBtn = screen.getByRole('button', { name: 'Import & Activate Profile' });
+    fireEvent.click(importBtn);
+
+    await waitFor(() => {
+      expect(agyApi.importAgyProfile).toHaveBeenCalledWith('pasted-profile', '{"token":{"access_token":"ya29.xyz"}}', 'current-token-123');
+    });
+  });
+
+  it('handles disconnecting web session from footer', () => {
+    render(<AccountSwitcherModal isOpen={true} onClose={mockOnClose} />);
+
+    const logoutBtn = screen.getByRole('button', { name: /Disconnect Web Session/i });
     fireEvent.click(logoutBtn);
 
     expect(mockSetToken).toHaveBeenCalledWith(null);

@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
 import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon, MinusIcon, PlusIcon, UserIcon } from './icons';
+import { fetchAgyProfiles } from '../api/agyProfiles';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -13,7 +15,22 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
   const setFontSize = useStore((s) => s.setFontSize);
   const theme = useStore((s) => s.theme);
   const toggleTheme = useStore((s) => s.toggleTheme);
+  const token = useStore((s) => s.token);
   const setToken = useStore((s) => s.setToken);
+
+  const [activeAgyProfile, setActiveAgyProfile] = useState<string>('default');
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchAgyProfiles(token || undefined)
+        .then((res) => {
+          if (res && res.current) {
+            setActiveAgyProfile(res.current);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, token]);
 
   if (!isOpen) return null;
 
@@ -234,19 +251,28 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
               fontSize: '11px',
               fontFamily: 'var(--font-mono)',
               fontWeight: 700,
-              color: 'var(--accent-red)',
+              color: 'var(--accent-blue)',
               marginBottom: '10px',
             }}>
-              SESSION CONTROL //
+              GOOGLE ANTIGRAVITY IDENTITY &amp; ACCOUNTS //
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
-                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                  Switch Account Profile
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>Active Google Identity:</span>
+                  <span style={{
+                    color: 'var(--accent-blue)',
+                    fontWeight: 700,
+                    backgroundColor: 'rgba(122, 162, 247, 0.1)',
+                    padding: '1px 6px',
+                    borderRadius: '3px',
+                  }}>
+                    {activeAgyProfile}
+                  </span>
                 </div>
                 <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                  Switch between saved tokens or add a new auth session.
+                  Manage OAuth tokens, switch Google accounts, or launch the Auth Helper.
                 </div>
               </div>
               <button
@@ -257,7 +283,7 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                 }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-blue)' }}
               >
-                <UserIcon size={12} /> PROFILES
+                <UserIcon size={12} /> SWITCH / ACCOUNTS
               </button>
             </div>
 
