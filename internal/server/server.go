@@ -47,6 +47,7 @@ func (s *Server) Start() error {
 	chatH := routes.NewChatHandler(auth, s.db)
 	wsH := routes.NewWorkspaceHandler(auth, s.db)
 	convH := routes.NewConversationsHandler(auth)
+	subagentH := routes.NewSubagentsHandler(auth)
 	skillsH := routes.NewSkillsHandler(auth, s.db)
 	plugH := routes.NewPluginsHandler(auth)
 	personaH := routes.NewPersonasHandler(auth, s.db)
@@ -77,6 +78,10 @@ func (s *Server) Start() error {
 	mux.HandleFunc("GET /api/agy/conversations", convH.ListConversations)
 	mux.HandleFunc("GET /api/agy/conversations/{id}/messages", convH.GetConversationMessages)
 	mux.HandleFunc("DELETE /api/agy/conversations/{id}", convH.DeleteConversation)
+
+	// AGY Subagent Seeking & Inspection
+	mux.HandleFunc("GET /api/agy/subagents", subagentH.ListSubagents)
+	mux.HandleFunc("GET /api/agy/subagents/{id}", subagentH.GetSubagent)
 
 	// AGY Google Auth Account Profiles
 	mux.HandleFunc("GET /api/agy/profiles", agyProfH.ListProfiles)
