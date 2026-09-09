@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { TurnAnchor, PresentationMode } from './TurnAnchor';
+import { TurnAnchor, PresentationMode, VerbosityMode } from './TurnAnchor';
+import { SubagentsModal } from './SubagentsModal';
 import { InteractiveClarifyModal } from './InteractiveClarifyModal';
 import { SystemDiagnosticsModal } from './SystemDiagnosticsModal';
 import {
@@ -115,6 +116,7 @@ const SLASH_COMMANDS: SlashCommandItem[] = [
   { cmd: '/learn', desc: 'Save behavioral learning or persistent memory', category: 'assistant' },
   { cmd: '/doctor', desc: 'Run system diagnostics and health check', category: 'assistant' },
   { cmd: '/diagnostics', desc: 'Open System Health & Process Supervision Modal', category: 'assistant' },
+  { cmd: '/subagents', desc: 'Seek, inspect, and monitor active and past subagents', category: 'assistant' },
   { cmd: '/browser', desc: 'Browser automation and web search', category: 'assistant' },
   { cmd: '/agents', desc: 'List and switch available agents & personas', category: 'assistant' },
 
@@ -228,6 +230,37 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const [activeClarifyToolCall, setActiveClarifyToolCall] = useState<ToolCall | null>(null);
   const [pendingQueue, setPendingQueue] = useState<string[]>([]);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
+  const [showSubagentsModal, setShowSubagentsModal] = useState(false);
+  const [activeSubagentId, setActiveSubagentId] = useState<string | undefined>(undefined);
+  const [verbosityMode, setVerbosityMode] = useState<VerbosityMode>(() => {
+    try {
+      const stored = localStorage.getItem('agy:chat_verbosity');
+      if (stored === 'compact' || stored === 'verbose' || stored === 'minimal') {
+        return stored;
+      }
+    } catch {}
+    return 'verbose';
+  });
+
+  const handleVerbosityChange = (mode: VerbosityMode) => {
+    setVerbosityMode(mode);
+    setGlobalPresentationMode(mode === 'compact' ? 'worklog' : mode === 'minimal' ? 'final' : 'transparent');
+    try {
+      localStorage.setItem('agy:chat_verbosity', mode);
+    } catch {}
+  };
+
+  useEffect(() => {
+    const handleSeek = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id?: string; role?: string }>;
+      if (customEvent.detail?.id) {
+        setActiveSubagentId(customEvent.detail.id);
+      }
+      setShowSubagentsModal(true);
+    };
+    window.addEventListener('agy:seek-subagent', handleSeek);
+    return () => window.removeEventListener('agy:seek-subagent', handleSeek);
+  }, []);
   const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [showPluginsModal, setShowPluginsModal] = useState(false);
   const [showPersonaModal, setShowPersonaModal] = useState(false);
@@ -759,6 +792,13 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
     if (text === '/diagnostics' || text === '/health') {
       setShowDiagnosticsModal(true);
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    if (text === '/subagents') {
+      setShowSubagentsModal(true);
       setInputText('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
       return;
@@ -1602,31 +1642,31 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', flexShrink: 0 }}>
-          {/* Tri-Mode Presentation Selector */}
+          {/* Tri-Mode Verbosity Selector */}
           <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-            {(['worklog', 'transparent', 'final'] as PresentationMode[]).map((mode) => (
+            {(['compact', 'verbose', 'minimal'] as VerbosityMode[]).map((mode) => (
               <button
                 key={mode}
-                data-testid={`mode-${mode}`}
-                aria-label={`presentation-mode-${mode}`}
-                onClick={() => setGlobalPresentationMode(mode)}
-                title={`Switch presentation mode to ${mode}`}
+                data-testid={`verbosity-${mode}`}
+                aria-label={`verbosity-mode-${mode}`}
+                onClick={() => handleVerbosityChange(mode)}
+                title={`Switch chat verbosity mode to ${mode}`}
                 style={{
-                  background: globalPresentationMode === mode ? 'var(--bg-tertiary)' : 'transparent',
-                  color: globalPresentationMode === mode ? 'var(--accent-cyan-bright)' : 'var(--text-muted)',
+                  background: verbosityMode === mode ? 'var(--bg-tertiary)' : 'transparent',
+                  color: verbosityMode === mode ? 'var(--accent-cyan-bright)' : 'var(--text-muted)',
                   border: 'none',
                   padding: '2px 6px',
                   fontSize: '9px',
                   fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
-                  fontWeight: globalPresentationMode === mode ? 700 : 400,
+                  fontWeight: verbosityMode === mode ? 700 : 400,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '2px',
                 }}
               >
-                <span>{mode === 'worklog' ? <ClipboardIcon size={11} /> : mode === 'transparent' ? <BoltIcon size={11} /> : <TargetIcon size={11} />}</span>
-                <span className="mobile-hide">{mode === 'worklog' ? 'LOG' : mode === 'transparent' ? 'STREAM' : 'FINAL'}</span>
+                <span>{mode === 'compact' ? <ClipboardIcon size={11} /> : mode === 'verbose' ? <BoltIcon size={11} /> : <TargetIcon size={11} />}</span>
+                <span className="mobile-hide">{mode.toUpperCase()}</span>
               </button>
             ))}
           </div>
@@ -1917,6 +1957,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
                       turnIndex={turnIndex >= 0 ? turnIndex : 0}
                       isStreaming={isStreaming && msg.status === 'streaming'}
                       globalMode={globalPresentationMode}
+                      verbosityMode={verbosityMode}
                       onForkTurn={handleForkTurn}
                       onCopyContent={copyMessageContent}
                       isCopied={copiedMessageId === msg.id}
@@ -2612,6 +2653,18 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
           onDismiss={() => setActiveClarifyToolCall(null)}
         />
       )}
+
+      {/* Subagents Explorer Modal */}
+      <SubagentsModal
+        isOpen={showSubagentsModal}
+        onClose={() => {
+          setShowSubagentsModal(false);
+          setActiveSubagentId(undefined);
+        }}
+        token={token}
+        initialSubagentId={activeSubagentId}
+        parentId={sessionId}
+      />
 
       {/* System Health Diagnostics & Process Supervision Modal */}
       <SystemDiagnosticsModal

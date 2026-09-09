@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import type { SessionStatus } from '../types';
+import { fetchSubagents, SubagentItem } from '../api/subagents';
 import {
   fetchConversations,
   fetchConversationMessages,
@@ -11,6 +12,7 @@ import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 import {
   CheckIcon,
   CloseIcon,
+  BoltIcon,
   HourglassIcon,
   EditIcon,
   TrashIcon,
@@ -544,7 +546,28 @@ export function SessionSidebar() {
   const token = useStore((s) => s.token);
 
   // Tab View Mode: 'conversations' (AGY Brain History) vs 'tabs' (Workspace Panes)
-  const [activeView, setActiveView] = useState<'conversations' | 'tabs'>('conversations');
+  const [activeView, setActiveView] = useState<'conversations' | 'subagents' | 'tabs'>('conversations');
+  const [subagents, setSubagents] = useState<SubagentItem[]>([]);
+  const [loadingSubagents, setLoadingSubagents] = useState(false);
+
+  const loadSubagents = useCallback(async () => {
+    if (!token) return;
+    setLoadingSubagents(true);
+    try {
+      const res = await fetchSubagents(token);
+      setSubagents(res.subagents || []);
+    } catch {
+      // non-critical
+    } finally {
+      setLoadingSubagents(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (activeView === 'subagents') {
+      loadSubagents();
+    }
+  }, [activeView, loadSubagents]);
 
   // Conversations state
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -676,6 +699,17 @@ export function SessionSidebar() {
   };
 
   // Filter conversations
+  const filteredSubagents = useMemo(() => {
+    if (!searchQuery.trim()) return subagents;
+    const q = searchQuery.toLowerCase();
+    return subagents.filter(
+      (s) =>
+        s.role.toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q) ||
+        s.prompt.toLowerCase().includes(q)
+    );
+  }, [subagents, searchQuery]);
+
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
     const q = searchQuery.toLowerCase().trim();
@@ -876,7 +910,28 @@ export function SessionSidebar() {
           }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <ScrollIcon size={12} /> AGY Conversations ({conversations.length})
+            <ScrollIcon size={12} /> HISTORY ({conversations.length})
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveView('subagents')}
+          data-testid="sidebar-tab-subagents"
+          style={{
+            flex: 1,
+            padding: '4px 6px',
+            fontSize: '10px',
+            fontFamily: 'inherit',
+            fontWeight: activeView === 'subagents' ? 700 : 500,
+            color: activeView === 'subagents' ? 'var(--accent-amber-bright)' : 'var(--text-muted)',
+            backgroundColor: activeView === 'subagents' ? 'var(--bg-secondary)' : 'transparent',
+            border: activeView === 'subagents' ? '1px solid var(--border)' : '1px solid transparent',
+            borderRadius: '3px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <BoltIcon size={12} /> SUBAGENTS ({subagents.length})
           </span>
         </button>
         <button
@@ -896,7 +951,7 @@ export function SessionSidebar() {
           }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <TabsIcon size={12} /> Panes & Tabs ({tabs.filter((t) => t.status === 'open').length})
+            <TabsIcon size={12} /> TABS ({tabs.filter((t) => t.status === 'open').length})
           </span>
         </button>
       </div>
@@ -926,7 +981,7 @@ export function SessionSidebar() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={activeView === 'conversations' ? 'Search conversations & prompts...' : 'Search workspace tabs...'}
+            placeholder={activeView === 'conversations' ? 'Search conversations & prompts...' : activeView === 'subagents' ? 'Search subagents...' : 'Search workspace tabs...'}
             style={{
               flex: 1,
               background: 'none',
@@ -956,7 +1011,91 @@ export function SessionSidebar() {
 
       {/* Main Content Stream */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-        {activeView === 'conversations' ? (
+        {activeView === 'subagents' ? (
+          <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {filteredSubagents.length > 0 ? (
+              filteredSubagents.map((sub) => (
+                <div
+                  key={sub.id}
+                  data-testid={`sidebar-subagent-${sub.id}`}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '3px',
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)',
+                    borderLeft:
+                      sub.status === 'error'
+                        ? '3px solid var(--accent-red)'
+                        : sub.status === 'running'
+                          ? '3px solid var(--accent-amber)'
+                          : '3px solid var(--accent-cyan)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-bright)' }}>
+                      /{sub.role}
+                    </span>
+                    {sub.status === 'running' && (
+                      <span className="tech-badge tech-badge--active" style={{ fontSize: '8px', padding: '1px 4px' }}>
+                        <span className="pulse-dot pulse-dot--executing" />
+                        RUNNING
+                      </span>
+                    )}
+                    {sub.status === 'done' && (
+                      <span className="tech-badge tech-badge--online" style={{ fontSize: '8px', padding: '1px 4px' }}>
+                        ● DONE
+                      </span>
+                    )}
+                    {sub.status === 'error' && (
+                      <span className="tech-badge tech-badge--danger" style={{ fontSize: '8px', padding: '1px 4px' }}>
+                        ● STOPPED
+                      </span>
+                    )}
+                  </div>
+                  {sub.prompt && (
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {sub.prompt}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', fontSize: '9px', color: 'var(--text-muted)' }}>
+                    <span>{sub.toolCount} tools</span>
+                    <button
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(
+                            new CustomEvent('agy:seek-subagent', {
+                              detail: { id: sub.id, role: sub.role },
+                            })
+                          );
+                        }
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent-cyan-bright)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '9px',
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      [INSPECT ↗]
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '30px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
+                {loadingSubagents ? 'Indexing subagents...' : 'No subagents found.'}
+              </div>
+            )}
+          </div>
+        ) : activeView === 'conversations' ? (
           <>
             {/* Conversations List */}
             {filteredConversations.length > 0 ? (
