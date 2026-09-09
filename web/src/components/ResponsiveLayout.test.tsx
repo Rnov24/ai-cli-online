@@ -160,7 +160,7 @@ describe('Responsive Layout & Overlap Remediation Suite', () => {
     });
 
     describe('1.5 SystemHeader Telemetry Contraction & Mission Clamping (ORIGINAL_REQUEST §R2)', () => {
-      it('applies .tablet-hide to PID/memory telemetry, latency indicator, cmd-k, and font steppers', () => {
+      it('renders compact status button, and applies .tablet-hide to latency indicator and cmd-k', () => {
         const { container } = render(
           <SystemHeader
             systemStatus={{
@@ -182,11 +182,10 @@ describe('Responsive Layout & Overlap Remediation Suite', () => {
           />
         );
 
-        // Telemetry details (PID and RSS memory)
-        const pidElement = screen.getByText(/PID:12345/i);
-        expect(pidElement).toHaveClass('tablet-hide');
-        const rssElement = screen.getByText(/14.2MB/i);
-        expect(rssElement).toHaveClass('tablet-hide');
+        // Compact status button renders SYS:ONLINE
+        const statusBtn = screen.getByRole('button', { name: /System status: Online/i });
+        expect(statusBtn).toBeInTheDocument();
+        expect(screen.getByText(/SYS:ONLINE/i)).toBeInTheDocument();
 
         // Latency indicator
         const latencyElement = container.querySelector('[title*="Latency: 42ms"]');
@@ -195,10 +194,6 @@ describe('Responsive Layout & Overlap Remediation Suite', () => {
         // Command palette button
         const cmdPaletteBtn = screen.getByRole('button', { name: /Open command palette/i });
         expect(cmdPaletteBtn).toHaveClass('tablet-hide');
-
-        // Font stepper container
-        const fontStepper = container.querySelector('.desktop-only.tablet-hide');
-        expect(fontStepper).not.toBeNull();
       });
 
       it('clamps mission name container with clamp(120px, 20vw, 220px) without overflow squashing', () => {
@@ -617,7 +612,7 @@ describe('Responsive Layout & Overlap Remediation Suite', () => {
         window.innerWidth = 820;
         window.innerHeight = 1180;
 
-        render(
+        const { container } = render(
           <SystemHeader
             systemStatus={{
               server: {
@@ -637,14 +632,17 @@ describe('Responsive Layout & Overlap Remediation Suite', () => {
           />
         );
 
-        // Telemetry details marked with .tablet-hide
-        expect(screen.getByText(/PID:9988/i)).toHaveClass('tablet-hide');
-        expect(screen.getByText(/15.1MB/i)).toHaveClass('tablet-hide');
+        // Compact status button rendered
+        expect(screen.getByText(/SYS:ONLINE/i)).toBeInTheDocument();
+
+        // Latency indicator marked with .tablet-hide
+        const latencyElement = container.querySelector('[title*="Latency: 42ms"]');
+        expect(latencyElement).toHaveClass('tablet-hide');
 
         // Mission title container has clamp style
         const missionText = screen.getByText('Alpha-Mission-Split-Tablet');
-        const container = missionText.closest('div[style*="max-width"]') as HTMLElement;
-        expect(container.style.maxWidth).toBe('clamp(120px, 20vw, 220px)');
+        const missionContainer = missionText.closest('div[style*="max-width"]') as HTMLElement;
+        expect(missionContainer.style.maxWidth).toBe('clamp(120px, 20vw, 220px)');
       });
     });
 
