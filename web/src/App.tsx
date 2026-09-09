@@ -81,6 +81,14 @@ function App() {
     return () => window.removeEventListener('agy:open-account-switcher', onAccountSwitcherEvent);
   }, []);
 
+  useEffect(() => {
+    const onOpenSettingsEvent = () => {
+      setSettingsModalOpen(true);
+    };
+    window.addEventListener('agy:open-settings', onOpenSettingsEvent);
+    return () => window.removeEventListener('agy:open-settings', onOpenSettingsEvent);
+  }, []);
+
   // Active session details
   const activeTab = useMemo(() => tabs.find((t) => t.id === activeTabId), [tabs, activeTabId]);
   const primaryTerminalId = activeTab?.terminalIds[0] || 'default';
@@ -332,6 +340,7 @@ function App() {
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onOpenHelp={() => handleOpenHelp('quickstart')}
         onOpenAccountSwitcher={() => setAccountSwitcherOpen(true)}
+        onOpenSettings={() => setSettingsModalOpen(true)}
         onToggleContextPanel={() => setContextPanelOpen(!contextPanelOpen)}
         contextPanelOpen={contextPanelOpen}
         onToggleMobileNav={() => setMobileNavOpen(true)}

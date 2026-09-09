@@ -2,14 +2,14 @@ import React, { useCallback } from 'react';
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
 import { WorkspaceSelector } from './WorkspaceSelector';
-import { MenuIcon, SearchIcon, SunIcon, MoonIcon, UserIcon } from './icons';
-import { getActiveAccount } from '../utils/accountStorage';
+import { MenuIcon, SearchIcon, SettingsIcon } from './icons';
 
 interface SystemHeaderProps {
   systemStatus: SystemStatus | null;
   onOpenCommandPalette: () => void;
   onOpenHelp?: () => void;
   onOpenAccountSwitcher?: () => void;
+  onOpenSettings?: () => void;
   onToggleContextPanel: () => void;
   contextPanelOpen: boolean;
   onToggleMobileNav: () => void;
@@ -26,7 +26,8 @@ export const SystemHeader = React.memo(function SystemHeader({
   systemStatus,
   onOpenCommandPalette,
   onOpenHelp,
-  onOpenAccountSwitcher,
+  onOpenAccountSwitcher: _onOpenAccountSwitcher,
+  onOpenSettings,
   onToggleContextPanel,
   contextPanelOpen,
   onToggleMobileNav,
@@ -37,13 +38,6 @@ export const SystemHeader = React.memo(function SystemHeader({
   onWorkspaceSwitched,
 }: SystemHeaderProps) {
   const latency = useStore((s) => s.latency);
-  const theme = useStore((s) => s.theme);
-  const toggleTheme = useStore((s) => s.toggleTheme);
-  const fontSize = useStore((s) => s.fontSize);
-  const setFontSize = useStore((s) => s.setFontSize);
-
-  const activeAccount = token ? getActiveAccount(token) : null;
-  const profileLabel = activeAccount?.name || (token && token !== 'default' ? `Account ${token.slice(0, 4)}` : 'Default');
 
   let latencyColor = 'var(--accent-green)';
   let latencyBars = 4;
@@ -138,32 +132,30 @@ export const SystemHeader = React.memo(function SystemHeader({
 
         {/* Live System Status Readout */}
         {systemStatus && (
-          <div
-            className="desktop-only"
-            title={`PID: ${systemStatus.server.pid} | Uptime: ${systemStatus.server.uptime}s | Heap: ${systemStatus.server.memory.heapUsedMb}MB / RSS: ${systemStatus.server.memory.rssMb}MB`}
+          <button
+            type="button"
+            className="mecha-btn desktop-only"
+            onClick={() => {
+              if (onOpenSettings) onOpenSettings();
+            }}
+            title={`SYS: ${systemStatus.server.idle ? 'STANDBY' : 'ONLINE'} | PID: ${systemStatus.server.pid} | RSS: ${systemStatus.server.memory.rssMb}MB | Uptime: ${systemStatus.server.uptime}s (Click for Settings & Diagnostics)`}
+            aria-label={`System status: ${systemStatus.server.idle ? 'Standby' : 'Online'}`}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '2px 7px',
-              borderRadius: '2px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-primary)',
+              gap: '5px',
+              padding: '2px 6px',
               fontSize: '10px',
-              color: systemStatus.server.idle ? 'var(--text-secondary)' : 'var(--accent-green-bright)',
+              cursor: 'pointer',
             }}
           >
             <span
               className={`pulse-dot ${systemStatus.server.idle ? 'pulse-dot--idle' : 'pulse-dot--online'}`}
             />
-            <span>SYS:{systemStatus.server.idle ? 'STANDBY' : 'ONLINE'}</span>
-            <span className="tablet-hide" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <span className="tablet-hide" style={{ color: 'var(--text-muted)' }}>//</span>
-              <span className="tablet-hide" style={{ color: 'var(--text-secondary)' }}>{systemStatus.server.memory.rssMb}MB</span>
-              <span className="tablet-hide" style={{ color: 'var(--text-muted)' }}>//</span>
-              <span className="tablet-hide" style={{ color: 'var(--text-muted)' }}>PID:{systemStatus.server.pid}</span>
+            <span style={{ fontWeight: 600, color: systemStatus.server.idle ? 'var(--text-secondary)' : 'var(--accent-green-bright)' }}>
+              SYS:{systemStatus.server.idle ? 'STANDBY' : 'ONLINE'}
             </span>
-          </div>
+          </button>
         )}
       </div>
 
@@ -287,33 +279,6 @@ export const SystemHeader = React.memo(function SystemHeader({
           </span>
         </div>
 
-        {/* Account Profile Switcher */}
-        <button
-          className="mecha-btn"
-          onClick={() => {
-            if (onOpenAccountSwitcher) {
-              onOpenAccountSwitcher();
-            } else {
-              window.dispatchEvent(new CustomEvent('agy:open-account-switcher'));
-            }
-          }}
-          title={`Active Profile: ${profileLabel}. Click to switch profile / account.`}
-          aria-label="Switch account profile"
-          style={{
-            padding: '2px 8px',
-            fontSize: '10px',
-            color: 'var(--accent-blue)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <UserIcon size={12} />
-          <span className="desktop-only" style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {profileLabel}
-          </span>
-        </button>
-
         {/* Interactive Help & Feature Guide Trigger */}
         <button
           className="mecha-btn"
@@ -352,59 +317,30 @@ export const SystemHeader = React.memo(function SystemHeader({
           <span>⌘K</span>
         </button>
 
-        {/* Font size adjustment */}
-        <div className="desktop-only tablet-hide" style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          backgroundColor: 'var(--bg-primary)',
-          border: '1px solid var(--border)',
-          borderRadius: '2px',
-          padding: '1px 3px',
-        }}>
-          <button
-            onClick={() => setFontSize(Math.max(10, fontSize - 1))}
-            disabled={fontSize <= 10}
-            title="Decrease font size"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontSize: '9px',
-              padding: '0 3px',
-            }}
-          >
-            A−
-          </button>
-          <span style={{ fontSize: '10px', color: 'var(--text-primary)', minWidth: '16px', textAlign: 'center' }}>
-            {fontSize}
-          </span>
-          <button
-            onClick={() => setFontSize(Math.min(24, fontSize + 1))}
-            disabled={fontSize >= 24}
-            title="Increase font size"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontSize: '9px',
-              padding: '0 3px',
-            }}
-          >
-            A+
-          </button>
-        </div>
-
-        {/* Theme Switcher */}
+        {/* System Settings Modal Trigger */}
         <button
           className="mecha-btn"
-          onClick={toggleTheme}
-          title={`Switch to ${theme === 'dark' ? 'Industrial Light' : 'Mecha Dark'} mode`}
-          aria-label="Toggle theme"
-          style={{ padding: '3px 8px', fontSize: '12px', minWidth: '32px', minHeight: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => {
+            if (onOpenSettings) {
+              onOpenSettings();
+            } else {
+              window.dispatchEvent(new CustomEvent('agy:open-settings'));
+            }
+          }}
+          title="System Settings & Diagnostics (Display, Theme, Font, Telemetry)"
+          aria-label="Open system settings"
+          style={{
+            padding: '3px 8px',
+            fontSize: '11px',
+            minHeight: '28px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: 'var(--text-secondary)',
+          }}
         >
-          {theme === 'dark' ? <SunIcon size={13} /> : <MoonIcon size={13} />}
+          <SettingsIcon size={13} />
+          <span className="desktop-only" style={{ fontSize: '9px', fontWeight: 600 }}>SETTINGS</span>
         </button>
 
         {/* Context Panel Toggle */}

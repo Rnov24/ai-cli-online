@@ -207,6 +207,19 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
                   </span>
                 </div>
               </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button
+                  className="mecha-btn"
+                  onClick={() => {
+                    onClose();
+                    window.dispatchEvent(new CustomEvent('agy:open-diagnostics'));
+                  }}
+                  style={{ fontSize: '10px', padding: '3px 8px', color: 'var(--accent-cyan-bright)' }}
+                >
+                  OPEN ADVANCED PROCESS DIAGNOSTICS →
+                </button>
+              </div>
             </div>
           )}
 
