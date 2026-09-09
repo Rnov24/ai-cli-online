@@ -14,7 +14,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/huacheng/agy-online/internal/db"
@@ -37,6 +39,10 @@ type SkillsResponse struct {
 	IsHome        bool        `json:"isHome"`
 	Skills        []SkillItem `json:"skills"`
 	Count         int         `json:"count"`
+	Total         int         `json:"total"`
+	Page          int         `json:"page"`
+	Limit         int         `json:"limit"`
+	TotalPages    int         `json:"totalPages"`
 }
 
 type SkillContentResponse struct {
@@ -63,9 +69,13 @@ type RemoteSkillItem struct {
 }
 
 type SkillsSearchResponse struct {
-	Query  string            `json:"query"`
-	Skills []RemoteSkillItem `json:"skills"`
-	Count  int               `json:"count"`
+	Query      string            `json:"query"`
+	Skills     []RemoteSkillItem `json:"skills"`
+	Count      int               `json:"count"`
+	Total      int               `json:"total"`
+	Page       int               `json:"page"`
+	Limit      int               `json:"limit"`
+	TotalPages int               `json:"totalPages"`
 }
 
 type InstallSkillRequest struct {
@@ -134,8 +144,20 @@ var curatedPopularSkills = []RemoteSkillItem{
 }
 
 type SkillsHandler struct {
-	auth *AuthHelper
-	db   *db.DB
+	auth       *AuthHelper
+	db         *db.DB
+	cacheMutex sync.RWMutex
+	cachedList []SkillItem
+	cacheTime  time.Time
+	cacheCwd   string
+}
+
+func (h *SkillsHandler) invalidateCache() {
+	h.cacheMutex.Lock()
+	defer h.cacheMutex.Unlock()
+	h.cacheTime = time.Time{}
+	h.cachedList = nil
+	h.cacheCwd = ""
 }
 
 func NewSkillsHandler(auth *AuthHelper, database *db.DB) *SkillsHandler {
@@ -279,91 +301,199 @@ func (h *SkillsHandler) ListSkills(w http.ResponseWriter, r *http.Request) {
 	isHome := persona.IsHomeDirectory(cwd)
 
 	var allSkills []SkillItem
-	seen := make(map[string]bool)
 
-	// 1. Workspace Skills (highest priority)
-	if !isHome && cwd != "" {
-		workspaceDirs := []string{
-			filepath.Join(cwd, ".agents", "skills"),
-			filepath.Join(cwd, ".agent", "skills"),
-			filepath.Join(cwd, ".claude", "skills"),
-		}
+	h.cacheMutex.RLock()
+	if time.Since(h.cacheTime) < 5*time.Second && h.cacheCwd == cwd && h.cachedList != nil {
+		allSkills = make([]SkillItem, len(h.cachedList))
+		copy(allSkills, h.cachedList)
+		h.cacheMutex.RUnlock()
+	} else {
+		h.cacheMutex.RUnlock()
 
-		// Also check git root if cwd is subdirectory
-		curr := cwd
-		tempDir := filepath.Clean(os.TempDir())
-		for {
-			if curr == home || persona.IsHomeDirectory(curr) || curr == tempDir {
-				break
-			}
-			gitDir := filepath.Join(curr, ".git")
-			if fi, err := os.Stat(gitDir); err == nil && (fi.IsDir() || !fi.IsDir()) {
-				workspaceDirs = append(workspaceDirs, filepath.Join(curr, ".agents", "skills"))
-				break
-			}
-			parent := filepath.Dir(curr)
-			if parent == curr || parent == "." || parent == "/" {
-				break
-			}
-			curr = parent
-		}
+		seen := make(map[string]bool)
 
-		for _, dir := range workspaceDirs {
-			skills := scanSkillsInDirectory(dir, "workspace")
-			for _, sk := range skills {
+		// 1. Workspace Skills (highest priority)
+		if !isHome && cwd != "" {
+			workspaceDirs := []string{
+				filepath.Join(cwd, ".agents", "skills"),
+				filepath.Join(cwd, ".agent", "skills"),
+				filepath.Join(cwd, ".claude", "skills"),
+			}
+
+			// Also check git root if cwd is subdirectory
+			curr := cwd
+			tempDir := filepath.Clean(os.TempDir())
+			for {
+				if curr == home || persona.IsHomeDirectory(curr) || curr == tempDir {
+					break
+				}
+				gitDir := filepath.Join(curr, ".git")
+				if fi, err := os.Stat(gitDir); err == nil && (fi.IsDir() || !fi.IsDir()) {
+					workspaceDirs = append(workspaceDirs, filepath.Join(curr, ".agents", "skills"))
+					break
+				}
+				parent := filepath.Dir(curr)
+				if parent == curr || parent == "." || parent == "/" {
+					break
+				}
+				curr = parent
+			}
+
+			for _, dir := range workspaceDirs {
+				skills := scanSkillsInDirectory(dir, "workspace")
+				for _, sk := range skills {
 				if !seen[sk.Name] {
 					seen[sk.Name] = true
 					allSkills = append(allSkills, sk)
 				}
 			}
 		}
-	}
-
-	// 2. Global Skills in User Home (~/.agents/skills)
-	if home != "" {
-		homeSkillsDir := filepath.Join(home, ".agents", "skills")
-		skills := scanSkillsInDirectory(homeSkillsDir, "global")
-		for _, sk := range skills {
-			if !seen[sk.Name] {
-				seen[sk.Name] = true
-				allSkills = append(allSkills, sk)
-			}
 		}
 
-		// Global plugin skills (e.g. ~/.gemini/config/plugins/*/skills)
-		pluginsBase := filepath.Join(home, ".gemini", "config", "plugins")
-		if pluginEntries, err := os.ReadDir(pluginsBase); err == nil {
-			for _, pe := range pluginEntries {
-				if pe.IsDir() {
-					pluginSkillsDir := filepath.Join(pluginsBase, pe.Name(), "skills")
-					pluginSkills := scanSkillsInDirectory(pluginSkillsDir, "global")
-					for _, sk := range pluginSkills {
-						if !seen[sk.Name] {
-							seen[sk.Name] = true
-							allSkills = append(allSkills, sk)
+		// 2. Global Skills in User Home (~/.agents/skills)
+		if home != "" {
+			homeSkillsDir := filepath.Join(home, ".agents", "skills")
+			skills := scanSkillsInDirectory(homeSkillsDir, "global")
+			for _, sk := range skills {
+				if !seen[sk.Name] {
+					seen[sk.Name] = true
+					allSkills = append(allSkills, sk)
+				}
+			}
+
+			// Global plugin skills (e.g. ~/.gemini/config/plugins/*/skills)
+			pluginsBase := filepath.Join(home, ".gemini", "config", "plugins")
+			if pluginEntries, err := os.ReadDir(pluginsBase); err == nil {
+				for _, pe := range pluginEntries {
+					if pe.IsDir() {
+						pluginSkillsDir := filepath.Join(pluginsBase, pe.Name(), "skills")
+						pluginSkills := scanSkillsInDirectory(pluginSkillsDir, "global")
+						for _, sk := range pluginSkills {
+							if !seen[sk.Name] {
+								seen[sk.Name] = true
+								allSkills = append(allSkills, sk)
+							}
 						}
 					}
 				}
 			}
-		}
 
-		// 3. Builtin Skills (~/.gemini/antigravity-cli/builtin/skills)
-		builtinDir := filepath.Join(home, ".gemini", "antigravity-cli", "builtin", "skills")
-		builtinSkills := scanSkillsInDirectory(builtinDir, "builtin")
-		for _, sk := range builtinSkills {
-			if !seen[sk.Name] {
-				seen[sk.Name] = true
-				allSkills = append(allSkills, sk)
+			// 3. Builtin Skills (~/.gemini/antigravity-cli/builtin/skills)
+			builtinDir := filepath.Join(home, ".gemini", "antigravity-cli", "builtin", "skills")
+			builtinSkills := scanSkillsInDirectory(builtinDir, "builtin")
+			for _, sk := range builtinSkills {
+				if !seen[sk.Name] {
+					seen[sk.Name] = true
+					allSkills = append(allSkills, sk)
+				}
 			}
 		}
+
+		h.cacheMutex.Lock()
+		h.cachedList = make([]SkillItem, len(allSkills))
+		copy(h.cachedList, allSkills)
+		h.cacheTime = time.Now()
+		h.cacheCwd = cwd
+		h.cacheMutex.Unlock()
+	}
+
+	scope := strings.TrimSpace(r.URL.Query().Get("scope"))
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	qLower := strings.ToLower(q)
+
+	var filteredSkills []SkillItem
+	for _, sk := range allSkills {
+		if scope != "" && scope != "all" && sk.Scope != scope {
+			continue
+		}
+		if q != "" {
+			nameMatch := strings.Contains(strings.ToLower(sk.Name), qLower)
+			descMatch := strings.Contains(strings.ToLower(sk.Description), qLower)
+			tagMatch := false
+			for _, tag := range sk.Tags {
+				if strings.Contains(strings.ToLower(tag), qLower) {
+					tagMatch = true
+					break
+				}
+			}
+			if !nameMatch && !descMatch && !tagMatch {
+				continue
+			}
+		}
+		filteredSkills = append(filteredSkills, sk)
+	}
+	if filteredSkills == nil {
+		filteredSkills = []SkillItem{}
+	}
+
+	pageStr := strings.TrimSpace(r.URL.Query().Get("page"))
+	limitStr := strings.TrimSpace(r.URL.Query().Get("limit"))
+
+	limit := 0
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil {
+			limit = l
+		}
+	}
+
+	if limit <= 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(SkillsResponse{
+			WorkspacePath: cwd,
+			IsHome:        isHome,
+			Skills:        filteredSkills,
+			Count:         len(filteredSkills),
+			Total:         len(filteredSkills),
+			Page:          1,
+			Limit:         0,
+			TotalPages:    1,
+		})
+		return
+	}
+
+	if limit > 100 {
+		limit = 100
+	}
+	page := 1
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	total := len(filteredSkills)
+	totalPages := 1
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+	if page > totalPages && total > 0 {
+		page = totalPages
+	}
+
+	start := (page - 1) * limit
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+
+	sliced := filteredSkills[start:end]
+	if sliced == nil {
+		sliced = []SkillItem{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SkillsResponse{
 		WorkspacePath: cwd,
 		IsHome:        isHome,
-		Skills:        allSkills,
-		Count:         len(allSkills),
+		Skills:        sliced,
+		Count:         len(sliced),
+		Total:         total,
+		Page:          page,
+		Limit:         limit,
+		TotalPages:    totalPages,
 	})
 }
 
@@ -495,6 +625,8 @@ func (h *SkillsHandler) ScaffoldSkill(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"Failed to write SKILL.md: ` + err.Error() + `"}`, http.StatusInternalServerError)
 		return
 	}
+
+	h.invalidateCache()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -938,7 +1070,7 @@ func (h *SkillsHandler) installSkillFromSource(source, skillName, scope, cwd str
 	}, nil
 }
 
-// SearchSkills handles GET /api/skills/search?q=<query>&limit=<limit>.
+// SearchSkills handles GET /api/skills/search?q=<query>&limit=<limit>&page=<page>.
 func (h *SkillsHandler) SearchSkills(w http.ResponseWriter, r *http.Request) {
 	if !h.auth.CheckAuth(r) {
 		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
@@ -946,9 +1078,27 @@ func (h *SkillsHandler) SearchSkills(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	limit := strings.TrimSpace(r.URL.Query().Get("limit"))
-	if limit == "" {
-		limit = "20"
+	limitStr := strings.TrimSpace(r.URL.Query().Get("limit"))
+	pageStr := strings.TrimSpace(r.URL.Query().Get("page"))
+
+	limit := 20
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if limit < 1 {
+		limit = 1
+	}
+
+	page := 1
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
 	}
 
 	qParam := q
@@ -961,7 +1111,7 @@ func (h *SkillsHandler) SearchSkills(w http.ResponseWriter, r *http.Request) {
 		baseURL = "https://skills.sh/api/search"
 	}
 
-	reqURL := fmt.Sprintf("%s?q=%s&limit=%s", baseURL, url.QueryEscape(qParam), url.QueryEscape(limit))
+	reqURL := fmt.Sprintf("%s?q=%s&limit=100", baseURL, url.QueryEscape(qParam))
 
 	var remoteSkills []RemoteSkillItem
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -989,11 +1139,38 @@ func (h *SkillsHandler) SearchSkills(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	total := len(remoteSkills)
+	totalPages := 1
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+	if page > totalPages && total > 0 {
+		page = totalPages
+	}
+
+	start := (page - 1) * limit
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+
+	sliced := remoteSkills[start:end]
+	if sliced == nil {
+		sliced = []RemoteSkillItem{}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SkillsSearchResponse{
-		Query:  q,
-		Skills: remoteSkills,
-		Count:  len(remoteSkills),
+		Query:      q,
+		Skills:     sliced,
+		Count:      len(sliced),
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
 	})
 }
 
@@ -1027,6 +1204,8 @@ func (h *SkillsHandler) InstallSkill(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
 		return
 	}
+
+	h.invalidateCache()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -1339,6 +1518,8 @@ func (h *SkillsHandler) DeleteSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.invalidateCache()
+
 	// Remove from skills-lock.json if present
 	if lock, err := loadSkillLock(lockPath); err == nil {
 		if _, exists := lock.Skills[name]; exists {
@@ -1414,6 +1595,8 @@ func (h *SkillsHandler) SyncSkills(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	h.invalidateCache()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SyncSkillsResponse{

@@ -169,8 +169,108 @@ description: AGY guide and quick reference
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if listRes.Count != 3 {
-		t.Fatalf("expected 3 skills, got %d", listRes.Count)
+	if listRes.Count != 3 || listRes.Total != 3 || listRes.Page != 1 || listRes.Limit != 0 || listRes.TotalPages != 1 {
+		t.Fatalf("expected unpaginated count=3, total=3, page=1, limit=0, totalPages=1, got count=%d, total=%d, page=%d, limit=%d, totalPages=%d",
+			listRes.Count, listRes.Total, listRes.Page, listRes.Limit, listRes.TotalPages)
+	}
+
+	// Test paginated request with limit=2&page=1
+	reqPage1 := httptest.NewRequest("GET", "/api/skills?cwd="+tmpWorkspace+"&limit=2&page=1", nil)
+	reqPage1.Header.Set("Authorization", "Bearer skill-token")
+	wPage1 := httptest.NewRecorder()
+	handler.ListSkills(wPage1, reqPage1)
+	if wPage1.Code != http.StatusOK {
+		t.Fatalf("expected 200 for page 1, got %d", wPage1.Code)
+	}
+	var resP1 SkillsResponse
+	if err := json.NewDecoder(wPage1.Body).Decode(&resP1); err != nil {
+		t.Fatalf("failed to decode page 1 response: %v", err)
+	}
+	if resP1.Count != 2 || resP1.Total != 3 || resP1.Page != 1 || resP1.Limit != 2 || resP1.TotalPages != 2 {
+		t.Errorf("page 1 mismatch: got count=%d, total=%d, page=%d, limit=%d, totalPages=%d",
+			resP1.Count, resP1.Total, resP1.Page, resP1.Limit, resP1.TotalPages)
+	}
+	if len(resP1.Skills) != 2 || resP1.Skills[0].Name != listRes.Skills[0].Name || resP1.Skills[1].Name != listRes.Skills[1].Name {
+		t.Errorf("page 1 items do not match first two skills")
+	}
+
+	// Test paginated request with limit=2&page=2
+	reqPage2 := httptest.NewRequest("GET", "/api/skills?cwd="+tmpWorkspace+"&limit=2&page=2", nil)
+	reqPage2.Header.Set("Authorization", "Bearer skill-token")
+	wPage2 := httptest.NewRecorder()
+	handler.ListSkills(wPage2, reqPage2)
+	if wPage2.Code != http.StatusOK {
+		t.Fatalf("expected 200 for page 2, got %d", wPage2.Code)
+	}
+	var resP2 SkillsResponse
+	if err := json.NewDecoder(wPage2.Body).Decode(&resP2); err != nil {
+		t.Fatalf("failed to decode page 2 response: %v", err)
+	}
+	if resP2.Count != 1 || resP2.Total != 3 || resP2.Page != 2 || resP2.Limit != 2 || resP2.TotalPages != 2 {
+		t.Errorf("page 2 mismatch: got count=%d, total=%d, page=%d, limit=%d, totalPages=%d",
+			resP2.Count, resP2.Total, resP2.Page, resP2.Limit, resP2.TotalPages)
+	}
+	if len(resP2.Skills) != 1 || resP2.Skills[0].Name != listRes.Skills[2].Name {
+		t.Errorf("page 2 item does not match third skill")
+	}
+
+	// Test out-of-bounds page clamping (limit=2&page=999)
+	reqClamp := httptest.NewRequest("GET", "/api/skills?cwd="+tmpWorkspace+"&limit=2&page=999", nil)
+	reqClamp.Header.Set("Authorization", "Bearer skill-token")
+	wClamp := httptest.NewRecorder()
+	handler.ListSkills(wClamp, reqClamp)
+	if wClamp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for clamped page, got %d", wClamp.Code)
+	}
+	var resClamp SkillsResponse
+	if err := json.NewDecoder(wClamp.Body).Decode(&resClamp); err != nil {
+		t.Fatalf("failed to decode clamped page response: %v", err)
+	}
+	if resClamp.Page != 2 || resClamp.Count != 1 {
+		t.Errorf("expected clamped page 2 with 1 item, got page=%d, count=%d", resClamp.Page, resClamp.Count)
+	}
+
+	// Test server-side scope filter (&scope=workspace)
+	reqScope := httptest.NewRequest("GET", "/api/skills?cwd="+tmpWorkspace+"&scope=workspace", nil)
+	reqScope.Header.Set("Authorization", "Bearer skill-token")
+	wScope := httptest.NewRecorder()
+	handler.ListSkills(wScope, reqScope)
+	if wScope.Code != http.StatusOK {
+		t.Fatalf("expected 200 for scope filter, got %d", wScope.Code)
+	}
+	var resScope SkillsResponse
+	if err := json.NewDecoder(wScope.Body).Decode(&resScope); err != nil {
+		t.Fatalf("failed to decode scope response: %v", err)
+	}
+	if resScope.Total != 1 || len(resScope.Skills) != 1 || resScope.Skills[0].Name != "deploy-staging" {
+		t.Errorf("expected 1 workspace skill deploy-staging, got total=%d, skills=%v", resScope.Total, resScope.Skills)
+	}
+
+	// Test cache invalidation: call ScaffoldSkill, then re-query ListSkills
+	scaffoldBody, _ := json.Marshal(map[string]string{
+		"name":        "new-cache-test-skill",
+		"description": "Cache invalidation test",
+		"scope":       "workspace",
+		"cwd":         tmpWorkspace,
+	})
+	reqScaffold := httptest.NewRequest("POST", "/api/skills/scaffold", bytes.NewReader(scaffoldBody))
+	reqScaffold.Header.Set("Authorization", "Bearer skill-token")
+	wScaffold := httptest.NewRecorder()
+	handler.ScaffoldSkill(wScaffold, reqScaffold)
+	if wScaffold.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for scaffold, got %d", wScaffold.Code)
+	}
+
+	reqAfterScaffold := httptest.NewRequest("GET", "/api/skills?cwd="+tmpWorkspace, nil)
+	reqAfterScaffold.Header.Set("Authorization", "Bearer skill-token")
+	wAfterScaffold := httptest.NewRecorder()
+	handler.ListSkills(wAfterScaffold, reqAfterScaffold)
+	var resAfterScaffold SkillsResponse
+	if err := json.NewDecoder(wAfterScaffold.Body).Decode(&resAfterScaffold); err != nil {
+		t.Fatalf("failed to decode after scaffold response: %v", err)
+	}
+	if resAfterScaffold.Total != 4 {
+		t.Errorf("expected 4 skills after cache invalidation, got %d", resAfterScaffold.Total)
 	}
 
 	// Check scopes
@@ -376,6 +476,23 @@ func TestSkillsHandler_SearchSkills(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected improve to be found in fallback list")
+	}
+
+	// 3. Paginated search
+	reqPaginatedSearch := httptest.NewRequest("GET", "/api/skills/search?q=&limit=2&page=1", nil)
+	reqPaginatedSearch.Header.Set("Authorization", "Bearer skill-token")
+	wPaginatedSearch := httptest.NewRecorder()
+	handler.SearchSkills(wPaginatedSearch, reqPaginatedSearch)
+	if wPaginatedSearch.Code != http.StatusOK {
+		t.Fatalf("expected 200 for paginated search, got %d", wPaginatedSearch.Code)
+	}
+	var resPaginatedSearch SkillsSearchResponse
+	if err := json.NewDecoder(wPaginatedSearch.Body).Decode(&resPaginatedSearch); err != nil {
+		t.Fatalf("failed to decode paginated search: %v", err)
+	}
+	if resPaginatedSearch.Count > 2 || resPaginatedSearch.Total < 2 || resPaginatedSearch.Page != 1 || resPaginatedSearch.Limit != 2 {
+		t.Errorf("paginated search mismatch: count=%d, total=%d, page=%d, limit=%d",
+			resPaginatedSearch.Count, resPaginatedSearch.Total, resPaginatedSearch.Page, resPaginatedSearch.Limit)
 	}
 }
 
