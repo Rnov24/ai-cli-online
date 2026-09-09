@@ -42,7 +42,7 @@ honor its STOP conditions, and update your row when done.
 | [032](032-rebrand-project-identity-artifacts-to-agy-online.md) | Rebrand Project Identity Related Artifacts to AGY Online | P2 | S | 031 | DONE |
 | [033](033-account-switch-and-auth-setup.md) | Implement Account Switching, Multi-Profile Management, and Auth Setup Hardening | P1 | M | 032 | DONE |
 | [034](034-skills-sh-integration.md) | Integrate skills.sh Registry, Skill Discovery, and 1-Click Download/Setup Engine | P1 | M | 033 | DONE |
-| [035](035-hermes-plugin-converter.md) | Automatic Hermes Plugin to AGY Agent Skill Converter and Importer | P1 | M | 034 | IN PROGRESS |
+| [035](035-hermes-plugin-converter.md) | Automatic Hermes Plugin to AGY Agent Skill Converter and Importer | P1 | M | 034 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
