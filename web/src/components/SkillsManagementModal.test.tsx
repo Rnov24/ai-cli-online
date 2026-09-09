@@ -10,6 +10,7 @@ import {
   deleteSkill,
   syncSkills,
   type SkillItem,
+  type RemoteSkillItem,
 } from '../api/skills';
 
 vi.mock('../api/skills', () => ({
@@ -447,4 +448,263 @@ describe('SkillsManagementModal', { timeout: 45000 }, () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });
+
+  const generateMockSkills = (count: number): SkillItem[] => {
+    return Array.from({ length: count }, (_, i) => ({
+      name: `skill-${String(i + 1).padStart(2, '0')}`,
+      description: `Description for skill ${i + 1}`,
+      scope: (i % 3 === 0 ? 'workspace' : i % 3 === 1 ? 'global' : 'builtin') as 'workspace' | 'global' | 'builtin',
+      path: `/path/skill-${i + 1}`,
+      skillFile: `/path/skill-${i + 1}/SKILL.md`,
+      hasScripts: false,
+      hasResources: false,
+    }));
+  };
+
+  it('renders pagination bar with correct item count and page indicators', async () => {
+    const manySkills = generateMockSkills(25);
+    mockFetchSkills.mockResolvedValue({
+      workspacePath: '/work/proj',
+      isHome: false,
+      skills: manySkills,
+      count: 25,
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/skill-01')).toBeInTheDocument();
+    });
+
+    const pageSizeSelect = screen.getByLabelText(/Items per page/i);
+    fireEvent.change(pageSizeSelect, { target: { value: '10' } });
+
+    expect(screen.getByText('SHOWING 1-10 OF 25 SKILLS')).toBeInTheDocument();
+    expect(screen.getByText('PAGE 1 OF 3')).toBeInTheDocument();
+
+    // Verify only 10 skill cards are rendered in the DOM
+    expect(screen.getByText('/skill-01')).toBeInTheDocument();
+    expect(screen.getByText('/skill-10')).toBeInTheDocument();
+    expect(screen.queryByText('/skill-11')).not.toBeInTheDocument();
+  });
+
+  it('navigates to next page on NEXT button click', async () => {
+    const manySkills = generateMockSkills(25);
+    mockFetchSkills.mockResolvedValue({
+      workspacePath: '/work/proj',
+      isHome: false,
+      skills: manySkills,
+      count: 25,
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/skill-01')).toBeInTheDocument();
+    });
+
+    const pageSizeSelect = screen.getByLabelText(/Items per page/i);
+    fireEvent.change(pageSizeSelect, { target: { value: '10' } });
+
+    const nextButton = screen.getByRole('button', { name: /NEXT/i });
+    fireEvent.click(nextButton);
+
+    expect(screen.getByText('PAGE 2 OF 3')).toBeInTheDocument();
+    expect(screen.getByText('SHOWING 11-20 OF 25 SKILLS')).toBeInTheDocument();
+    expect(screen.queryByText('/skill-01')).not.toBeInTheDocument();
+    expect(screen.getByText('/skill-11')).toBeInTheDocument();
+    expect(screen.getByText('/skill-20')).toBeInTheDocument();
+    expect(screen.queryByText('/skill-21')).not.toBeInTheDocument();
+
+    const prevButton = screen.getByRole('button', { name: /PREV/i });
+    expect(prevButton).not.toBeDisabled();
+  });
+
+  it('disables PREV button on first page and NEXT button on last page', async () => {
+    const manySkills = generateMockSkills(25);
+    mockFetchSkills.mockResolvedValue({
+      workspacePath: '/work/proj',
+      isHome: false,
+      skills: manySkills,
+      count: 25,
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/skill-01')).toBeInTheDocument();
+    });
+
+    const pageSizeSelect = screen.getByLabelText(/Items per page/i);
+    fireEvent.change(pageSizeSelect, { target: { value: '10' } });
+
+    const prevButton = screen.getByRole('button', { name: /PREV/i });
+    const nextButton = screen.getByRole('button', { name: /NEXT/i });
+
+    expect(prevButton).toBeDisabled();
+    expect(nextButton).not.toBeDisabled();
+
+    // Navigate to page 2 then page 3
+    fireEvent.click(nextButton);
+    expect(screen.getByText('PAGE 2 OF 3')).toBeInTheDocument();
+    expect(prevButton).not.toBeDisabled();
+    expect(nextButton).not.toBeDisabled();
+
+    fireEvent.click(nextButton);
+    expect(screen.getByText('PAGE 3 OF 3')).toBeInTheDocument();
+    expect(prevButton).not.toBeDisabled();
+    expect(nextButton).toBeDisabled();
+  });
+
+  it('resets page to 1 when search query or scope filter changes', async () => {
+    const manySkills = generateMockSkills(25);
+    mockFetchSkills.mockResolvedValue({
+      workspacePath: '/work/proj',
+      isHome: false,
+      skills: manySkills,
+      count: 25,
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/skill-01')).toBeInTheDocument();
+    });
+
+    const pageSizeSelect = screen.getByLabelText(/Items per page/i);
+    fireEvent.change(pageSizeSelect, { target: { value: '10' } });
+
+    const nextButton = screen.getByRole('button', { name: /NEXT/i });
+    fireEvent.click(nextButton);
+    expect(screen.getByText('PAGE 2 OF 3')).toBeInTheDocument();
+
+    // Change search query
+    const searchInput = screen.getByPlaceholderText(/Search skills\.\.\./i);
+    fireEvent.change(searchInput, { target: { value: 'skill' } });
+
+    expect(screen.getByText(/PAGE 1 OF/i)).toBeInTheDocument();
+
+    // Move to page 2 again
+    fireEvent.click(nextButton);
+    expect(screen.getByText('PAGE 2 OF 3')).toBeInTheDocument();
+
+    // Click scope filter pill
+    const projectScopePill = screen.getByRole('button', { name: /^PROJECT/i });
+    fireEvent.click(projectScopePill);
+
+    expect(screen.getByText(/PAGE 1 OF/i)).toBeInTheDocument();
+  });
+
+  it('updates displayed items when page size select changes', async () => {
+    const manySkills = generateMockSkills(25);
+    mockFetchSkills.mockResolvedValue({
+      workspacePath: '/work/proj',
+      isHome: false,
+      skills: manySkills,
+      count: 25,
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('/skill-01')).toBeInTheDocument();
+    });
+
+    const pageSizeSelect = screen.getByLabelText(/Items per page/i);
+    // First set to 10
+    fireEvent.change(pageSizeSelect, { target: { value: '10' } });
+    expect(screen.getByText('SHOWING 1-10 OF 25 SKILLS')).toBeInTheDocument();
+    expect(screen.getByText('PAGE 1 OF 3')).toBeInTheDocument();
+
+    // Change page size select from 10 to 25
+    fireEvent.change(pageSizeSelect, { target: { value: '25' } });
+    expect(screen.getByText('SHOWING 1-25 OF 25 SKILLS')).toBeInTheDocument();
+    expect(screen.getByText('PAGE 1 OF 1')).toBeInTheDocument();
+
+    // Verify all 25 skills are rendered on page 1 of 1
+    expect(screen.getByText('/skill-01')).toBeInTheDocument();
+    expect(screen.getByText('/skill-25')).toBeInTheDocument();
+  });
+
+  it('paginates remote skills in explore tab', async () => {
+    const manyRemote: RemoteSkillItem[] = Array.from({ length: 15 }, (_, i) => ({
+      id: `owner/skill-${i + 1}/skill-${i + 1}`,
+      skillId: `remote-skill-${i + 1}`,
+      name: `remote-skill-${i + 1}`,
+      installs: 100 + i,
+      source: `owner/skill-${i + 1}`,
+    }));
+    mockSearchSkills.mockResolvedValue({
+      query: '',
+      skills: manyRemote,
+      count: 15,
+    });
+
+    render(
+      <SkillsManagementModal
+        isOpen={true}
+        onClose={vi.fn()}
+        token="test-token"
+        cwd="/work/proj"
+      />
+    );
+
+    // Switch to EXPLORE tab
+    const exploreTab = screen.getByRole('button', { name: /EXPLORE/i });
+    fireEvent.click(exploreTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('/remote-skill-1')).toBeInTheDocument();
+    });
+
+    // Default explore page size is 10
+    expect(screen.getByText('SHOWING 1-10 OF 15 SKILLS')).toBeInTheDocument();
+    expect(screen.getByText('PAGE 1 OF 2')).toBeInTheDocument();
+    expect(screen.getByText('/remote-skill-10')).toBeInTheDocument();
+    expect(screen.queryByText('/remote-skill-11')).not.toBeInTheDocument();
+
+    // Click NEXT
+    const nextButtons = screen.getAllByRole('button', { name: /NEXT/i });
+    fireEvent.click(nextButtons[0]);
+
+    expect(screen.getByText('PAGE 2 OF 2')).toBeInTheDocument();
+    expect(screen.getByText('/remote-skill-11')).toBeInTheDocument();
+    expect(screen.getByText('/remote-skill-15')).toBeInTheDocument();
+  });
 });
+
