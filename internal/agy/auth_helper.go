@@ -38,6 +38,21 @@ type AuthFlow struct {
 	AuthURL     string
 	DoneChan    chan error
 	CreatedAt   time.Time
+
+	outputMu sync.Mutex
+	output   strings.Builder
+}
+
+func (f *AuthFlow) appendOutput(s string) {
+	f.outputMu.Lock()
+	defer f.outputMu.Unlock()
+	f.output.WriteString(s)
+}
+
+func (f *AuthFlow) getOutput() string {
+	f.outputMu.Lock()
+	defer f.outputMu.Unlock()
+	return f.output.String()
 }
 
 type AuthFlowResponse struct {
@@ -129,30 +144,33 @@ func StartAuthFlow(profileName string) (*AuthFlowResponse, error) {
 		log.Printf("[auth_helper] Launched %s --print login in PTY with HOME=%s", bin, tempHome)
 
 		go func() {
-			scanner := bufio.NewScanner(ptmx)
-			for scanner.Scan() {
-				line := scanner.Text()
-				log.Printf("[auth_helper] pty: %s", line)
-				if match := oauthURLRe.FindString(line); match != "" {
-					cleanURL := strings.TrimRight(match, "\r\n\t \"'")
-					select {
-					case urlChan <- cleanURL:
-					default:
+			buf := make([]byte, 2048)
+			urlFound := false
+			for {
+				n, err := ptmx.Read(buf)
+				if n > 0 {
+					chunk := string(buf[:n])
+					flow.appendOutput(chunk)
+					log.Printf("[auth_helper] pty: %s", strings.TrimSpace(chunk))
+					if !urlFound {
+						if match := oauthURLRe.FindString(chunk); match != "" {
+							urlFound = true
+							cleanURL := strings.TrimRight(match, "\r\n\t \"'")
+							select {
+							case urlChan <- cleanURL:
+							default:
+							}
+						}
 					}
-					return
 				}
-			}
-			if err := scanner.Err(); err != nil {
-				log.Printf("[auth_helper] pty scanner error: %v", err)
-				select {
-				case errChan <- err:
-				default:
-				}
-			} else {
-				log.Printf("[auth_helper] pty reached EOF without URL")
-				select {
-				case errChan <- errors.New("agy exited without outputting authentication URL"):
-				default:
+				if err != nil {
+					if !urlFound {
+						select {
+						case errChan <- fmt.Errorf("agy exited before generating URL: %w", err):
+						default:
+						}
+					}
+					break
 				}
 			}
 		}()
@@ -305,33 +323,54 @@ func SubmitAuthCode(flowID, profileName, code string) error {
 		return fmt.Errorf("failed to submit authorization code to process: %w", writeErr)
 	}
 
-	// Wait up to 15 seconds for process to finish
+	pName := profileName
+	if pName == "" {
+		pName = flow.ProfileName
+	}
+
+	tempTokenPath := filepath.Join(flow.TempHome, ".gemini", "antigravity-cli", "antigravity-oauth-token")
+
+	// Wait loop: poll for token file or process completion every 200ms
 	waitDone := make(chan error, 1)
 	go func() {
 		waitDone <- flow.Cmd.Wait()
 	}()
 
-	select {
-	case <-waitDone:
-		// process completed
-	case <-time.After(15 * time.Second):
-		_ = flow.Cmd.Process.Kill()
-		return errors.New("timed out waiting for Google authentication to complete")
-	}
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(20 * time.Second)
 
-	// Check if token was written in isolated home
-	tempTokenPath := filepath.Join(flow.TempHome, ".gemini", "antigravity-cli", "antigravity-oauth-token")
-	tokenBytes, err := os.ReadFile(tempTokenPath)
-	if err != nil {
-		return fmt.Errorf("Google authentication failed or token file was not generated: %w", err)
-	}
+	for {
+		select {
+		case err := <-waitDone:
+			// Process exited. Check if token file was created
+			tokenBytes, readErr := os.ReadFile(tempTokenPath)
+			if readErr == nil && len(tokenBytes) > 10 {
+				log.Printf("[auth_helper] Token file found after process exit (%d bytes)", len(tokenBytes))
+				return ImportProfile(pName, string(tokenBytes))
+			}
+			out := flow.getOutput()
+			log.Printf("[auth_helper] agy exited (err: %v). Output: %s", err, out)
+			if strings.Contains(out, "invalid_grant") || strings.Contains(out, "Malformed") {
+				return errors.New("Google rejected this authorization code (it may be expired, malformed, or already used). Please generate a fresh link, click it to get a new code, and paste the new code.")
+			}
+			return fmt.Errorf("Google authentication failed (token not generated). Output: %s", strings.TrimSpace(out))
 
-	// Save to real profiles directory and activate
-	pName := profileName
-	if pName == "" {
-		pName = flow.ProfileName
+		case <-ticker.C:
+			// Token file may appear while agy is still running
+			if tokenBytes, readErr := os.ReadFile(tempTokenPath); readErr == nil && len(tokenBytes) > 10 {
+				log.Printf("[auth_helper] Token file detected while process running (%d bytes), saving profile", len(tokenBytes))
+				_ = flow.Cmd.Process.Kill()
+				return ImportProfile(pName, string(tokenBytes))
+			}
+
+		case <-timeout:
+			_ = flow.Cmd.Process.Kill()
+			out := flow.getOutput()
+			log.Printf("[auth_helper] SubmitAuthCode timed out after 20s. Output: %s", out)
+			return errors.New("Timed out waiting for Google authentication to complete. Please ensure you copied the code from the newly generated link.")
+		}
 	}
-	return ImportProfile(pName, string(tokenBytes))
 }
 
 // CancelAuthFlow terminates an in-flight auth flow and cleans up its temporary files.

@@ -1104,6 +1104,24 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
                         </button>
                       </div>
 
+                      {agyError && (
+                        <div
+                          role="alert"
+                          style={{
+                            padding: '6px 10px',
+                            backgroundColor: 'rgba(247, 118, 142, 0.12)',
+                            border: '1px solid rgba(247, 118, 142, 0.4)',
+                            borderRadius: '4px',
+                            color: 'var(--accent-red, #f7768e)',
+                            fontSize: '11px',
+                            fontFamily: 'var(--font-mono)',
+                            marginBottom: '10px',
+                          }}
+                        >
+                          ⚠ {agyError}
+                        </div>
+                      )}
+
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                         <button
                           type="button"
