@@ -43,6 +43,7 @@ honor its STOP conditions, and update your row when done.
 | [033](033-account-switch-and-auth-setup.md) | Implement Account Switching, Multi-Profile Management, and Auth Setup Hardening | P1 | M | 032 | DONE |
 | [034](034-skills-sh-integration.md) | Integrate skills.sh Registry, Skill Discovery, and 1-Click Download/Setup Engine | P1 | M | 033 | DONE |
 | [035](035-hermes-plugin-converter.md) | Automatic Hermes Plugin to AGY Agent Skill Converter and Importer | P1 | M | 034 | DONE |
+| [036](036-minimize-dashboard-and-move-items-to-settings.md) | Minimize Dashboard Telemetry and Relocate Controls to Settings Modal | P1 | M | — | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -73,6 +74,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 033 builds on Plan 032**: Adds token-validated login handling, multi-account profile storage, interactive account switching, and token-namespaced tab persistence.
 - **Plan 034 builds on Plan 033**: Delivers skills.sh registry search proxy, resilient 1-click GitHub/registry skill installation, safe uninstallation with builtin protection, lockfile synchronization, and the "Explore Skills.sh" interactive marketplace in the Skills Hub.
 - **Plan 035 builds on Plan 034**: Delivers automated Hermes plugin detection, manifest and Python schema parsing, markdown generation with parameter tables, universal runner injection, and 1-click import in the Skills Hub.
+- **Plan 036 is independent**: Streamlines the persistent top telemetry header by condensing system status to a compact dot indicator, removing redundant font steppers, theme toggles, and account switcher buttons, while introducing a dedicated Settings (`⚙`) trigger that routes all workspace configuration into `SettingsModal.tsx`.
 
 ## Findings considered and rejected
 
