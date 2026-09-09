@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ToolCall } from 'ai-cli-online-shared';
+import type { ToolCall } from 'agy-online-shared';
 import { CloseIcon, CheckIcon } from './icons';
 
 interface ToolCallCardProps {

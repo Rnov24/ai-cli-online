@@ -49,7 +49,17 @@ func Open(dataDir string) (*DB, error) {
 		return nil, fmt.Errorf("failed to create data dir: %w", err)
 	}
 
-	dbPath := filepath.Join(dataDir, "ai-cli-online.db")
+	newDbPath := filepath.Join(dataDir, "agy-online.db")
+	oldDbPath := filepath.Join(dataDir, "ai-cli-online.db")
+	if _, err := os.Stat(newDbPath); os.IsNotExist(err) {
+		if _, errOld := os.Stat(oldDbPath); errOld == nil {
+			log.Printf("[db] Migrating database from %s to %s", oldDbPath, newDbPath)
+			_ = os.Rename(oldDbPath, newDbPath)
+			_ = os.Rename(oldDbPath+"-wal", newDbPath+"-wal")
+			_ = os.Rename(oldDbPath+"-shm", newDbPath+"-shm")
+		}
+	}
+	dbPath := newDbPath
 	sqlDb, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite database at %s: %w", dbPath, err)

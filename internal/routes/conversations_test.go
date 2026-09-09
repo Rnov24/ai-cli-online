@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
+	"github.com/huacheng/agy-online/internal/config"
 )
 
 func TestConversationsHandler(t *testing.T) {

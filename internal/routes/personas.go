@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/persona"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/persona"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 var validPersonaIdRegex = regexp.MustCompile(`^[a-zA-Z0-9_\-]+$`)

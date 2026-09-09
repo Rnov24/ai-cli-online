@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { ToolCall } from 'ai-cli-online-shared';
+import type { ToolCall } from 'agy-online-shared';
 import { ShieldIcon, HelpIcon, CloseIcon } from './icons';
 
 interface InteractiveClarifyModalProps {

@@ -6,7 +6,7 @@ set -euo pipefail
 #  用法: sudo bash install-service.sh
 # ============================================
 
-SERVICE_NAME="ai-cli-online"
+SERVICE_NAME="agy-online"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 # --- 检测环境 ---
@@ -19,14 +19,14 @@ RUN_USER="${SUDO_USER:-$(whoami)}"
 RUN_HOME=$(eval echo "~${RUN_USER}")
 
 # 检查 Go 二进制程序
-CLI_BIN="${PROJECT_DIR}/bin/ai-cli-online"
+CLI_BIN="${PROJECT_DIR}/bin/agy-online"
 if [[ ! -x "$CLI_BIN" ]]; then
-  echo "未检测到已编译的 bin/ai-cli-online，尝试编译..."
+  echo "未检测到已编译的 bin/agy-online，尝试编译..."
   if command -v go &>/dev/null; then
-    (cd "$PROJECT_DIR" && go build -o bin/ai-cli-online ./cmd/ai-cli-online)
+    (cd "$PROJECT_DIR" && go build -o bin/agy-online ./cmd/agy-online)
   else
-    echo "[错误] 未找到 bin/ai-cli-online 且未安装 go 编译器。"
-    echo "请先在编译机或本地执行: go build -o bin/ai-cli-online ./cmd/ai-cli-online"
+    echo "[错误] 未找到 bin/agy-online 且未安装 go 编译器。"
+    echo "请先在编译机或本地执行: go build -o bin/agy-online ./cmd/agy-online"
     exit 1
   fi
 fi

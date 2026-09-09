@@ -1,316 +1,263 @@
-# AGY Online — Antigravity 开发工作区
+<div align="center">
 
-[![npm version](https://img.shields.io/npm/v/ai-cli-online.svg)](https://www.npmjs.com/package/ai-cli-online)
+# AGY Online
+
+### 专为 Google Antigravity CLI (`agy`) 打造的自主开发工作区与持久化终端控制台
+
+[![npm version](https://img.shields.io/npm/v/agy-online.svg)](https://www.npmjs.com/package/agy-online)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Report](https://img.shields.io/badge/Go-%3E%3D1.22-blue.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-00ADD8.svg)](https://golang.org/)
+[![Memory Footprint](https://img.shields.io/badge/空闲内存-%3C15MB-brightgreen.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Termux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
 
-在浏览器中运行的 AI 开发环境。持久化终端会话、结构化 13-skill 任务生命周期、自主执行 — 单个编译好的静态 Go 二进制可执行文件 (`bin/ai-cli-online`) 内嵌 Web UI 资源即可运行。
+[**English**](README.md) • [**简体中文**](README.zh-CN.md)
 
-专为运行 **Google Antigravity CLI (`agy`)** 而构建。tmux 保证断网后进程存活；浏览器 UI 在终端旁提供规划、批注、Git 历史可视化和对话面板。
+</div>
 
-**npm:** https://www.npmjs.com/package/ai-cli-online | **GitHub:** https://github.com/huacheng/ai-cli-online
+---
 
-[**English**](README.md)
+**AGY Online** 是一款专为 **Google Antigravity CLI (`agy`)** 深度优化的超轻量级、高性能网页端开发环境。它采用 **Go 语言单静态二进制可执行文件** 打包，内嵌完整编译好的 React Web UI 资源，无需在服务器或移动设备安装 Node.js 与庞大的 `node_modules`。
 
-![screenshot](screenshot.jpg)
+无论是在 20 元/月的低配 VPS、安卓手机 Termux 环境，还是本地高性能工作站上，AGY Online 均能提供断网不掉线的持久化 tmux 会话、实时的 Plan 文档批注系统、Git 提交图形化与 Diff 查看器、Google 多账户 OAuth 一键切换，以及原生 13-skill 全自动 AI 任务闭环。
 
-## 核心能力
+---
 
-**终端 + 规划 + 执行，一屏完成：**
+## ⚡ 核心架构优势
 
-```
-┌─ 标签页 ────────────────────────────────────────────────────┐
-│ ┌─ Plan 面板 ──────┬─ 终端 ─────────────────────────────┐   │
-│ │ AiTasks/ 文件浏览 │                                    │   │
-│ │ Markdown 查看器   │  $ /ai-cli-task auto my-feature    │   │
-│ │ 内联批注          │  ▶ 规划中...                        │   │
-│ │ (插入/删除/       │  ▶ 检查(post-plan): 通过            │   │
-│ │  替换/评注)       │  ▶ 执行步骤 1/4...                  │   │
-│ │                   │  ▶ 执行步骤 2/4...                  │   │
-│ │ Mermaid 图表      │  ...                               │   │
-│ │                   ├────────────────────────────────────┤   │
-│ │                   │ Chat 编辑器                         │   │
-│ │                   │ 多行 Markdown + /命令               │   │
-│ └───────────────────┴────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────┘
-```
+| 特性 | 传统 Web 终端方案 | AGY Online |
+|:---|:---|:---|
+| **空闲常驻内存** | 70MB – 150MB+ (Node.js 运行时) | **~13.7MB RSS (<15MB)**（纯 Go 0 CGO） |
+| **冷启动耗时** | 1,200ms – 2,500ms (V8 JIT 预热) | **< 20ms** 瞬间启动 |
+| **部署体积** | 散碎多文件 + 数万依赖文件 | **单一可执行文件**，内嵌 Web 前端资源 (`embed.FS`) |
+| **会话持久性** | 网页刷新或断网易丢失进程 | **tmux 原生常驻**，网络断开进程不掉线 |
+| **任务自主闭环** | 依赖人工手动多次复制粘贴 Prompt | 内置 **13-skill 自动化状态机引擎** (`ai-cli-task`) |
+| **Google 多账户** | 频繁手动编辑配置文件 | **图形化多账户切换面板**，内置 1 键 OAuth 助手 |
+| **移动端/Termux** | 缺乏辅助按键，手机熄屏被杀后台 | **触控专属虚拟按键栏**，Termux:Boot 自启与防休眠锁 |
 
-- **Plan 面板** — 浏览 `AiTasks/` 文件，4 种批注类型标注文档，向 AI 发送结构化反馈
-- **终端** — 完整 xterm.js + WebGL 渲染，二进制协议实现超低延迟，带手机触控辅助按键栏
-- **Chat 编辑器** — 多行 Markdown 编辑器，Antigravity 斜杠命令，草稿服务端持久化
-- **移动端与 Termux 原生支持** — 支持 Termux:Boot 开机自启，wake-lock 防休眠，注册独立 PID
-- **空闲节能服务 (Idle Serving)** — 无客户端连接时自动进入低功耗休眠，提交 SQLite WAL，GC 回收内存 (空闲内存低于 15MB，仅约 13.7MB RSS)
-- 面板可同时打开，各自独立调整大小
+---
 
-## AI 任务生命周期
-
-`ai-cli-task` 插件提供 13 个 skill 的完整任务执行生命周期：
+## 🖥️ 界面布局与核心面板
 
 ```
-init → plan → check → exec → check → merge → report
-        ↑        ↓
-      re-plan ←──┘ (遇到问题时)
+┌─ 标签页栏 ────────────────────────────────────────────────────────────┐
+│ ┌─ Plan 批注面板 ───┬─ 终端面板 ──────────────────────────────────┐   │
+│ │ AiTasks/ 任务目录  │                                             │   │
+│ │ Markdown 文档渲染  │  $ /ai-cli-task auto my-feature             │   │
+│ │                   │  ▶ [auto] 初始化任务模块与分支...           │   │
+│ │ 4类结构化批注:     │  ▶ [auto] 生成执行方案中...                 │   │
+│ │  [+] 插入内容      │  ▶ [auto] 关卡 1 (方案可行性检查): PASS     │   │
+│ │  [-] 删除标记      │  ▶ [auto] 正在执行实施步骤 1/4              │   │
+│ │  [↔] 替换修正      │  ▶ [auto] 正在执行实施步骤 2/4              │   │
+│ │  [?] 提问批注      │  ...                                        │   │
+│ │                   ├─────────────────────────────────────────────┤   │
+│ │ Mermaid 流程图    │ Chat / 斜杠命令输入框                        │   │
+│ │ LaTeX 数学公式    │ 多行 Markdown 编辑 + /goal, /plan, /model   │   │
+│ └───────────────────┴─────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
-| Skill | 功能 |
-|-------|------|
-| **init** | 创建任务模块 (`AiTasks/<name>/`)，git 分支，可选 worktree |
-| **plan** | 生成实施计划或处理人工批注 |
-| **research** | 收集并整理外部参考资料，支撑规划与执行阶段 |
-| **check** | 在 3 个检查点评估可行性 (post-plan / mid-exec / post-exec) |
-| **verify** | 运行领域适配的自动化测试与验证用例，生成验证报告 |
-| **exec** | 逐步执行计划，每步独立验证 |
-| **merge** | 将已完成任务分支合并到主干，支持智能冲突解决 |
-| **report** | 生成完成报告，提炼经验沉淀至全局知识库 |
-| **auto** | 在单个 Antigravity (`agy`) 会话中自主闭环运行全生命周期 |
-| **cancel** | 停止执行，设为已取消，可选清理相关 worktree |
-| **list** | 只读查询任务状态、模块清单与依赖拓扑图谱 |
-| **annotate** | 处理 Plan 面板提交的批注（插入/删除/替换/评注） |
-| **summarize** | 重新生成浓缩上下文摘要以防止长文本溢出 |
+- **WebGL 硬件加速终端**：基于 xterm.js 与纯 Go 自研的 1-字节二进制数据协议，极低输入延迟，全面支持多窗格任意切分与 tmux 会话无缝重连。
+- **Plan 交互式批注面板**：实时查看 AI 生成的方案与需求，划选文本即可添加「插入/删除/替换/提问」四类结构化批注，以标准 JSON 反馈给 `agy` 修正方案。
+- **Git 历史可视化与 Diff 对比**：无需在命令行敲击复杂 git 命令，可视化查看分支泳道图、提交文件列表与代码变更高亮对比。
+- **Markdown 聊天与指令控制台**：支持语法高亮多行输入，内置 Antigravity 斜杠命令补全 (`/goal`, `/plan`, `/grill-me`, `/review`, `/model`)，草稿自动存入数据库。
+- **Google 账户多配置切换器**：无需切换终端配置文件，一键在公司账号、个人账号与团队测试账号之间无感切换，内置 OAuth 本地回环助手。
+- **Skills 技能中心**：官方 `skills.sh` 技能市场一键探索与安装，内置 Hermes 插件向 Antigravity 技能的自动转换器。
 
-### 自主模式
+---
+
+## 🔄 13-Skill 任务生命周期引擎 (`ai-cli-task`)
+
+AGY Online 原生支持 13-skill Antigravity 任务生命周期插件，具备完整的状态机门禁与经验沉淀机制：
+
+```
+              ┌────────────────────────────────────────────────────────┐
+              ▼                                                        │
+init ──► plan ──► check ──► exec ──► verify ──► check ──► merge ──► report
+  │        ▲        │ (失败)          (失败)      │ (失败)
+  │        └────────┴─────────────────────────────┘
+  └─► research (外部参考资料收集)
+```
+
+| 技能命令 | 功能说明 |
+|:---|:---|
+| `/auto <module>` | **全自主执行闭环**：单个会话内连续完成 plan → check → exec → verify → merge → report |
+| `/init <module>` | 初始化任务目录 `AiTasks/<name>/`，自动创建 Git 任务专属分支与关联工作树 |
+| `/plan <module>` | 生成结构化实施步骤，或自动合并处理 Plan 面板的人工交互批注 |
+| `/research <module>`| 检索外部文档、技术参考与网络资料，归档至 `.references/` 知识库 |
+| `/check <module>` | 三道质量与漂移检查关卡（方案后/实施中/完成后），严格把控执行质量 |
+| `/verify <module>` | 运行特定领域的自动化测试与验证脚本，产出验证结果报告至 `.test/` |
+| `/exec <module>` | 按照步骤严格执行代码改动，每步带有校验反馈门禁 |
+| `/merge <module>` | 将已通过全面验证的任务分支合并回主干（`main`），自动处理冲突 |
+| `/report <module>` | 自动生成任务完成报告，提取踩坑经验沉淀至经验数据库 `.experiences/` |
+| `/cancel <module>` | 优雅中止执行中的任务，设置状态为取消并执行必要的资源清理 |
+| `/list` | 只读查询当前所有任务模块状态、依赖树及执行阶段 |
+| `/annotate <f> <a>`| 处理前端 Plan 面板提交的结构化 JSON 批注内容 |
+| `/summarize <module>`| 自动压缩任务上下文摘要，避免长周期任务导致 LLM 上下文窗口溢出 |
+
+---
+
+## 🚀 快速上手
+
+### 方式 1：使用 `npx` 零安装免配置运行
 
 ```bash
-/ai-cli-task auto my-feature
+npx agy-online
 ```
 
-一条命令触发完整生命周期。单个 Antigravity (`agy`) 会话在内部依次运行 plan → check → exec → merge → report，所有步骤共享上下文。守护进程通过 `.auto-signal` 文件监控进度，强制超时，检测停滞。
-
-### 任务结构
-
-```
-AiTasks/
-├── .index.json                  # 模块索引
-├── .experiences/                # 跨任务知识库（按领域类型分类）
-│   ├── .summary.md              # 经验文件索引
-│   └── <type>.md
-├── .references/                 # 外部参考资料（执行中收集）
-│   ├── .summary.md              # 参考文件索引
-│   └── <topic>.md
-└── my-feature/
-    ├── .index.json              # 状态、阶段、时间戳、依赖 (JSON)
-    ├── .target.md               # 需求描述（人工编写）
-    ├── .summary.md              # 浓缩上下文（防止上下文溢出）
-    ├── .analysis/               # 评估历史
-    ├── .test/                   # 测试标准与结果
-    ├── .bugfix/                 # 问题历史
-    ├── .notes/                  # 研究发现
-    ├── .report.md               # 完成报告
-    └── .plan.md                 # 实施计划
-```
-
-### 类型感知执行
-
-任务按领域类型分类（`software`、`dsp`、`ml`、`literary`、`science:physics` 等）。每种类型会调整规划方法、执行工具和验证标准。已完成任务的经验存储在 `.experiences/<type>.md` 中，供同类型的后续任务参考。
-
-## 终端特性
-
-- **会话持久化** — tmux 保证断网后进程存活；固定 socket 路径，服务重启后自动重连
-- **Tab 多标签页** — 独立终端分组，布局跨刷新持久化
-- **分屏布局** — 水平/垂直任意嵌套分割
-- **二进制协议** — 1 字节前缀帧用于终端 I/O，TCP Nagle 禁用，WebSocket 压缩
-- **WebGL 渲染** — 吞吐量比 canvas 提升 3-10 倍
-- **复制粘贴** — 鼠标选中自动复制，右键粘贴
-- **滚动历史** — capture-pane 回看，保留 ANSI 颜色
-- **文件传输** — 上传/下载文件，浏览目录，CWD 打包下载为 tar.gz
-- **网络指示器** — 实时 RTT 延迟 + 信号条
-- **自动重连** — 指数退避 + jitter 防雷群效应
-
-## 批注系统
-
-Plan 面板提供 4 种批注类型，用于向 AI 发送结构化反馈：
-
-| 类型 | 图标 | 说明 |
-|------|------|------|
-| **插入** | `+` | 在指定位置添加内容 |
-| **删除** | `−` | 标记待删除的文本 |
-| **替换** | `↔` | 用新文本替换旧文本 |
-| **评注** | `?` | 提问或留下备注 |
-
-批注双层持久化（localStorage + SQLite），以结构化 JSON 发送给 AI。`plan` skill 处理批注 — 按影响分级、应用变更、更新任务文件。
-
-## 快速开始
-
-### 方式一：npx 一键启动（推荐）
+### 方式 2：NPM 全局安装
 
 ```bash
-npx ai-cli-online
+npm install -g agy-online
+agy-online start
 ```
 
-### 方式二：全局安装
+### 方式 3：从源码编译单一二进制
 
 ```bash
-npm install -g ai-cli-online
-ai-cli-online
-```
+# 1. 克隆代码仓库
+git clone https://github.com/huacheng/agy-online.git
+cd agy-online
 
-### 方式三：从源码运行
-
-```bash
-git clone https://github.com/huacheng/ai-cli-online.git
-cd ai-cli-online
+# 2. 安装依赖并编译前端与 Go 二进制
 npm install
-npm run build      # 编译 Web UI 并打包为单一 Go 可执行二进制
-./bin/ai-cli-online start
-```
-
-## 前提条件
-
-- Go >= 1.22（源码编译需要）
-- tmux 已安装（Termux: `pkg install tmux`，Ubuntu: `sudo apt install tmux`）
-- agy 已安装（Google Antigravity CLI）
-
-## 进程管理与 CLI 命令
-
-支持 PID 文件跟踪和后台守护进程模式：
-
-```bash
-# 后台守护进程模式启动
-./bin/ai-cli-online start -d
-
-# 查看运行状态、PID、内存与运行时间
-./bin/ai-cli-online status
-
-# 停止正在运行的守护进程
-./bin/ai-cli-online stop
-
-# 重启服务
-./bin/ai-cli-online restart
-```
-
-## 移动端与 Termux 开机自启服务
-
-AGY Online 原生适配 Android Termux 环境：
-
-1. **设备开机自启**:
-   ```bash
-   bash scripts/install-termux-boot.sh
-   ```
-   安装 Termux:Boot 钩子 `~/.termux/boot/start-ai-cli-online.sh`，手机开机时自动在后台启动 Web 服务。
-
-2. **Wake-Lock 防休眠**:
-   启动脚本自动调用 `termux-wake-lock`，防止 Android 锁屏灭屏后挂起 CPU 和网络连接。
-
-3. **手机虚拟辅助按键**:
-   Web 终端提供移动端快捷触控工具栏（`ESC`、`TAB`、`^C`、方向键、`agy ▶`、`/`、剪贴板粘贴），点击 `⌨️` 即可切换，彻底解决手机软键盘无特殊键的问题。
-
-4. **空闲节能模式 (Idle Serving)**:
-   当浏览器没有活动连接超过 60 秒时，后端自动转入低功耗空闲状态：提交 SQLite WAL 并调用 GC 释放未使用内存（空闲内存仅约 70MB RSS）。
-
-## 配置
-
-创建 `server/.env`：
-
-```env
-PORT=3001                        # 服务端口
-HOST=0.0.0.0                     # 绑定地址
-AUTH_TOKEN=your-secret-token     # 认证 Token（生产环境必须设置）
-DEFAULT_WORKING_DIR=/home/user   # 默认工作目录
-HTTPS_ENABLED=true               # nginx 反代时设为 false
-TRUST_PROXY=1                    # nginx 反代时设为 1
-```
-
-完整选项参见 `server/.env.example`。
-
-## 架构
-
-```
-浏览器 (xterm.js + WebGL)
-  ├── Plan 面板 (批注编辑器)
-  ├── Chat 编辑器 (Markdown + /命令)
-  └── 终端视图 (WebGL 渲染器)
-        │
-        ↕ WebSocket binary/JSON + REST API
-        │
-Go 原生服务 (单一静态可执行文件)
-  ├── 嵌入式 Web UI 静态资源 (embed.FS)
-  ├── WebSocket ↔ PTY 转发 (creack/pty + coder/websocket)
-  ├── tmux 会话管理 (~/.tmux-sockets/ai-cli-online)
-  ├── 文件传输 API (tar.gz 流式归档、上传、下载)
-  ├── 纯 Go SQLite (草稿、批注、设置，基于 modernc.org/sqlite)
-  └── REST 路由处理 (sessions, files, editor, settings, git, system)
-        │
-        ↕ PTY / tmux sockets
-        │
-tmux sessions → shell → Google Antigravity CLI (agy) / AI agents
-  └── AiTasks/ 生命周期 (init/plan/check/exec/merge/report/auto)
-```
-
-- **前端**: React + Zustand + xterm.js (WebGL)
-- **后端**: Go (Golang) + `creack/pty` + `coder/websocket` + `modernc.org/sqlite` (纯 Go，零 CGO)
-- **交付产物**: 单一独立静态可执行二进制 (`bin/ai-cli-online`)，内置嵌入前端所有静态资源
-- **会话管理**: tmux（持久化终端会话）
-- **布局系统**: Tab 标签页 + 递归分割树（LeafNode / SplitNode）
-- **传输协议**: 二进制帧（热路径）+ JSON（控制消息）
-- **任务系统**: 13-skill 插件，状态机 + 依赖门控 + 经验知识库
-
-## 项目结构
-
-```
-ai-cli-online/
-├── cmd/ai-cli-online/   # CLI 命令行入口与守护进程生命周期管理
-├── internal/
-│   ├── files/           # 原子文件操作与符号链接越权安全防护
-│   ├── pid/             # 进程 PID 跟踪与生命周期注册
-│   ├── routes/          # REST 路由处理 (会话、文件、git、task-auto)
-│   ├── server/          # 内嵌 Web UI 资源的 HTTP 与 WebSocket 服务引擎
-│   ├── terminal/        # PTY 中继转发、tmux 会话管理器与 direct 降级
-│   └── ws/              # WebSocket Hub 与客户端连接监督
-├── web/src/
-│   ├── App.tsx          # 主前端应用 (登录 / TabBar / 终端 / 主题)
-│   ├── store/           # Zustand 状态管理 (模块化切片)
-│   ├── components/      # UI 组件 (PlanPanel, TerminalView, AiChatView)
-│   ├── hooks/           # React Hooks (WebSocket, 自适应轮询, 视口缩放)
-│   └── api/             # 类型化 API 客户端模块
-├── shared/              # 共享 TypeScript 接口与通信协议类型
-├── ai-cli-task/         # 13-skill Antigravity 任务生命周期插件
-├── bin/                 # 编译产物单静态可执行文件 (`bin/ai-cli-online`)
-├── start.sh             # 生产启动脚本
-└── install-service.sh   # systemd + nginx 安装配置器
-```
-
-## 开发
-
-```bash
-# 开发模式（前后端分离）
-npm run dev
-
-# 构建
 npm run build
 
-# 生产模式（构建 + 启动）
-bash start.sh
+# 3. 启动服务
+./bin/agy-online start
 ```
 
-### systemd 服务 + nginx 反向代理
+在浏览器中访问 **`http://localhost:3001`** 即可进入工作区。
+
+---
+
+## ⚙️ 守护进程与服务运维
+
+编译后的 Go 单文件二进制自带进程生命周期管理、PID 追踪与优雅停机逻辑：
 
 ```bash
-sudo bash install-service.sh             # 交互安装 (systemd + 可选 nginx 反代)
-sudo systemctl start ai-cli-online       # 启动服务
-sudo journalctl -u ai-cli-online -f      # 查看日志
+# 后台守护进程模式运行
+./bin/agy-online start -d
+
+# 指定端口后台运行
+./bin/agy-online start -p 8080 -d
+
+# 查看运行状态、PID、内存占用及运行时长
+./bin/agy-online status
+
+# 优雅重启服务
+./bin/agy-online restart
+
+# 停止服务
+./bin/agy-online stop
 ```
 
-安装脚本会：
-1. 创建 systemd 服务，支持开机自启和进程管理
-2. 检测 nginx 并可选配置反向代理（WebSocket 支持、SSL、`client_max_body_size`）
-3. nginx 启用时自动设置 `HTTPS_ENABLED=false` 和 `TRUST_PROXY=1`
+---
 
-## 安全
+## 📱 移动端与 Termux (Android) 极客配置
 
-- Token 认证 + timing-safe 比较
-- 所有文件操作的 symlink 穿越防护
-- 未认证 WebSocket 连接限制
-- TOCTOU 下载防护（流式大小检查）
-- CSP Headers (frame-ancestors, base-uri, form-action)
-- 限速（可配置读/写阈值）
+AGY Online 专为手机端移动开发提供深度优化，空闲仅需不到 15MB 内存：
 
-## 鸣谢与致敬 (Acknowledgements & Inspiration)
+### 1. 1 键安装 Termux:Boot 开机自启
 
-AGY Online 的架构设计、交互工效与终端交互范式深受以下开源项目的启发与奠基：
+```bash
+bash scripts/install-termux-boot.sh
+```
 
-- [**ai-cli-online**](https://github.com/huacheng/ai-cli-online) — 奠定基础的浏览器 Web 终端与持久化 AI CLI 开发环境。
-- [**hermes-webui**](https://github.com/nesquena/hermes-webui) — 在 Agent Web 界面交互、终端人机工效与自主工作流设计方面的开创性灵感。
+- 自动配置自启脚本 `~/.termux/boot/start-agy-online.sh`。
+- 自动申请 `termux-wake-lock` 防休眠锁，手机锁屏熄屏不中断 AI 运行。
+- 安卓手机开机后全自动静默后台启动服务。
 
-## License
+### 2. 触控专属虚拟按键栏
 
-MIT
+点击底栏 **`⌨️`** 图标随时唤起专为手机优化的快捷工具条：
+- 快捷键：`ESC`, `TAB`, `Ctrl+C`, `Ctrl+D`, `▲`, `▼`, `◀`, `▶`, `/`
+- 一键发送 `agy ▶` 命令快速启动终端会话
+- 支持一键粘贴手机剪贴板内容
+
+---
+
+## 🏗️ 整体架构图
+
+```
+浏览器端 (xterm.js + WebGL)
+  ├── Plan 批注面板 (交互式 Markdown 编辑器)
+  ├── Git 历史面板 (提交图谱 + Diff 比较器)
+  ├── 聊天面板 (Markdown 编辑器 + 斜杠指令)
+  └── 终端视图 (WebGL 渲染器 + 触控按键栏)
+        │
+        ↕ WebSocket (0x01-0x05 二进制高频流) + REST API
+Go 原生服务端 (单一静态可执行文件, 0 CGO)
+  ├── 内嵌 Web 前端资源 (embed.FS — 部署无需 node_modules)
+  ├── WebSocket ↔ PTY 管道中继 (creack/pty + coder/websocket)
+  ├── tmux 会话管理层 (~/.tmux-sockets/agy-online)
+  ├── 纯 Go SQLite (WAL 模式, modernc.org/sqlite)
+  ├── 空闲资源回收器 (无连接 60 秒后自动整理 WAL 并还回物理内存给 OS)
+  └── REST 路由集群 (会话、文件、Git、技能、Google 账户配置)
+        │
+        ↕ tmux socket 管道 / direct PTY 自动回退
+tmux 终端会话 ──► 交互 Shell ──► Google Antigravity CLI (agy)
+  └── AiTasks/ 任务生命周期 (13-skill 自动化闭环)
+```
+
+---
+
+## 🔧 环境变量与配置
+
+AGY Online 会按优先级读取 `~/.agy-online/.env` 或项目根目录下的 `.env`：
+
+| 配置项 | 默认值 | 说明 |
+|:---|:---|:---|
+| `PORT` | `3001` | 服务监听端口 |
+| `HOST` | `0.0.0.0` | 绑定监听地址 |
+| `AUTH_TOKEN` | *(留空)* | 访问 Web 界面的身份验证口令（生产建议设置） |
+| `DEFAULT_WORKING_DIR`| 当前用户目录 | 新建终端会话时的默认工作目录 |
+| `DATA_DIR` | `~/.agy-online/data` | 数据库 (`agy-online.db`) 与持久化数据存储目录 |
+| `START_COMMAND` | *(系统默认 Shell)* | 终端会话启动执行的自定义命令 |
+| `MAX_CONNECTIONS` | `10` | 允许同时建立的最大 WebSocket 连接数 |
+
+---
+
+## 🛡️ 生产环境部署 (systemd + nginx)
+
+通过自动化脚本快速配置系统服务与 nginx 反向代理（含 WebSocket 支持与 SSL 终止）：
+
+```bash
+sudo bash install-service.sh
+```
+
+```bash
+# 管理系统服务
+sudo systemctl start agy-online
+sudo systemctl status agy-online
+sudo journalctl -u agy-online -f
+```
+
+---
+
+## ⌨️ 全局快捷键速查
+
+| 快捷键 | 功能 |
+|:---|:---|
+| `Ctrl + \` | 快速开启/折叠 Markdown 聊天输入面板 |
+| `Alt + A` | 唤起 Autonomous 自动化任务模态框 |
+| `Alt + P` | 唤起 Skills 技能中心与管理面板 |
+| `Alt + G` | 快速开启/折叠 Git 提交历史与 Diff 查看器 |
+| `Alt + C` | 唤起 AI 澄清提问解答模态框 |
+| `Alt + H` | 打开帮助与快捷键说明手册 |
+| `Ctrl + S` | 在文件浏览器中保存正在编辑的文件 |
+| `Escape` | 关闭当前弹窗或退出文件编辑模式 |
+
+---
+
+## 🤝 致谢与致敬
+
+AGY Online 的设计深受以下优秀项目与开源精神的启发：
+- [**Google Antigravity CLI (`agy`)**](https://github.com/google/antigravity) — Google 新一代前沿自主编码智能体引擎。
+- [**ai-cli-online**](https://github.com/huacheng/ai-cli-online) — 奠定轻量化 Web 终端与 AI 交互原型的基石项目。
+- [**hermes-webui**](https://github.com/nesquena/hermes-webui) — 在智能体人机协作交互设计方面给予了重要灵感。
+
+---
+
+## 📄 开源协议
+
+本项目采用 [MIT](LICENSE) 开源协议。

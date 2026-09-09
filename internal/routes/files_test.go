@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
+	"github.com/huacheng/agy-online/internal/config"
 )
 
 func TestFileHandler_Rm_Guards(t *testing.T) {

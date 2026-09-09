@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchSystemStatus, fetchProcessList, fetchSystemLogs, ProcessItem, SystemLogEntry } from '../api/system';
-import type { SystemStatus } from 'ai-cli-online-shared';
+import type { SystemStatus } from 'agy-online-shared';
 import { StethoscopeIcon, CloseIcon, BoltIcon, DesktopScreenIcon } from './icons';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 

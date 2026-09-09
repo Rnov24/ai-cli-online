@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/idle"
-	"github.com/huacheng/ai-cli-online/internal/routes"
-	"github.com/huacheng/ai-cli-online/internal/ws"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/idle"
+	"github.com/huacheng/agy-online/internal/routes"
+	"github.com/huacheng/agy-online/internal/ws"
 )
 
 type Server struct {

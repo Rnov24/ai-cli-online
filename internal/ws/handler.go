@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/files"
-	"github.com/huacheng/ai-cli-online/internal/idle"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/files"
+	"github.com/huacheng/agy-online/internal/idle"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 const (

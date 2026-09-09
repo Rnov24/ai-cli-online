@@ -1,5 +1,5 @@
 {
-  "name": "ai-cli-online-web",
+  "name": "agy-online-web",
   "version": "3.0.17",
   "description": "AGY Online Web Frontend",
   "type": "module",
@@ -12,7 +12,7 @@
   "dependencies": {
     "@types/dompurify": "^3.0.5",
     "@types/katex": "^0.16.8",
-    "ai-cli-online-shared": "*",
+    "agy-online-shared": "*",
     "dompurify": "^3.3.1",
     "katex": "^0.18.5",
     "marked": "^17.0.1",

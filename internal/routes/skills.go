@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/persona"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/persona"
 )
 
 type SkillItem struct {

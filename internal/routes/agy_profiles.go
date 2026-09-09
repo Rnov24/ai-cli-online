@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/huacheng/ai-cli-online/internal/agy"
+	"github.com/huacheng/agy-online/internal/agy"
 )
 
 type AgyProfilesHandler struct {

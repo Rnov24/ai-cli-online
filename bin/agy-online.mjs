@@ -8,8 +8,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 const isWin = process.platform === 'win32';
-const binaryName = isWin ? 'ai-cli-online.exe' : 'ai-cli-online';
-const binaryPath = join(rootDir, 'bin', binaryName);
+const preferredName = isWin ? 'agy-online.exe' : 'agy-online';
+const fallbackName = isWin ? 'ai-cli-online.exe' : 'ai-cli-online';
+
+let binaryPath = join(rootDir, 'bin', preferredName);
+if (!existsSync(binaryPath) && existsSync(join(rootDir, 'bin', fallbackName))) {
+  binaryPath = join(rootDir, 'bin', fallbackName);
+}
 
 if (!existsSync(binaryPath)) {
   console.error(`Error: AGY Online binary not found at ${binaryPath}`);

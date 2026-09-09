@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import type { SystemStatus } from 'ai-cli-online-shared';
+import type { SystemStatus } from 'agy-online-shared';
 import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon, MinusIcon, PlusIcon, UserIcon } from './icons';
 import { fetchAgyProfiles } from '../api/agyProfiles';
 

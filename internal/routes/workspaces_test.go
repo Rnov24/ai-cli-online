@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/db"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/db"
 )
 
 func setupTestWorkspaceHandler(t *testing.T) (*WorkspaceHandler, string, func()) {

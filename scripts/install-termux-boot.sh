@@ -25,20 +25,20 @@ fi
 BOOT_DIR="${HOME}/.termux/boot"
 mkdir -p "$BOOT_DIR"
 
-BOOT_SCRIPT="${BOOT_DIR}/start-ai-cli-online.sh"
-LOG_DIR="${HOME}/.ai-cli-online/logs"
-RUN_DIR="${HOME}/.ai-cli-online/run"
+BOOT_SCRIPT="${BOOT_DIR}/start-agy-online.sh"
+LOG_DIR="${HOME}/.agy-online/logs"
+RUN_DIR="${HOME}/.agy-online/run"
 mkdir -p "$LOG_DIR" "$RUN_DIR"
 
-CLI_BIN="${ROOT_DIR}/bin/ai-cli-online"
+CLI_BIN="${ROOT_DIR}/bin/agy-online"
 if [[ ! -x "${CLI_BIN}" ]]; then
   echo "Building AGY Online Go binary..."
-  (cd "$ROOT_DIR" && go build -o bin/ai-cli-online ./cmd/ai-cli-online)
+  (cd "$ROOT_DIR" && go build -o bin/agy-online ./cmd/agy-online)
 fi
 
 # Create symlink in $PREFIX/bin for convenient global CLI access
 if [[ -d "${PREFIX:-/data/data/com.termux/files/usr}/bin" ]]; then
-  ln -sf "${CLI_BIN}" "${PREFIX:-/data/data/com.termux/files/usr}/bin/ai-cli-online" 2>/dev/null || true
+  ln -sf "${CLI_BIN}" "${PREFIX:-/data/data/com.termux/files/usr}/bin/agy-online" 2>/dev/null || true
 fi
 
 echo "Configuring boot script at: ${BOOT_SCRIPT}"
@@ -60,7 +60,7 @@ export HOME="/data/data/com.termux/files/home"
 export PATH="${HOME}/.gemini/antigravity-cli/bin:${PREFIX}/bin:${PATH}"
 
 ROOT_DIR="__ROOT_DIR__"
-BOOT_LOG="${HOME}/.ai-cli-online/logs/boot.log"
+BOOT_LOG="${HOME}/.agy-online/logs/boot.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Device booted. Starting AGY Online..." >> "$BOOT_LOG"
 
@@ -69,10 +69,10 @@ sleep 3
 
 # 4. Start AGY Online in background daemon mode
 cd "$ROOT_DIR"
-if [[ -x "./bin/ai-cli-online" ]]; then
-  ./bin/ai-cli-online start -d >> "$BOOT_LOG" 2>&1
+if [[ -x "./bin/agy-online" ]]; then
+  ./bin/agy-online start -d >> "$BOOT_LOG" 2>&1
 else
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ./bin/ai-cli-online not found or not executable" >> "$BOOT_LOG"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ./bin/agy-online not found or not executable" >> "$BOOT_LOG"
   exit 1
 fi
 
@@ -112,5 +112,5 @@ fi
 echo "Test now manually by running:"
 echo "  bash $BOOT_SCRIPT"
 echo "Or check status with:"
-echo "  ./bin/ai-cli-online status"
+echo "  ./bin/agy-online status"
 echo "=================================================="

@@ -1,4 +1,4 @@
-module github.com/huacheng/ai-cli-online
+module github.com/huacheng/agy-online
 
 go 1.26.0
 

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
-	"github.com/huacheng/ai-cli-online/internal/ws"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/ws"
 )
 
 type SessionHandler struct {

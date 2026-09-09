@@ -25,17 +25,18 @@ else
 fi
 
 # 2. 清理残留的旧进程（仅限本项目）
+pkill -f "agy-online" 2>/dev/null || true
 pkill -f "ai-cli-online" 2>/dev/null || true
 
 # 3. 检查或构建 Go 二进制
 cd "$PROJECT_DIR"
-if [[ ! -f "bin/ai-cli-online" ]]; then
+if [[ ! -f "bin/agy-online" ]]; then
   echo "[构建] 首次运行，编译 Web UI 与 Go 单二进制..."
   npm run build --workspace=web
-  go build -o bin/ai-cli-online ./cmd/ai-cli-online
+  go build -o bin/agy-online ./cmd/agy-online
   echo "[构建] 完成"
 fi
 
 # 4. 启动服务
 echo "[启动] 启动 AGY Online (端口: $PORT)..."
-exec "$PROJECT_DIR/bin/ai-cli-online" start -p "$PORT"
+exec "$PROJECT_DIR/bin/agy-online" start -p "$PORT"

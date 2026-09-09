@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/files"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/files"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 type EditorHandler struct {

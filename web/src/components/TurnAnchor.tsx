@@ -1,5 +1,5 @@
 import { useState, memo } from 'react';
-import type { ChatMessage } from 'ai-cli-online-shared';
+import type { ChatMessage } from 'agy-online-shared';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ThinkingBlock } from './ThinkingBlock';
 import { ToolCallCard } from './ToolCallCard';

@@ -1,4 +1,4 @@
-import type { ChatMessage } from 'ai-cli-online-shared';
+import type { ChatMessage } from 'agy-online-shared';
 
 export function exportSessionToHtml(sessionName: string, messages: ChatMessage[]): void {
   const renderedDate = new Date().toLocaleString();

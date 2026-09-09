@@ -25,9 +25,9 @@ func LoadConfig() *Config {
 		home = "/root"
 	}
 
-	// Try reading global ~/.ai-cli-online/.env, server/.env, or .env if exists
+	// Try reading global ~/.agy-online/.env, legacy ~/.ai-cli-online/.env, or .env if exists
+	loadDotEnv(filepath.Join(home, ".agy-online", ".env"))
 	loadDotEnv(filepath.Join(home, ".ai-cli-online", ".env"))
-	loadDotEnv("server/.env")
 	loadDotEnv(".env")
 
 	port := 3001
@@ -58,10 +58,13 @@ func LoadConfig() *Config {
 
 	dataDir := os.Getenv("DATA_DIR")
 	if dataDir == "" {
-		// Prefer ~/.ai-cli-online/data if accessible
-		userDir := filepath.Join(home, ".ai-cli-online", "data")
+		// Prefer ~/.agy-online/data if accessible (or migrate from ~/.ai-cli-online/data)
+		userDir := filepath.Join(home, ".agy-online", "data")
+		legacyDir := filepath.Join(home, ".ai-cli-online", "data")
 		if err := os.MkdirAll(userDir, 0700); err == nil {
 			dataDir = userDir
+		} else if _, errLegacy := os.Stat(legacyDir); errLegacy == nil {
+			dataDir = legacyDir
 		} else {
 			dataDir = filepath.Join(".", "data")
 			_ = os.MkdirAll(dataDir, 0700)

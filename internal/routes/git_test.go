@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 func setupTestGitRepo(t *testing.T) (string, string, string) {

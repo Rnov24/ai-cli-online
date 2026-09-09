@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/idle"
-	"github.com/huacheng/ai-cli-online/internal/pid"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/idle"
+	"github.com/huacheng/agy-online/internal/pid"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 var startTime = time.Now()

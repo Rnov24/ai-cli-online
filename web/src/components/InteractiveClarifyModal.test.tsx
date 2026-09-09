@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { InteractiveClarifyModal } from './InteractiveClarifyModal';
-import type { ToolCall } from 'ai-cli-online-shared';
+import type { ToolCall } from 'agy-online-shared';
 
 describe('InteractiveClarifyModal', () => {
   const mockOnSubmit = vi.fn();

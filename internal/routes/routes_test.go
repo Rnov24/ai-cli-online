@@ -7,12 +7,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/idle"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/idle"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 func TestRoutes(t *testing.T) {
@@ -216,12 +217,16 @@ func TestWriteFileContent_PathValidation(t *testing.T) {
 	auth := NewAuthHelper(cfg)
 	editH := NewEditorHandler(auth, nil)
 
-	// Test writing outside cwd via ".." and sibling directory paths returns HTTP 403
+	outsideFile := siblingFile
+	if homeDir, _ := os.UserHomeDir(); runtime.GOOS == "windows" && homeDir != "" {
+		outsideFile = filepath.Join(filepath.Dir(homeDir), "outside.txt")
+	}
+
 	badPaths := []string{
 		"../escape.txt",
 		"../../etc/passwd",
 		filepath.Join(tempDir, "..", "outside.txt"),
-		siblingFile,
+		outsideFile,
 	}
 
 	for _, badPath := range badPaths {
@@ -302,11 +307,13 @@ func TestWriteFileContent_PathValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Stat script.sh failed: %v", err)
 	}
-	if scriptFi.Mode().Perm() != expectedPerm {
-		t.Errorf("Expected permissions %04o to be preserved, got %04o", expectedPerm, scriptFi.Mode().Perm())
-	}
-	if scriptFi.Mode().Perm()&0100 == 0 {
-		t.Errorf("Expected executable bit to be preserved")
+	if runtime.GOOS != "windows" {
+		if scriptFi.Mode().Perm() != expectedPerm {
+			t.Errorf("Expected permissions %04o to be preserved, got %04o", expectedPerm, scriptFi.Mode().Perm())
+		}
+		if scriptFi.Mode().Perm()&0100 == 0 {
+			t.Errorf("Expected executable bit to be preserved")
+		}
 	}
 }
 

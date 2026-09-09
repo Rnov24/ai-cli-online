@@ -1,316 +1,263 @@
-# AGY Online — Antigravity Development Workspace
+<div align="center">
 
-[![npm version](https://img.shields.io/npm/v/ai-cli-online.svg)](https://www.npmjs.com/package/ai-cli-online)
+# AGY Online
+
+### Autonomous Browser Workspace & Persistent Command Console for Google Antigravity CLI (`agy`)
+
+[![npm version](https://img.shields.io/npm/v/agy-online.svg)](https://www.npmjs.com/package/agy-online)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Report](https://img.shields.io/badge/Go-%3E%3D1.22-blue.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-00ADD8.svg)](https://golang.org/)
+[![Memory Footprint](https://img.shields.io/badge/Idle%20RAM-%3C15MB-brightgreen.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Termux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
 
-An AI-powered development environment that runs in your browser. Persistent terminal sessions, structured 13-skill task lifecycle, and autonomous execution — all through a single compiled static Go executable (`bin/ai-cli-online`) with embedded Web UI assets.
+[**English**](README.md) • [**简体中文**](README.zh-CN.md)
 
-Built exclusively for running **Google Antigravity CLI (`agy`)** over local or unstable networks. tmux keeps everything alive when connections drop; the browser UI provides planning, annotation, git history visualizer, and chat panels alongside the terminal.
+</div>
 
-**npm:** https://www.npmjs.com/package/ai-cli-online | **GitHub:** https://github.com/huacheng/ai-cli-online
+---
 
-[**中文文档**](README.zh-CN.md)
+**AGY Online** is a lightweight, high-performance web development environment engineered exclusively for **Google Antigravity CLI (`agy`)**. Packaged as a **single, self-contained Go static binary** with an embedded Web UI, AGY Online bridges the gap between raw terminal AI agents and modern desktop IDEs.
 
-![screenshot](screenshot.jpg)
+Whether deployed on a $3/month VPS, an Android phone via Termux, or a local workstation, AGY Online delivers persistent tmux terminal sessions, real-time Plan document annotation, Git history diffing, multi-account Google authentication, and native 13-skill autonomous AI task loops.
 
-## What It Does
+---
 
-**Terminal + Planning + Execution in one screen:**
+## ⚡ Why AGY Online?
 
-```
-┌─ Tabs ──────────────────────────────────────────────────────┐
-│ ┌─ Plan Panel ──────┬─ Terminal ────────────────────────┐   │
-│ │ AiTasks/ browser   │                                   │   │
-│ │ Markdown viewer    │  $ /ai-cli-task auto my-feature   │   │
-│ │ Inline annotations │  ▶ planning...                    │   │
-│ │ (insert/delete/    │  ▶ check(post-plan): PASS         │   │
-│ │  replace/comment)  │  ▶ executing step 1/4...          │   │
-│ │                    │  ▶ executing step 2/4...          │   │
-│ │ Mermaid diagrams   │  ...                              │   │
-│ │                    ├───────────────────────────────────┤   │
-│ │                    │ Chat Editor                        │   │
-│ │                    │ Multi-line Markdown + /commands    │   │
-│ └────────────────────┴───────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────┘
-```
+| Feature | Legacy Web Terminals | AGY Online |
+|:---|:---|:---|
+| **Idle Memory** | 70MB – 150MB+ (Node.js runtime) | **~13.7MB RSS (<15MB)** in pure Go (0 CGO) |
+| **Cold Boot** | 1,200ms – 2,500ms (V8 JIT warmup) | **< 20ms** instant binary startup |
+| **Binary Packaging** | Multi-file Node tree + `node_modules` | **Single static binary** with embedded React UI (`embed.FS`) |
+| **Session Resilience** | PTY process killed on tab disconnect | **Persistent tmux engine**; survives reconnects & reboots |
+| **Autonomous Lifecycle** | Manual copy-paste prompts | Native **13-skill task automation engine** (`ai-cli-task`) |
+| **Google Profiles** | Manual config editing | **Interactive multi-profile switcher** with 1-click OAuth |
+| **Mobile & Termux** | Clunky virtual keyboards, background sleep | **Touch quick-keys toolbar**, Termux:Boot & CPU wake-lock |
 
-- **Plan Panel** — browse `AiTasks/` files, annotate documents with 4 annotation types, send structured feedback to AI
-- **Terminal** — full xterm.js with WebGL rendering, binary protocol for ultra-low latency, and touch quick-keys for mobile
-- **Chat Editor** — multi-line Markdown editor with slash commands, server-side draft persistence
-- **Mobile & Termux Ready** — auto-start at Android device boot via Termux:Boot, wake-lock CPU protection, and registered PID tracking
-- **Idle Serving** — automatic low-power idle mode when 0 clients connected; checkpoints SQLite WAL and trims memory (sub-15MB idle RAM, ~13.7MB RSS)
-- All panels can be open simultaneously, each independently resizable
+---
 
-## AI Task Lifecycle
-
-The `ai-cli-task` plugin provides a 13-skill lifecycle for structured AI task execution:
+## 🖥️ Screen Layout & Capabilities
 
 ```
-init → plan → check → exec → check → merge → report
-        ↑        ↓
-      re-plan ←──┘ (on issues)
+┌─ Tab Bar ─────────────────────────────────────────────────────────────┐
+│ ┌─ Plan Panel ──────┬─ Terminal ──────────────────────────────────┐   │
+│ │ AiTasks/ module   │                                             │   │
+│ │ Markdown viewer   │  $ /ai-cli-task auto my-feature             │   │
+│ │                   │  ▶ [auto] Initializing task workspace...    │   │
+│ │ Annotations:      │  ▶ [auto] Generating implementation plan... │   │
+│ │  [+] Insert       │  ▶ [auto] Checkpoint 1 (post-plan): PASS    │   │
+│ │  [-] Delete       │  ▶ [auto] Executing implementation step 1/4 │   │
+│ │  [↔] Replace      │  ▶ [auto] Executing implementation step 2/4 │   │
+│ │  [?] Comment      │  ...                                        │   │
+│ │                   ├─────────────────────────────────────────────┤   │
+│ │ Mermaid Diagrams  │ Chat / Slash Editor                         │   │
+│ │ LaTeX equations   │ Multi-line Markdown + /goal, /plan, /model  │   │
+│ └───────────────────┴─────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
-| Skill | What it does |
-|-------|-------------|
-| **init** | Create task module (`AiTasks/<name>/`), git branch, optional worktree |
-| **plan** | Generate implementation plan or process human annotations |
-| **research** | Collect and organize external references to support planning and execution |
-| **check** | Evaluate feasibility at 3 checkpoints (post-plan / mid-exec / post-exec) |
-| **verify** | Run domain-adapted tests and verification procedures, producing result files |
-| **exec** | Execute plan steps with per-step verification |
-| **merge** | Merge completed task branch to main with automated conflict resolution |
-| **report** | Generate completion report, distill lessons to experience database |
-| **auto** | Run the full lifecycle autonomously in a single Antigravity (`agy`) session |
-| **cancel** | Stop execution, set status to cancelled, optional cleanup |
-| **list** | Query task status, module inventory, and dependency relationships (read-only) |
-| **annotate** | Process Plan panel annotations (insert/delete/replace/comment) |
-| **summarize** | Regenerate condensed context summaries |
+- **Persistent WebGL Terminal**: Hardware-accelerated terminal powered by xterm.js and a custom 1-byte binary protocol relaying I/O to tmux (with direct PTY fallback).
+- **Interactive Plan & Annotation Panel**: Review AI-generated architecture and task plans in real-time. Highlight text to insert, delete, replace, or leave comments, sending structured JSON feedback directly to `agy`.
+- **Git History Visualizer & Diff Viewer**: Inspect commit logs with interactive lane graph visualization, file commit diffs, and instant message search.
+- **Markdown Chat & Slash Console**: Full-fledged Markdown editor with syntax highlighting, Antigravity slash commands (`/goal`, `/plan`, `/grill-me`, `/review`, `/model`), and server-side draft synchronization.
+- **Antigravity Google Auth Profile Switcher**: Switch between work, personal, and team Google accounts without touching configuration files. Features a built-in OAuth helper and direct token importer.
+- **Skills Hub**: Discover and 1-click install skills from the official `skills.sh` registry, or convert legacy Hermes plugins to native Antigravity skills automatically.
 
-### Auto Mode
+---
+
+## 🔄 13-Skill Task Lifecycle Engine (`ai-cli-task`)
+
+AGY Online natively supports the complete 13-skill Antigravity task lifecycle plugin:
+
+```
+              ┌────────────────────────────────────────────────────────┐
+              ▼                                                        │
+init ──► plan ──► check ──► exec ──► verify ──► check ──► merge ──► report
+  │        ▲        │ (fail)          (fail)      │ (fail)
+  │        └────────┴─────────────────────────────┘
+  └─► research (external knowledge ingestion)
+```
+
+| Skill | Description |
+|:---|:---|
+| `/auto <module>` | **Full autonomous loop**: runs plan → check → exec → verify → merge → report in a single session |
+| `/init <module>` | Initializes task module directory under `AiTasks/<name>/`, creates git branch & workspace |
+| `/plan <module>` | Drafts implementation plan or consumes human annotations from the Plan Panel |
+| `/research <module>`| Collects external references, documentation, and web sources into `.references/` |
+| `/check <module>` | Evaluates feasibility and drift at 3 critical checkpoints (post-plan, mid-exec, post-exec) |
+| `/verify <module>` | Runs domain-adapted automated tests and verification suites, logging results to `.test/` |
+| `/exec <module>` | Executes implementation steps with step-by-step validation gates |
+| `/merge <module>` | Merges validated task branch back to `main` with automated conflict resolution |
+| `/report <module>` | Generates completion report and distills lessons learned into `.experiences/` |
+| `/cancel <module>` | Gracefully terminates active task execution, marks state cancelled, and cleans resources |
+| `/list` | Queries all task modules, dependency graphs, and lifecycle states (read-only) |
+| `/annotate <f> <a>`| Ingests structured JSON annotations submitted from the browser Plan panel |
+| `/summarize <module>`| Condenses context summaries to avoid LLM context window overflow |
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Run with `npx` (No Install Required)
 
 ```bash
-/ai-cli-task auto my-feature
+npx agy-online
 ```
 
-One command triggers the entire lifecycle. A single Antigravity (`agy`) session runs plan → check → exec → merge → report internally, sharing context across all steps. A daemon monitors progress via `.auto-signal` files, enforces timeouts, and detects stalls.
-
-### Task Structure
-
-```
-AiTasks/
-├── .index.json                  # Module listing
-├── .experiences/                # Cross-task knowledge base (by domain type)
-│   ├── .summary.md              # Experience file index
-│   └── <type>.md
-├── .references/                 # External reference materials (collected during plan/exec)
-│   ├── .summary.md              # Reference file index
-│   └── <topic>.md
-└── my-feature/
-    ├── .index.json              # Status, phase, timestamps, dependencies (JSON)
-    ├── .target.md               # Requirements (human-authored)
-    ├── .summary.md              # Condensed context (prevents context overflow)
-    ├── .analysis/               # Evaluation history
-    ├── .test/                   # Test criteria & results
-    ├── .bugfix/                 # Issue history
-    ├── .notes/                  # Research findings
-    ├── .report.md               # Completion report
-    └── .plan.md                 # Implementation plan
-```
-
-### Type-Aware Execution
-
-Tasks are classified by domain type (`software`, `dsp`, `ml`, `literary`, `science:physics`, etc.). Each type adapts planning methodology, execution tools, and verification criteria. Completed task lessons are stored in `.experiences/<type>.md` and referenced by future tasks of the same type.
-
-## Terminal Features
-
-- **Session Persistence** — tmux keeps processes alive through disconnects; fixed socket path ensures auto-reconnect after server restarts
-- **Multi-Tab** — independent terminal groups with layout persistence across refreshes
-- **Split Panes** — horizontal / vertical splits, arbitrarily nested
-- **Binary Protocol** — 1-byte prefix frames for terminal I/O, TCP Nagle disabled, WebSocket compression
-- **WebGL Rendering** — 3-10x throughput vs canvas
-- **Copy & Paste** — mouse selection auto-copies; right-click pastes
-- **Scroll History** — capture-pane scrollback with ANSI color preservation
-- **File Transfer** — upload/download files, browse directories, download CWD as tar.gz
-- **Network Indicator** — real-time RTT latency with signal bars
-- **Auto Reconnect** — exponential backoff with jitter
-
-## Annotation System
-
-The Plan panel provides 4 annotation types for structured AI feedback:
-
-| Type | Icon | Description |
-|------|------|------------|
-| **Insert** | `+` | Add content at a specific location |
-| **Delete** | `−` | Mark text for removal |
-| **Replace** | `↔` | Substitute old text with new |
-| **Comment** | `?` | Ask questions or leave notes |
-
-Annotations are persisted (localStorage + SQLite) and sent to the AI as structured JSON. The `plan` skill processes them — triaging by impact, applying changes, and updating task files.
-
-## Quick Start
-
-### Option 1: npx (Recommended)
+### Option 2: Global NPM Install
 
 ```bash
-npx ai-cli-online
+npm install -g agy-online
+agy-online start
 ```
 
-### Option 2: Global Install
+### Option 3: Precompiled Binary / Build from Source
 
 ```bash
-npm install -g ai-cli-online
-ai-cli-online
-```
+# 1. Clone repository
+git clone https://github.com/huacheng/agy-online.git
+cd agy-online
 
-### Option 3: From Source
-
-```bash
-git clone https://github.com/huacheng/ai-cli-online.git
-cd ai-cli-online
+# 2. Build Web UI and single Go binary
 npm install
-npm run build      # Compiles React Web UI and builds the single Go binary
-./bin/ai-cli-online start
+npm run build
+
+# 3. Start server
+./bin/agy-online start
 ```
 
-## Prerequisites
+Access the web console at **`http://localhost:3001`**.
 
-- Go >= 1.22 (to build from source)
-- tmux installed (`pkg install tmux` on Termux, `sudo apt install tmux` on Ubuntu)
-- agy installed (Google Antigravity CLI)
+---
 
-## Process Management & CLI Commands
+## ⚙️ Service & Daemon Management
 
-Manage the server lifecycle with PID tracking and background daemon mode:
+The compiled Go executable contains a built-in process manager with PID tracking, resource accounting, and graceful shutdown:
 
 ```bash
 # Start in background daemon mode
-./bin/ai-cli-online start -d
+./bin/agy-online start -d
 
-# Check running status, PID, memory, and uptime
-./bin/ai-cli-online status
+# Start on a custom port
+./bin/agy-online start -p 8080 -d
 
-# Stop running server daemon
-./bin/ai-cli-online stop
+# Inspect status, PID, RSS memory, and uptime
+./bin/agy-online status
 
-# Restart server
-./bin/ai-cli-online restart
+# Restart daemon cleanly
+./bin/agy-online restart
+
+# Stop daemon
+./bin/agy-online stop
 ```
 
-## Mobile & Termux Auto-Serving on Boot
+---
 
-AGY Online provides first-class support for running on Android devices via Termux:
+## 📱 Mobile & Termux (Android) Setup
 
-1. **Auto-Start on Device Boot**:
-   ```bash
-   bash scripts/install-termux-boot.sh
-   ```
-   This creates a boot hook in `~/.termux/boot/start-ai-cli-online.sh` that starts the server whenever your Android device powers on.
+AGY Online is optimized to run headlessly on Android devices via **Termux**, consuming under 15MB of RAM:
 
-2. **Wake-Lock & Battery Optimization**:
-   The installer automatically acquires `termux-wake-lock` to ensure Android does not put the CPU to sleep when the screen is off.
+### 1. 1-Tap Termux:Boot Auto-Start
 
-3. **Touch Quick-Keys Bar**:
-   The Web UI provides a mobile-friendly touch toolbar (`ESC`, `TAB`, `^C`, arrows, `agy ▶`, `/`, paste) toggleable via `⌨️`, eliminating mobile virtual keyboard friction.
-
-4. **Idle Power-Saving**:
-   When no browser tabs are connected, the backend automatically transitions to low-power idle mode, committing SQLite WAL and releasing garbage-collected memory (reducing RAM to ~70MB).
-
-## Configuration
-
-Create `server/.env`:
-
-```env
-PORT=3001                        # Server port
-HOST=0.0.0.0                     # Bind address
-AUTH_TOKEN=your-secret-token     # Auth token (required for production)
-DEFAULT_WORKING_DIR=/home/user   # Default working directory
-HTTPS_ENABLED=true               # Set to false behind nginx reverse proxy
-TRUST_PROXY=1                    # Set to 1 when behind nginx/reverse proxy
+```bash
+bash scripts/install-termux-boot.sh
 ```
 
-See `server/.env.example` for all available options.
+- Installs `~/.termux/boot/start-agy-online.sh`.
+- Acquires `termux-wake-lock` automatically so the CPU remains active when your phone screen turns off.
+- Boots AGY Online headlessly in the background whenever your Android phone boots up.
 
-## Architecture
+### 2. Mobile Touch Quick-Keys Toolbar
+
+Tap the **`⌨️`** button in the bottom navigation bar to toggle the touch-optimized mobile toolbar:
+- Quick keys: `ESC`, `TAB`, `Ctrl+C`, `Ctrl+D`, `▲`, `▼`, `◀`, `▶`, `/`
+- One-tap `agy ▶` launcher
+- Native clipboard paste button
+
+---
+
+## 🏗️ Architecture
 
 ```
-Browser (xterm.js + WebGL)
-  ├── Plan Panel (annotation editor)
-  ├── Chat Editor (Markdown + /commands)
-  └── Terminal View (WebGL renderer)
+Browser Client (xterm.js + WebGL)
+  ├── Plan Panel (interactive task annotation editor)
+  ├── Git History Panel (commit browser + diff viewer + lane graph)
+  ├── Chat Editor (Markdown + Antigravity slash commands)
+  └── Terminal View (WebGL renderer + quick-keys)
         │
-        ↕ WebSocket binary/JSON + REST API
-        │
-Go Native Server (Single static executable)
-  ├── Embedded Web UI assets (embed.FS)
+        ↕ WebSocket (0x01-0x05 binary frames) + REST API
+Go Native Server (Single static binary, 0 CGO)
+  ├── Embedded Web UI assets (embed.FS — no external node_modules)
   ├── WebSocket ↔ PTY relay (creack/pty + coder/websocket)
-  ├── tmux session manager (~/.tmux-sockets/ai-cli-online)
-  ├── File transfer API (tar.gz streaming, upload, download)
-  ├── SQLite (drafts, annotations, settings via modernc.org/sqlite)
-  └── REST route handlers (sessions, files, editor, settings, git, system)
+  ├── tmux session manager (~/.tmux-sockets/agy-online)
+  ├── Pure-Go SQLite with WAL mode (modernc.org/sqlite)
+  ├── Idle Memory Compactor (checkpoints WAL & frees OS memory after 60s idle)
+  └── REST routes (sessions, files, editor, settings, git, agy profiles)
         │
-        ↕ PTY / tmux sockets
-        │
-tmux sessions → shell → Google Antigravity CLI (agy) / AI agents
-  └── AiTasks/ lifecycle (init/plan/check/exec/merge/report/auto)
+        ↕ tmux socket / direct PTY fallback
+tmux session ──► shell ──► Google Antigravity CLI (agy)
+  └── AiTasks/ lifecycle (13-skill state machine)
 ```
 
-- **Frontend**: React + Zustand + xterm.js (WebGL)
-- **Backend**: Go (Golang) + `creack/pty` + `coder/websocket` + `modernc.org/sqlite` (Pure Go, 0 CGO)
-- **Binary**: Single self-contained static executable (`bin/ai-cli-online`) with embedded Web UI assets
-- **Session Manager**: tmux (persistent terminal sessions)
-- **Layout**: Tabs + recursive split tree (LeafNode / SplitNode)
-- **Transport**: Binary frames (hot path) + JSON (control messages)
-- **Task System**: 13-skill plugin with state machine, dependency gates, and experience database
+---
 
-## Project Structure
+## 🔧 Configuration & Environment Variables
 
-```
-ai-cli-online/
-├── cmd/ai-cli-online/   # CLI entry point & daemon lifecycle management
-├── internal/
-│   ├── files/           # Atomic file operations & symlink security guards
-│   ├── pid/             # Process ID tracking & lifecycle registry
-│   ├── routes/          # REST route handlers (sessions, files, git, task-auto)
-│   ├── server/          # HTTP & WebSocket server engine with embed.FS UI
-│   ├── terminal/        # PTY relay, tmux manager, and direct fallback
-│   └── ws/              # WebSocket hub & client connection supervision
-├── web/src/
-│   ├── App.tsx          # Main application (Login / TabBar / Terminal / Theme)
-│   ├── store/           # Zustand store (modular slices)
-│   ├── components/      # UI components (PlanPanel, TerminalView, AiChatView)
-│   ├── hooks/           # React hooks (WebSocket, adaptive polling, resize)
-│   └── api/             # Typed API client modules
-├── shared/              # Shared TypeScript interfaces & protocol types
-├── ai-cli-task/         # 13-skill Antigravity lifecycle plugin
-├── bin/                 # Compiled static executable (`bin/ai-cli-online`)
-├── start.sh             # Production startup script
-└── install-service.sh   # systemd + nginx installer
-```
+AGY Online reads environment variables from `~/.agy-online/.env` or `.env`:
 
-## Development
+| Variable | Default | Description |
+|:---|:---|:---|
+| `PORT` | `3001` | Server listening port |
+| `HOST` | `0.0.0.0` | Network bind address |
+| `AUTH_TOKEN` | *(empty)* | Optional authentication token required to access Web UI |
+| `DEFAULT_WORKING_DIR`| `$HOME` | Default directory when opening terminal sessions |
+| `DATA_DIR` | `~/.agy-online/data` | Database (`agy-online.db`) and persistent state directory |
+| `START_COMMAND` | *(system shell)* | Custom startup command for new terminal sessions |
+| `MAX_CONNECTIONS` | `10` | Maximum simultaneous WebSocket connections |
+
+---
+
+## 🛡️ Production Deployment (systemd + nginx)
+
+Run the automated production installer to configure a systemd service and optional nginx reverse proxy with WebSocket support and SSL:
 
 ```bash
-# Dev mode (frontend + backend separately)
-npm run dev
-
-# Build
-npm run build
-
-# Production (build + start)
-bash start.sh
+sudo bash install-service.sh
 ```
-
-### systemd Service + nginx Reverse Proxy
 
 ```bash
-sudo bash install-service.sh          # Interactive install (systemd + optional nginx)
-sudo systemctl start ai-cli-online    # Start service
-sudo journalctl -u ai-cli-online -f   # View logs
+# Manage system service
+sudo systemctl start agy-online
+sudo systemctl status agy-online
+sudo journalctl -u agy-online -f
 ```
 
-The install script will:
-1. Create a systemd service for auto-start and process management
-2. Detect nginx and optionally configure reverse proxy (WebSocket support, SSL, `client_max_body_size`)
-3. Auto-set `HTTPS_ENABLED=false` and `TRUST_PROXY=1` in `server/.env` when nginx is enabled
+---
 
-## Security
+## ⌨️ Global Keyboard Shortcuts
 
-- Token authentication with timing-safe comparison
-- Symlink traversal protection on all file operations
-- Unauthenticated WebSocket connection limits
-- TOCTOU download guard (streaming size check)
-- CSP headers (frame-ancestors, base-uri, form-action)
-- Rate limiting (configurable read/write thresholds)
+| Shortcut | Action |
+|:---|:---|
+| `Ctrl + \` | Toggle Chat Editor panel |
+| `Alt + A` | Open Autonomous Task Modal |
+| `Alt + P` | Open Skills Hub & Management Modal |
+| `Alt + G` | Toggle Git History & Diff Viewer panel |
+| `Alt + C` | Open Interactive Clarification Modal |
+| `Alt + H` | Open Help & Guide Modal |
+| `Ctrl + S` | Save file in Workspace Explorer |
+| `Escape` | Dismiss active modal or exit file edit mode |
 
-## Acknowledgements & Inspiration
+---
 
-AGY Online builds upon the architectural foundations, terminal ergonomics, and interaction paradigms established by:
+## 🤝 Acknowledgements
 
-- [**ai-cli-online**](https://github.com/huacheng/ai-cli-online) — The foundational browser-based web terminal and persistent AI CLI development environment.
-- [**hermes-webui**](https://github.com/nesquena/hermes-webui) — Inspirations in agent web interface design, terminal ergonomics, and autonomous workflows.
+AGY Online builds upon the architectural ideas and community efforts of:
+- [**Google Antigravity CLI (`agy`)**](https://github.com/google/antigravity) — Google's advanced autonomous agentic coding engine.
+- [**ai-cli-online**](https://github.com/huacheng/ai-cli-online) — The original foundational browser web terminal for CLI agents.
+- [**hermes-webui**](https://github.com/nesquena/hermes-webui) — Inspirations in agent web interface design and developer ergonomics.
 
-## License
+---
 
-MIT
+## 📄 License
+
+[MIT](LICENSE) © 2026 AGY Online Contributors.

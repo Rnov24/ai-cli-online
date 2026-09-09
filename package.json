@@ -1,21 +1,22 @@
 {
-  "name": "ai-cli-online",
+  "name": "agy-online",
   "version": "3.0.17",
   "description": "AGY Online — Autonomous Terminal & Development Workspace for Google Antigravity CLI (agy)",
   "license": "MIT",
   "bin": {
-    "ai-cli-online": "bin/ai-cli-online.mjs"
+    "agy-online": "bin/agy-online.mjs",
+    "ai-cli-online": "bin/agy-online.mjs"
   },
   "engines": {
     "node": ">=18"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/huacheng/ai-cli-online.git"
+    "url": "git+https://github.com/huacheng/agy-online.git"
   },
-  "homepage": "https://github.com/huacheng/ai-cli-online#readme",
+  "homepage": "https://github.com/huacheng/agy-online#readme",
   "bugs": {
-    "url": "https://github.com/huacheng/ai-cli-online/issues"
+    "url": "https://github.com/huacheng/agy-online/issues"
   },
   "keywords": [
     "terminal",
@@ -44,9 +45,9 @@
   "scripts": {
     "dev": "npm run dev --workspace=web",
     "dev:web": "npm run dev --workspace=web",
-    "build": "npm run build --workspace=shared && npm run build --workspace=web && go build -o bin/ai-cli-online ./cmd/ai-cli-online",
-    "build:go": "go build -o bin/ai-cli-online ./cmd/ai-cli-online",
-    "start": "./bin/ai-cli-online start",
+    "build": "npm run build --workspace=shared && npm run build --workspace=web && go build -o bin/agy-online ./cmd/agy-online",
+    "build:go": "go build -o bin/agy-online ./cmd/agy-online",
+    "start": "./bin/agy-online start",
     "test": "npm run test --workspace=web && go test -v ./...",
     "test:go": "go test -v ./...",
     "test:watch": "npm run test:watch --workspace=web"

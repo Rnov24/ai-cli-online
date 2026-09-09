@@ -5,7 +5,8 @@ export interface AccountProfile {
   lastUsed: number;
 }
 
-export const ACCOUNTS_STORAGE_KEY = 'ai-cli-online-accounts';
+export const ACCOUNTS_STORAGE_KEY = 'agy-online-accounts';
+export const LEGACY_ACCOUNTS_STORAGE_KEY = 'ai-cli-online-accounts';
 
 function getStorage(): Storage | null {
   try {
@@ -36,7 +37,13 @@ export function getSavedAccounts(): AccountProfile[] {
   if (!storage) return [];
 
   try {
-    const raw = storage.getItem(ACCOUNTS_STORAGE_KEY);
+    let raw = storage.getItem(ACCOUNTS_STORAGE_KEY);
+    if (!raw) {
+      raw = storage.getItem(LEGACY_ACCOUNTS_STORAGE_KEY);
+      if (raw) {
+        try { storage.setItem(ACCOUNTS_STORAGE_KEY, raw); } catch { /* ignore */ }
+      }
+    }
     if (!raw) return [];
     const accounts = JSON.parse(raw);
     if (!Array.isArray(accounts)) return [];

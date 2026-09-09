@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**AGY Online** (`ai-cli-online`) is a browser-based development environment built exclusively for **Google Antigravity CLI (`agy`)**. Through xterm.js + tmux, it provides persistent terminal sessions alongside an integrated Plan annotation panel, Git History visualizer, and Markdown Chat editor. It natively supports the `ai-cli-task` 13-skill lifecycle plugin (`init`, `plan`, `research`, `check`, `verify`, `exec`, `merge`, `report`, `auto`, `cancel`, `list`, `annotate`, `summarize`), enabling autonomous AI task execution.
+**AGY Online** (`agy-online`) is a browser-based development environment built exclusively for **Google Antigravity CLI (`agy`)**. Through xterm.js + tmux, it provides persistent terminal sessions alongside an integrated Plan annotation panel, Git History visualizer, and Markdown Chat editor. It natively supports the `ai-cli-task` 13-skill lifecycle plugin (`init`, `plan`, `research`, `check`, `verify`, `exec`, `merge`, `report`, `auto`, `cancel`, `list`, `annotate`, `summarize`), enabling autonomous AI task execution.
 
 ## Architecture
 
@@ -17,7 +17,7 @@ Browser (xterm.js + WebGL)
 Go Native Server (Single static executable)
   ├── Embedded Web UI assets (embed.FS)
   ├── WebSocket (0x01-0x05 binary) ↔ PTY relay (creack/pty)
-  ├── tmux session manager (~/.tmux-sockets/ai-cli-online)
+  ├── tmux session manager (~/.tmux-sockets/agy-online)
   ├── File transfer API (tar.gz streaming, upload, download)
   ├── Pure-Go SQLite (drafts, annotations, settings via modernc.org/sqlite)
   └── REST routes (sessions, files, editor, settings, git, system)
@@ -29,7 +29,7 @@ tmux sessions → shell → Google Antigravity CLI (agy)
 
 - **Frontend**: React + Zustand + xterm.js (WebGL rendering)
 - **Backend**: Go (Golang) + `creack/pty` + `coder/websocket` + `modernc.org/sqlite` (Pure Go, 0 CGO)
-- **Binary**: Single self-contained static executable (`bin/ai-cli-online`) with embedded Web UI assets
+- **Binary**: Single self-contained static executable (`bin/agy-online`) with embedded Web UI assets
 - **Session Management**: tmux (persistent terminal sessions survive disconnects)
 - **Layout**: Tabs + recursive split tree (LeafNode / SplitNode)
 - **Data Persistence**: SQLite (WAL mode, pure Go)
@@ -42,10 +42,10 @@ tmux sessions → shell → Google Antigravity CLI (agy)
 # Build Web UI and single Go binary
 npm run build
 # or build Go binary directly:
-go build -o bin/ai-cli-online ./cmd/ai-cli-online
+go build -o bin/agy-online ./cmd/agy-online
 
 # Start production server (foreground)
-./bin/ai-cli-online start
+./bin/agy-online start
 # or via npm:
 npm start
 
@@ -53,11 +53,11 @@ npm start
 npm test
 
 # Service lifecycle commands (with PID management)
-./bin/ai-cli-online start -d    # Background daemon mode
-./bin/ai-cli-online status      # Query PID, memory, and status
-./bin/ai-cli-online stop        # Stop daemon cleanly
-./bin/ai-cli-online restart     # Restart daemon
-./bin/ai-cli-online install-boot # Install Termux:Boot auto-start
+./bin/agy-online start -d    # Background daemon mode
+./bin/agy-online status      # Query PID, memory, and status
+./bin/agy-online stop        # Stop daemon cleanly
+./bin/agy-online restart     # Restart daemon
+./bin/agy-online install-boot # Install Termux:Boot auto-start
 
 # Termux & mobile auto-start script
 bash scripts/install-termux-boot.sh
@@ -76,8 +76,8 @@ bash start.sh
   - Calls `runtime.GC()` and `debug.FreeOSMemory()` to return physical pages to the OS kernel.
 - **Adaptive Polling**: Frontend pauses document, CWD, and task polling when the browser tab is hidden or screen is off.
 - **Mobile Quick-Keys**: Touch-friendly virtual toolbar (`ESC`, `TAB`, `^C`, arrows, `agy ▶`, `/`, clipboard) toggleable via `⌨️`.
-- **Termux:Boot Integration**: Registers auto-start on Android device boot via `~/.termux/boot/start-ai-cli-online.sh` with wake-lock support.
-- **PID Registry**: Tracks `server.pid` and `tmux.pid` in `~/.ai-cli-online/run/` for clean lifecycle management.
+- **Termux:Boot Integration**: Registers auto-start on Android device boot via `~/.termux/boot/start-agy-online.sh` with wake-lock support.
+- **PID Registry**: Tracks `server.pid` and `tmux.pid` in `~/.agy-online/run/` for clean lifecycle management.
 
 ## Antigravity CLI (`agy`) Integration
 

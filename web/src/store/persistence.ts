@@ -15,12 +15,21 @@ import { removeLeafFromTree } from './helpers';
 // Constants
 // ---------------------------------------------------------------------------
 
-export const TABS_KEY = 'ai-cli-online-tabs';
-export const LEGACY_LAYOUT_KEY = 'ai-cli-online-layout';
-export const LEGACY_SESSION_NAMES_KEY = 'ai-cli-online-session-names';
+export const TABS_KEY = 'agy-online-tabs';
+export const LEGACY_TABS_KEY = 'ai-cli-online-tabs';
+export const LEGACY_LAYOUT_KEY = 'agy-online-layout';
+export const OLD_LAYOUT_KEY = 'ai-cli-online-layout';
+export const LEGACY_SESSION_NAMES_KEY = 'agy-online-session-names';
+export const OLD_SESSION_NAMES_KEY = 'ai-cli-online-session-names';
 
 export function getTabsKey(token?: string | null): string {
   if (!token) return TABS_KEY;
+  const id = computeTokenId(token);
+  return `agy-online-tabs-${id}`;
+}
+
+export function getLegacyTabsKey(token?: string | null): string {
+  if (!token) return LEGACY_TABS_KEY;
   const id = computeTokenId(token);
   return `ai-cli-online-tabs-${id}`;
 }
@@ -120,10 +129,17 @@ export function toPersistable(state: AppState): PersistableFields {
 export function loadTabs(token?: string | null): PersistedTabsState | null {
   const activeToken = token ?? _store?.getState().token ?? null;
   const namespacedKey = activeToken ? getTabsKey(activeToken) : null;
+  const legacyNamespacedKey = activeToken ? getLegacyTabsKey(activeToken) : null;
 
   if (namespacedKey) {
     try {
-      const raw = localStorage.getItem(namespacedKey);
+      let raw = localStorage.getItem(namespacedKey);
+      if (!raw && legacyNamespacedKey) {
+        raw = localStorage.getItem(legacyNamespacedKey);
+        if (raw) {
+          try { localStorage.setItem(namespacedKey, raw); } catch { /* ignore */ }
+        }
+      }
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed.version === 2) return parsed as PersistedTabsState;
@@ -135,7 +151,13 @@ export function loadTabs(token?: string | null): PersistedTabsState | null {
 
   // Try v2 format from default / fallback key
   try {
-    const raw = localStorage.getItem(TABS_KEY);
+    let raw = localStorage.getItem(TABS_KEY);
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_TABS_KEY);
+      if (raw) {
+        try { localStorage.setItem(TABS_KEY, raw); } catch { /* ignore */ }
+      }
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.version === 2) return parsed as PersistedTabsState;
@@ -146,13 +168,13 @@ export function loadTabs(token?: string | null): PersistedTabsState | null {
 
   // Migrate from v1 (old layout + session names)
   try {
-    const raw = localStorage.getItem(LEGACY_LAYOUT_KEY);
+    const raw = localStorage.getItem(LEGACY_LAYOUT_KEY) || localStorage.getItem(OLD_LAYOUT_KEY);
     if (raw) {
       const legacy: LegacyPersistedLayout = JSON.parse(raw);
 
       let tabName = 'Default';
       try {
-        const namesRaw = localStorage.getItem(LEGACY_SESSION_NAMES_KEY);
+        const namesRaw = localStorage.getItem(LEGACY_SESSION_NAMES_KEY) || localStorage.getItem(OLD_SESSION_NAMES_KEY);
         if (namesRaw) {
           const names: Record<string, string> = JSON.parse(namesRaw);
           const first = Object.values(names)[0];

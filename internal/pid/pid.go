@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/files"
+	"github.com/huacheng/agy-online/internal/files"
 )
 
 type ProcessInfo struct {
@@ -29,7 +29,7 @@ func IsTermux() bool {
 func GetRunDir() string {
 	home, _ := os.UserHomeDir()
 	if home != "" {
-		dir := filepath.Join(home, ".ai-cli-online", "run")
+		dir := filepath.Join(home, ".agy-online", "run")
 		if err := os.MkdirAll(dir, 0700); err == nil {
 			return dir
 		}

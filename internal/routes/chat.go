@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/agy"
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/agy"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 type ChatHandler struct {

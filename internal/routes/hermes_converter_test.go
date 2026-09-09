@@ -7,10 +7,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
+	"github.com/huacheng/agy-online/internal/config"
 )
 
 func TestHermesConverter_Detection(t *testing.T) {
@@ -300,7 +301,7 @@ def run_action(message: str = "pong"):
 	runnerFile := filepath.Join(skillDir, "scripts", "runner.py")
 	if fi, err := os.Stat(runnerFile); err != nil || fi.IsDir() {
 		t.Errorf("runner.py not found in %s", skillDir)
-	} else if fi.Mode()&0111 == 0 {
+	} else if runtime.GOOS != "windows" && fi.Mode()&0111 == 0 {
 		t.Errorf("runner.py is not executable: mode=%v", fi.Mode())
 	}
 

@@ -33,7 +33,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
 
   theme: (() => {
     try {
-      const saved = localStorage.getItem('ai-cli-online-theme');
+      const saved = localStorage.getItem('agy-online-theme') || localStorage.getItem('ai-cli-online-theme');
       if (saved === 'light' || saved === 'dark') return saved;
     } catch { /* ignore */ }
     return 'dark';
@@ -41,7 +41,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
 
   setTheme: (theme) => {
     set({ theme });
-    try { localStorage.setItem('ai-cli-online-theme', theme); } catch { /* ignore */ }
+    try { localStorage.setItem('agy-online-theme', theme); } catch { /* ignore */ }
     document.documentElement.setAttribute('data-theme', theme);
   },
 

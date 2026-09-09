@@ -37,7 +37,7 @@ if command -v termux-wake-lock >/dev/null 2>&1; then
 fi
 PROJECT_DIR="__PROJECT_DIR__"
 cd "$PROJECT_DIR"
-./bin/ai-cli-online start -d
+./bin/agy-online start -d
 # Open browser automatically to localhost URL
 if command -v termux-open-url >/dev/null 2>&1; then
   sleep 1
@@ -53,7 +53,7 @@ cat > "$STOP_TASK" << 'TASK_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 PROJECT_DIR="__PROJECT_DIR__"
 cd "$PROJECT_DIR"
-./bin/ai-cli-online stop
+./bin/agy-online stop
 if command -v termux-wake-unlock >/dev/null 2>&1; then
   termux-wake-unlock
 fi

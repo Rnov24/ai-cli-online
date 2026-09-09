@@ -44,7 +44,7 @@ export const useStore = create<AppState>((...args) => {
     setToken: (token) => {
       if (token) {
         try {
-          localStorage.setItem('ai-cli-online-token', token);
+          localStorage.setItem('agy-online-token', token);
         } catch {
           /* storage full */
         }
@@ -124,6 +124,7 @@ export const useStore = create<AppState>((...args) => {
       }
 
       // Logout
+      localStorage.removeItem('agy-online-token');
       localStorage.removeItem('ai-cli-online-token');
       // Do not clear saved tabs so accounts preserve their layout across sessions
 

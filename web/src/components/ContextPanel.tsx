@@ -3,7 +3,7 @@ import { PlanPanel } from './PlanPanel';
 import { WorkspaceFilesPanel } from './WorkspaceFilesPanel';
 import { GitHistoryPanel } from './GitHistoryPanel';
 import { ChevronRightIcon } from './icons';
-import type { SystemStatus } from 'ai-cli-online-shared';
+import type { SystemStatus } from 'agy-online-shared';
 
 interface ContextPanelProps {
   isOpen: boolean;

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 type AuthHelper struct {

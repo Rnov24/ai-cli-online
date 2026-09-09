@@ -10,13 +10,13 @@ echo.
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%.."
 
-set "BIN_EXE=%CD%\bin\ai-cli-online.exe"
+set "BIN_EXE=%CD%\bin\agy-online.exe"
 
 if not exist "%BIN_EXE%" (
-    echo [BUILD] ai-cli-online.exe not found in bin\. Building now...
-    go build -o "%BIN_EXE%" ./cmd/ai-cli-online
+    echo [BUILD] agy-online.exe not found in bin\. Building now...
+    go build -o "%BIN_EXE%" ./cmd/agy-online
     if not exist "%BIN_EXE%" (
-        echo [ERROR] Failed to compile bin\ai-cli-online.exe. Please ensure Go is installed.
+        echo [ERROR] Failed to compile bin\agy-online.exe. Please ensure Go is installed.
         pause
         exit /b 1
     )

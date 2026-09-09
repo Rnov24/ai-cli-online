@@ -15,13 +15,13 @@ import (
 	"syscall"
 	"time"
 
-	aicli "github.com/huacheng/ai-cli-online"
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/db"
-	"github.com/huacheng/ai-cli-online/internal/idle"
-	"github.com/huacheng/ai-cli-online/internal/pid"
-	"github.com/huacheng/ai-cli-online/internal/server"
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	agyonline "github.com/huacheng/agy-online"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/db"
+	"github.com/huacheng/agy-online/internal/idle"
+	"github.com/huacheng/agy-online/internal/pid"
+	"github.com/huacheng/agy-online/internal/server"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 const AppVersion = "3.1.0-go"
@@ -176,7 +176,7 @@ func runServer(registerPid bool, portOverride int) {
 		}()
 	}
 
-	staticFS, err := aicli.GetWebDistFS()
+	staticFS, err := agyonline.GetWebDistFS()
 	if err != nil {
 		log.Printf("[server] Warning: embedded web assets not available: %v", err)
 	}

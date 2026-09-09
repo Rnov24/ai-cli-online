@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useStore } from '../store';
-import type { SystemStatus } from 'ai-cli-online-shared';
+import type { SystemStatus } from 'agy-online-shared';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import { MenuIcon, SearchIcon, SettingsIcon } from './icons';
 

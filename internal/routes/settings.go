@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/huacheng/ai-cli-online/internal/db"
+	"github.com/huacheng/agy-online/internal/db"
 )
 
 type SettingsHandler struct {

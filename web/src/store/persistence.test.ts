@@ -14,7 +14,7 @@ describe('persistence', () => {
     const key2 = getTabsKey('token-123');
     const key3 = getTabsKey('token-456');
 
-    expect(key1).toMatch(/^ai-cli-online-tabs-[0-9a-f]{8}$/);
+    expect(key1).toMatch(/^agy-online-tabs-[0-9a-f]{8}$/);
     expect(key1).toBe(key2);
     expect(key1).not.toBe(key3);
   });

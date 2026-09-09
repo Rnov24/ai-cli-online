@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
-	"github.com/huacheng/ai-cli-online/internal/db"
+	"github.com/huacheng/agy-online/internal/config"
+	"github.com/huacheng/agy-online/internal/db"
 )
 
 func TestTaskAutoHandler(t *testing.T) {
@@ -285,11 +285,17 @@ func TestTaskAutoHandler(t *testing.T) {
 
 		go handler.watchAutoLoop(ctx, sessionTerm, taskDirTerm, 10, 15, time.Now())
 
-		// Wait for ticker (2s) to execute session check
-		time.Sleep(2200 * time.Millisecond)
+		// Wait for watchAutoLoop to detect terminated session (ticker runs every 2s)
+		var rec *db.TaskAutoRecord
+		for i := 0; i < 60; i++ {
+			time.Sleep(100 * time.Millisecond)
+			rec, _ = database.GetTaskAuto(sessionTerm)
+			if rec == nil {
+				break
+			}
+		}
 
 		// Dead session record should be reaped from DB
-		rec, _ := database.GetTaskAuto(sessionTerm)
 		if rec != nil {
 			t.Errorf("Expected terminated session record to be deleted, got %+v", rec)
 		}

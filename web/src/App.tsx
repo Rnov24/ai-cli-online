@@ -15,10 +15,10 @@ import { AccountSwitcherModal } from './components/AccountSwitcherModal';
 import { fetchSystemStatus } from './api/system';
 import { fetchCwd } from './api/files';
 import { useAdaptivePolling } from './hooks/useAdaptivePolling';
-import type { SystemStatus } from 'ai-cli-online-shared';
+import type { SystemStatus } from 'agy-online-shared';
 
 function getInitialToken(): string | null {
-  return localStorage.getItem('ai-cli-online-token');
+  return localStorage.getItem('agy-online-token') || localStorage.getItem('ai-cli-online-token');
 }
 
 function App() {

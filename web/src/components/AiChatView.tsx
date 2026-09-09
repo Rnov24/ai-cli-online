@@ -20,7 +20,7 @@ import {
 import { fetchSessionJournal, TurnJournalItem } from '../api/journal';
 import { exportSessionToHtml } from '../utils/exportHtml';
 import { useStore } from '../store';
-import type { ChatMessage, ToolCall } from 'ai-cli-online-shared';
+import type { ChatMessage, ToolCall } from 'agy-online-shared';
 import {
   fetchWorkspaceMode,
   fetchWorkspaces,

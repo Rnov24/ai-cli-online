@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/huacheng/ai-cli-online/internal/agy"
-	"github.com/huacheng/ai-cli-online/internal/config"
+	"github.com/huacheng/agy-online/internal/agy"
+	"github.com/huacheng/agy-online/internal/config"
 )
 
 func TestAgyProfilesRoutes(t *testing.T) {

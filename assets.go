@@ -1,4 +1,4 @@
-package aicli
+package agyonline
 
 import (
 	"embed"

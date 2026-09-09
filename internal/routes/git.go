@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huacheng/ai-cli-online/internal/terminal"
+	"github.com/huacheng/agy-online/internal/terminal"
 )
 
 type GitHandler struct {

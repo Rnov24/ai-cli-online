@@ -11,8 +11,8 @@ echo "Compiling AGY Online for Android ARM64..."
 mkdir -p "${ROOT_DIR}/dist"
 CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build \
   -ldflags="-s -w" \
-  -o "${ROOT_DIR}/dist/ai-cli-online-android-arm64" \
-  "${ROOT_DIR}/cmd/ai-cli-online"
+  -o "${ROOT_DIR}/dist/agy-online-android-arm64" \
+  "${ROOT_DIR}/cmd/agy-online"
 
-echo "✔ Build complete: ${ROOT_DIR}/dist/ai-cli-online-android-arm64"
-ls -lh "${ROOT_DIR}/dist/ai-cli-online-android-arm64"
+echo "✔ Build complete: ${ROOT_DIR}/dist/agy-online-android-arm64"
+ls -lh "${ROOT_DIR}/dist/agy-online-android-arm64"

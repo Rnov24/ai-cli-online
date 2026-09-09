@@ -3,7 +3,7 @@ package ws
 import (
 	"testing"
 
-	"github.com/huacheng/ai-cli-online/internal/config"
+	"github.com/huacheng/agy-online/internal/config"
 )
 
 func TestHubSessionManagement(t *testing.T) {

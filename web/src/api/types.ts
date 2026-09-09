@@ -1,4 +1,4 @@
-import type { FileEntry } from 'ai-cli-online-shared';
+import type { FileEntry } from 'agy-online-shared';
 
 export type { FileEntry };
 

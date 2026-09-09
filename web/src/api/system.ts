@@ -1,6 +1,6 @@
 import { API_BASE, authHeaders } from './client';
 import { parseResponse } from './apiClient';
-import type { SystemStatus } from 'ai-cli-online-shared';
+import type { SystemStatus } from 'agy-online-shared';
 
 export async function fetchSystemStatus(token: string): Promise<SystemStatus> {
   const res = await fetch(`${API_BASE}/api/system/status`, {

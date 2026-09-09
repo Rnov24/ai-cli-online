@@ -3,10 +3,14 @@ package agy
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
 func TestAuthFlowWithMockAgy(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping shell mock on Windows")
+	}
 	cliDir := setupTestCliDir(t)
 	_ = cliDir
 
@@ -67,6 +71,9 @@ fi
 }
 
 func TestCancelAuthFlow(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping shell mock on Windows")
+	}
 	mockDir := t.TempDir()
 	mockAgy := filepath.Join(mockDir, "mock-agy-sleep.sh")
 	script := `#!/bin/sh
@@ -96,6 +103,9 @@ sleep 10
 }
 
 func TestStartAuthFlowWithRealAgy(t *testing.T) {
+	if os.Getenv("AGY_TEST_LIVE_AUTH") != "1" {
+		t.Skip("skipping live agy auth test without AGY_TEST_LIVE_AUTH=1")
+	}
 	bin := ResolveAgyBinary()
 	if bin == "" || bin == "agy" {
 		t.Skip("real agy binary not available")

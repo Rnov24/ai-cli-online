@@ -27,7 +27,7 @@ func init() {
 	}
 	dir := filepath.Join(home, ".tmux-sockets")
 	_ = os.MkdirAll(dir, 0700)
-	SocketPath = filepath.Join(dir, "ai-cli-online")
+	SocketPath = filepath.Join(dir, "agy-online")
 }
 
 func Exec(ctx context.Context, args ...string) (string, error) {
