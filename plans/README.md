@@ -38,6 +38,7 @@ honor its STOP conditions, and update your row when done.
 | [028](028-workspace-files-breadcrumbs-filter-and-save-shortcut.md) | Workspace File Explorer Breadcrumb Navigation, Quick Filter, and Save Shortcut Hardening | P1 | M | 027 | DONE |
 | [029](029-git-history-commit-search-and-filter-ergonomics.md) | Git History Commit Message Search, Query Injection Guard, and Filter Ergonomics | P1 | M | 028 | DONE |
 | [030](030-terminal-pty-zombie-reaping-and-winsize-sanitization.md) | Terminal PTY Zombie Process Reaping, Auto-Cleanup on Exit, and Window Size Clamping | P1 | M | 029 | DONE |
+| [031](031-binary-content-detection-permission-preservation-and-download.md) | Content-Based Binary Detection, File Permission Preservation, and Binary Download UX | P1 | M | 030 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -63,6 +64,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 028 builds on Plan 027**: Delivers interactive segmented breadcrumb navigation, real-time file filtering, and Ctrl+S/Escape keyboard shortcut ergonomics to WorkspaceFilesPanel.
 - **Plan 029 builds on Plan 028**: Delivers git commit message search (`q`), query injection protection, search clear ergonomics, and DOMPurify aria-label retention.
 - **Plan 030 builds on Plan 029**: Delivers background process reaping (`cmd.Wait()`) for direct and tmux sessions, auto-cleanup on shell exit, and terminal geometry sanitization.
+- **Plan 031 builds on Plan 030**: Delivers content-based binary detection, executable permission preservation on file write, and direct binary download action.
 
 ## Findings considered and rejected
 

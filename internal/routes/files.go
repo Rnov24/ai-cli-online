@@ -380,7 +380,12 @@ func (f *FileHandler) GetFileContent(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(filepath.Ext(resolved))
 	isBinary := (ext == ".pdf" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
-		ext == ".gif" || ext == ".webp" || ext == ".ico" || ext == ".bmp")
+		ext == ".gif" || ext == ".webp" || ext == ".ico" || ext == ".bmp" ||
+		ext == ".wasm" || ext == ".zip" || ext == ".tar" || ext == ".gz" ||
+		ext == ".tgz" || ext == ".7z" || ext == ".rar" || ext == ".sqlite" ||
+		ext == ".db" || ext == ".bin" || ext == ".so" || ext == ".dylib" ||
+		ext == ".dll" || ext == ".exe" || ext == ".mp3" || ext == ".mp4" ||
+		ext == ".webm" || ext == ".ogg" || ext == ".wav" || ext == ".flac") || isBinaryContent(data)
 
 	content := string(data)
 	encoding := "utf-8"
@@ -396,4 +401,17 @@ func (f *FileHandler) GetFileContent(w http.ResponseWriter, r *http.Request) {
 		"size":     fi.Size(),
 		"encoding": encoding,
 	})
+}
+
+func isBinaryContent(data []byte) bool {
+	n := len(data)
+	if n > 512 {
+		n = 512
+	}
+	for i := 0; i < n; i++ {
+		if data[i] == 0 {
+			return true
+		}
+	}
+	return false
 }

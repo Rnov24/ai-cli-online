@@ -270,7 +270,37 @@ func TestFileHandler_GetFileContent(t *testing.T) {
 		t.Errorf("Expected size %d, got %d", len(pngBytes), pngResp.Size)
 	}
 
-	// Test 3: StatusNotModified check with since
+	// Test 3: Fetch arbitrary binary file with null bytes
+	binFile := filepath.Join(tempDir, "data.bin")
+	binBytes := []byte{0x00, 0x01, 0x02, 0xFF, 0x00, 0xFE}
+	if err := os.WriteFile(binFile, binBytes, 0644); err != nil {
+		t.Fatalf("Failed to write bin file: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/sessions/tab-1/file-content?path=data.bin", nil)
+	req.SetPathValue("sessionId", "tab-1")
+	w = httptest.NewRecorder()
+	fileH.GetFileContent(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for data.bin, got %d: %s", w.Code, w.Body.String())
+	}
+	var binResp struct {
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+		Size     int64  `json:"size"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &binResp); err != nil {
+		t.Fatalf("Failed to decode json response: %v", err)
+	}
+	if binResp.Encoding != "base64" {
+		t.Errorf("Expected encoding base64 for data.bin, got %s", binResp.Encoding)
+	}
+	if binResp.Size != int64(len(binBytes)) {
+		t.Errorf("Expected size %d, got %d", len(binBytes), binResp.Size)
+	}
+
+	// Test 4: StatusNotModified check with since
 	sinceURL := fmt.Sprintf("/api/sessions/tab-1/file-content?path=note.txt&since=%.0f", textResp.Mtime)
 	req = httptest.NewRequest(http.MethodGet, sinceURL, nil)
 	req.SetPathValue("sessionId", "tab-1")

@@ -3,7 +3,7 @@ import { fetchFiles, downloadFile, deleteItem, touchFile, mkdirPath } from '../a
 import type { FileEntry } from '../api/files';
 import { fetchFileContent, saveFileContent } from '../api/docs';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { FolderIcon, FileIcon, SaveIcon, CheckIcon, EditIcon, CloseIcon, RefreshCwIcon } from './icons';
+import { FolderIcon, FileIcon, SaveIcon, CheckIcon, EditIcon, CloseIcon, RefreshCwIcon, DownloadIcon } from './icons';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
 
 interface WorkspaceFilesPanelProps {
@@ -215,14 +215,18 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
     }
   };
 
-  const handleDownload = async (entry: FileEntry, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const itemPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+  const handleDownloadPath = async (filePath: string) => {
     try {
-      await downloadFile(token, sessionId, itemPath);
+      await downloadFile(token, sessionId, filePath);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to download');
     }
+  };
+
+  const handleDownload = async (entry: FileEntry, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const itemPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+    await handleDownloadPath(itemPath);
   };
 
   const pathSegments = currentPath ? currentPath.split('/').filter(Boolean) : [];
@@ -608,16 +612,33 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {fileEncoding === 'base64' ? (
-                  <span style={{
-                    fontSize: '10px',
-                    color: isImageFile(selectedFile) ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                    padding: '2px 6px',
-                    backgroundColor: isImageFile(selectedFile) ? 'rgba(56, 189, 248, 0.1)' : 'var(--bg-tertiary)',
-                    borderRadius: '3px',
-                    fontFamily: 'var(--font-mono)',
-                  }}>
-                    {isImageFile(selectedFile) ? 'Image Preview' : 'Binary File'}
-                  </span>
+                  <>
+                    <span style={{
+                      fontSize: '10px',
+                      color: isImageFile(selectedFile) ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      padding: '2px 6px',
+                      backgroundColor: isImageFile(selectedFile) ? 'rgba(56, 189, 248, 0.1)' : 'var(--bg-tertiary)',
+                      borderRadius: '3px',
+                      fontFamily: 'var(--font-mono)',
+                    }}>
+                      {isImageFile(selectedFile) ? 'Image Preview' : 'Binary File'}
+                    </span>
+                    <button
+                      className="mecha-btn"
+                      onClick={() => handleDownloadPath(selectedFile)}
+                      title="Download file"
+                      aria-label="Download file"
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                    >
+                      <DownloadIcon size={11} /> Download
+                    </button>
+                  </>
                 ) : isEditing ? (
                   <>
                     <button
@@ -749,6 +770,21 @@ export function WorkspaceFilesPanel({ sessionId, token }: WorkspaceFilesPanelPro
                     <FileIcon size={32} />
                     <span>Binary file preview is not supported for this file type.</span>
                     <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)' }}>{selectedFile}</span>
+                    <button
+                      className="mecha-btn"
+                      onClick={() => handleDownloadPath(selectedFile)}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '11px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        cursor: 'pointer',
+                        marginTop: '4px',
+                      }}
+                    >
+                      <DownloadIcon size={12} /> Download File
+                    </button>
                   </div>
                 ) : selectedFile.endsWith('.md') ? (
                   <MarkdownRenderer content={fileContent} />

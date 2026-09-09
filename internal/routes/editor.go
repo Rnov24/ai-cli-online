@@ -205,7 +205,12 @@ func (e *EditorHandler) WriteFileContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := files.AtomicWriteFile(resolved, []byte(req.Content), 0644); err != nil {
+	perm := fi.Mode().Perm()
+	if perm == 0 {
+		perm = 0644
+	}
+
+	if err := files.AtomicWriteFile(resolved, []byte(req.Content), perm); err != nil {
 		http.Error(w, `{"error":"Failed to write file"}`, http.StatusInternalServerError)
 		return
 	}

@@ -276,6 +276,38 @@ func TestWriteFileContent_PathValidation(t *testing.T) {
 	if !writeResp.Ok || writeResp.Mtime <= 0 {
 		t.Errorf("Expected ok=true and positive mtime, got %+v", writeResp)
 	}
+
+	// Test writing to an executable script preserves executable permissions
+	scriptFile := filepath.Join(tempDir, "script.sh")
+	_ = os.WriteFile(scriptFile, []byte("#!/bin/sh\necho hi\n"), 0755)
+	_ = os.Chmod(scriptFile, 0755)
+	origFi, _ := os.Stat(scriptFile)
+	expectedPerm := origFi.Mode().Perm()
+
+	body, _ = json.Marshal(map[string]string{
+		"path":    "script.sh",
+		"content": "#!/bin/sh\necho updated\n",
+	})
+	req = httptest.NewRequest(http.MethodPut, "/api/sessions/tab-1/file-content", bytes.NewReader(body))
+	req.SetPathValue("sessionId", "tab-1")
+	req.Header.Set("Authorization", "Bearer test-secret")
+	w = httptest.NewRecorder()
+
+	editH.WriteFileContent(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for script.sh, got %d: %s", w.Code, w.Body.String())
+	}
+
+	scriptFi, err := os.Stat(scriptFile)
+	if err != nil {
+		t.Fatalf("os.Stat script.sh failed: %v", err)
+	}
+	if scriptFi.Mode().Perm() != expectedPerm {
+		t.Errorf("Expected permissions %04o to be preserved, got %04o", expectedPerm, scriptFi.Mode().Perm())
+	}
+	if scriptFi.Mode().Perm()&0100 == 0 {
+		t.Errorf("Expected executable bit to be preserved")
+	}
 }
 
 func TestKillSession_Cascade(t *testing.T) {

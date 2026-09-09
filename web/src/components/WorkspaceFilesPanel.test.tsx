@@ -211,4 +211,36 @@ describe('WorkspaceFilesPanel Component', () => {
       expect(screen.queryByText('Close')).not.toBeInTheDocument();
     });
   });
+
+  it('renders binary file preview with download button and triggers download', async () => {
+    vi.mocked(docsApi.fetchFileContent).mockResolvedValueOnce({
+      content: 'AAAA',
+      encoding: 'base64',
+      size: 4,
+      mtime: Date.now(),
+    });
+
+    render(<WorkspaceFilesPanel token={mockToken} sessionId={mockSessionId} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('package.json')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('package.json'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Binary file preview is not supported for this file type.')).toBeInTheDocument();
+    });
+
+    // Verify Download button is present
+    const downloadBtns = screen.getAllByRole('button', { name: /download/i });
+    expect(downloadBtns.length).toBeGreaterThan(0);
+
+    // Click download
+    fireEvent.click(downloadBtns[0]);
+
+    await waitFor(() => {
+      expect(filesApi.downloadFile).toHaveBeenCalledWith(mockToken, mockSessionId, 'package.json');
+    });
+  });
 });
