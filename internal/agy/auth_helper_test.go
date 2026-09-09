@@ -94,3 +94,29 @@ sleep 10
 		t.Fatalf("expected error submitting code to cancelled flow, got nil")
 	}
 }
+
+func TestStartAuthFlowWithRealAgy(t *testing.T) {
+	bin := ResolveAgyBinary()
+	if bin == "" || bin == "agy" {
+		t.Skip("real agy binary not available")
+	}
+
+	resp, err := StartAuthFlow("test-live-profile")
+	if err != nil {
+		t.Fatalf("StartAuthFlow failed: %v", err)
+	}
+	defer func() {
+		if resp.FlowID != "" {
+			CancelAuthFlow(resp.FlowID)
+		}
+	}()
+
+	if resp.AuthURL == "" {
+		t.Fatalf("expected non-empty AuthURL, got empty; Message=%q", resp.Message)
+	}
+
+	if resp.FlowID == "" {
+		t.Fatalf("expected non-empty FlowID")
+	}
+}
+

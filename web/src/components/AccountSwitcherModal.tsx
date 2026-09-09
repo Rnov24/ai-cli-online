@@ -58,7 +58,7 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
   const [isSavingCurrent, setIsSavingCurrent] = useState(false);
 
   // Auth Helper & Add Profile State
-  const [activeTab, setActiveTab] = useState<'oauth' | 'paste' | null>(null);
+  const [activeTab, setActiveTab] = useState<'oauth' | 'paste' | null>('oauth');
   const [newProfileName, setNewProfileName] = useState('');
   const [authFlowId, setAuthFlowId] = useState<string | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
@@ -103,7 +103,7 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
       setAgySuccess(null);
       setWebError(null);
       setEditingProfile(null);
-      setActiveTab(null);
+      setActiveTab('oauth');
       setAuthFlowId(null);
       setAuthUrl(null);
       setAuthCodeInput('');
@@ -866,7 +866,7 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button
                   type="button"
-                  onClick={() => setActiveTab(activeTab === 'oauth' ? null : 'oauth')}
+                  onClick={() => setActiveTab('oauth')}
                   style={{
                     padding: '4px 8px',
                     fontSize: '11px',
@@ -883,7 +883,7 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab(activeTab === 'paste' ? null : 'paste')}
+                  onClick={() => setActiveTab('paste')}
                   style={{
                     padding: '4px 8px',
                     fontSize: '11px',
@@ -1028,6 +1028,31 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
                       >
                         <CopyIcon size={13} /> {copiedUrl ? 'Copied!' : 'Copy Link'}
                       </button>
+                    </div>
+
+                    <div
+                      style={{
+                        padding: '8px 10px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        marginBottom: '10px',
+                        wordBreak: 'break-all',
+                        fontSize: '11px',
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      <div style={{ color: 'var(--text-secondary)', marginBottom: '4px', fontSize: '10px', fontWeight: 600 }}>
+                        CLICKABLE AUTHORIZATION LINK:
+                      </div>
+                      <a
+                        href={authUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}
+                      >
+                        {authUrl}
+                      </a>
                     </div>
 
                     <form onSubmit={handleSubmitAuthCode}>
