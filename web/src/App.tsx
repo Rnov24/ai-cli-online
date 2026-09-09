@@ -11,6 +11,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsModal, HelpGuideTab } from './components/ShortcutsModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AutoTaskModal } from './components/AutoTaskModal';
+import { AccountSwitcherModal } from './components/AccountSwitcherModal';
 import { fetchSystemStatus } from './api/system';
 import { fetchCwd } from './api/files';
 import { useAdaptivePolling } from './hooks/useAdaptivePolling';
@@ -44,6 +45,7 @@ function App() {
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [autoTaskModalOpen, setAutoTaskModalOpen] = useState(false);
+  const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [autoTaskModule, setAutoTaskModule] = useState('');
   const [helpGuideTab, setHelpGuideTab] = useState<HelpGuideTab>('quickstart');
 
@@ -69,6 +71,14 @@ function App() {
     };
     window.addEventListener('agy:open-auto-task', onAutoTaskEvent);
     return () => window.removeEventListener('agy:open-auto-task', onAutoTaskEvent);
+  }, []);
+
+  useEffect(() => {
+    const onAccountSwitcherEvent = () => {
+      setAccountSwitcherOpen(true);
+    };
+    window.addEventListener('agy:open-account-switcher', onAccountSwitcherEvent);
+    return () => window.removeEventListener('agy:open-account-switcher', onAccountSwitcherEvent);
   }, []);
 
   // Active session details
@@ -246,6 +256,10 @@ function App() {
 
       // Esc: Close any active modal
       if (e.key === 'Escape') {
+        if (accountSwitcherOpen) {
+          setAccountSwitcherOpen(false);
+          return;
+        }
         if (autoTaskModalOpen) {
           setAutoTaskModalOpen(false);
           return;
@@ -272,6 +286,7 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
+    accountSwitcherOpen,
     autoTaskModalOpen,
     commandPaletteOpen,
     shortcutsModalOpen,
@@ -316,6 +331,7 @@ function App() {
         systemStatus={systemStatus}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onOpenHelp={() => handleOpenHelp('quickstart')}
+        onOpenAccountSwitcher={() => setAccountSwitcherOpen(true)}
         onToggleContextPanel={() => setContextPanelOpen(!contextPanelOpen)}
         contextPanelOpen={contextPanelOpen}
         onToggleMobileNav={() => setMobileNavOpen(true)}
@@ -404,6 +420,12 @@ function App() {
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         systemStatus={systemStatus}
+      />
+
+      {/* Account Profile Switcher Modal */}
+      <AccountSwitcherModal
+        isOpen={accountSwitcherOpen}
+        onClose={() => setAccountSwitcherOpen(false)}
       />
 
       {/* Autonomous Task Loop Modal (⚡) */}

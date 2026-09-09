@@ -39,3 +39,9 @@ server/certs/
 *.exe
 *.exe~
 
+# Agent survey scratch files
+.agents/
+ORIGINAL_REQUEST.md
+PROJECT.md
+TEST_INFRA.md
+

@@ -57,7 +57,7 @@ export const useStore = create<AppState>((...args) => {
         });
 
         // Phase 1: synchronous localStorage restore (fast render)
-        const localSaved = loadTabs();
+        const localSaved = loadTabs(token);
         if (localSaved && localSaved.tabs.length > 0) {
           const terminalsMap: Record<string, TerminalInstance> = {};
           for (const tab of localSaved.tabs) {
@@ -125,7 +125,7 @@ export const useStore = create<AppState>((...args) => {
 
       // Logout
       localStorage.removeItem('ai-cli-online-token');
-      localStorage.removeItem('ai-cli-online-tabs');
+      // Do not clear saved tabs so accounts preserve their layout across sessions
 
       set({
         token,

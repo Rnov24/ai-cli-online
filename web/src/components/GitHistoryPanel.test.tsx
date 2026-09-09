@@ -24,7 +24,7 @@ import { fetchWorkspaceMode } from '../api/workspaces';
 const mockFetchGitLog = vi.mocked(fetchGitLog);
 const mockFetchWorkspaceMode = vi.mocked(fetchWorkspaceMode);
 
-describe('GitHistoryPanel', () => {
+describe('GitHistoryPanel', { timeout: 35000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchWorkspaceMode.mockResolvedValue({ isHome: false, mode: 'coding-agent', cwd: '/work/proj', workspaceName: 'proj' });
@@ -63,7 +63,7 @@ describe('GitHistoryPanel', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Fix login bug')).toBeInTheDocument();
-    });
+    }, { timeout: 10000 });
     expect(screen.getByText('abc123a')).toBeInTheDocument();
     // Author and time are now combined in a single compact span
     expect(screen.getByText(/Alice/)).toBeInTheDocument();

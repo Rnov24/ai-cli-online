@@ -377,6 +377,17 @@ export const CommandPalette = React.memo(function CommandPalette({
       },
     },
     {
+      id: 'switch-account',
+      category: 'SYSTEM',
+      title: 'Switch Account / Profile & Auth Tokens',
+      desc: 'Switch active session profile, rename tokens, or add new connection',
+      shortcut: '/account',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-account-switcher'));
+        onClose();
+      },
+    },
+    {
       id: 'open-settings',
       category: 'SYSTEM',
       title: 'System Settings',

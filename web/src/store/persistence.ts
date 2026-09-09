@@ -7,6 +7,7 @@ import type {
 } from '../types';
 import { sessionsApi } from '../api/apiClient';
 import { fetchTabsLayout, saveTabsLayout, saveTabsLayoutBeacon } from '../api/tabs';
+import { computeTokenId } from '../utils/accountStorage';
 import type { AppState, PersistableFields } from './types';
 import { removeLeafFromTree } from './helpers';
 
@@ -14,9 +15,15 @@ import { removeLeafFromTree } from './helpers';
 // Constants
 // ---------------------------------------------------------------------------
 
-const TABS_KEY = 'ai-cli-online-tabs';
-const LEGACY_LAYOUT_KEY = 'ai-cli-online-layout';
-const LEGACY_SESSION_NAMES_KEY = 'ai-cli-online-session-names';
+export const TABS_KEY = 'ai-cli-online-tabs';
+export const LEGACY_LAYOUT_KEY = 'ai-cli-online-layout';
+export const LEGACY_SESSION_NAMES_KEY = 'ai-cli-online-session-names';
+
+export function getTabsKey(token?: string | null): string {
+  if (!token) return TABS_KEY;
+  const id = computeTokenId(token);
+  return `ai-cli-online-tabs-${id}`;
+}
 
 interface LegacyPersistedLayout {
   terminalIds: string[];
@@ -66,7 +73,7 @@ function persistTabsToServer(data: PersistedTabsState): void {
 // Public persistence API
 // ---------------------------------------------------------------------------
 
-export function persistTabs(state: PersistableFields): void {
+export function persistTabs(state: PersistableFields, token?: string | null): void {
   const data: PersistedTabsState = {
     version: 2,
     activeTabId: state.activeTabId,
@@ -75,8 +82,13 @@ export function persistTabs(state: PersistableFields): void {
     nextTabId: state.nextTabId,
     tabs: state.tabs,
   };
+  const activeToken = token ?? _store?.getState().token ?? null;
+  const key = getTabsKey(activeToken);
   try {
-    localStorage.setItem(TABS_KEY, JSON.stringify(data));
+    localStorage.setItem(key, JSON.stringify(data));
+    if (key !== TABS_KEY) {
+      localStorage.setItem(TABS_KEY, JSON.stringify(data));
+    }
   } catch {
     /* storage full */
   }
@@ -105,8 +117,23 @@ export function toPersistable(state: AppState): PersistableFields {
 // Load persisted tabs (v2) or migrate from v1
 // ---------------------------------------------------------------------------
 
-export function loadTabs(): PersistedTabsState | null {
-  // Try v2 format
+export function loadTabs(token?: string | null): PersistedTabsState | null {
+  const activeToken = token ?? _store?.getState().token ?? null;
+  const namespacedKey = activeToken ? getTabsKey(activeToken) : null;
+
+  if (namespacedKey) {
+    try {
+      const raw = localStorage.getItem(namespacedKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.version === 2) return parsed as PersistedTabsState;
+      }
+    } catch {
+      /* corrupt data */
+    }
+  }
+
+  // Try v2 format from default / fallback key
   try {
     const raw = localStorage.getItem(TABS_KEY);
     if (raw) {

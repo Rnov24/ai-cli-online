@@ -1,6 +1,6 @@
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
-import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon, MinusIcon, PlusIcon } from './icons';
+import { SettingsIcon, CloseIcon, MoonIcon, SunIcon, LogoutIcon, MinusIcon, PlusIcon, UserIcon } from './icons';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -225,6 +225,27 @@ export function SettingsModal({ isOpen, onClose, systemStatus }: SettingsModalPr
               marginBottom: '10px',
             }}>
               SESSION CONTROL //
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div>
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                  Switch Account Profile
+                </div>
+                <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                  Switch between saved tokens or add a new auth session.
+                </div>
+              </div>
+              <button
+                className="mecha-btn"
+                onClick={() => {
+                  onClose();
+                  window.dispatchEvent(new CustomEvent('agy:open-account-switcher'));
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-blue)' }}
+              >
+                <UserIcon size={12} /> PROFILES
+              </button>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

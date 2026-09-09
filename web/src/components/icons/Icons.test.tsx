@@ -53,6 +53,8 @@ describe('SVG Icon System', () => {
     { name: 'ChevronRightIcon', Component: Icons.ChevronRightIcon },
     { name: 'ChevronLeftIcon', Component: Icons.ChevronLeftIcon },
     { name: 'RefreshCwIcon', Component: Icons.RefreshCwIcon },
+    { name: 'UserIcon', Component: Icons.UserIcon },
+    { name: 'KeyIcon', Component: Icons.KeyIcon },
   ];
 
   it('exports createIcon and IconProps', () => {

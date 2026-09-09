@@ -2,12 +2,14 @@ import React, { useCallback } from 'react';
 import { useStore } from '../store';
 import type { SystemStatus } from 'ai-cli-online-shared';
 import { WorkspaceSelector } from './WorkspaceSelector';
-import { MenuIcon, SearchIcon, SunIcon, MoonIcon } from './icons';
+import { MenuIcon, SearchIcon, SunIcon, MoonIcon, UserIcon } from './icons';
+import { getActiveAccount } from '../utils/accountStorage';
 
 interface SystemHeaderProps {
   systemStatus: SystemStatus | null;
   onOpenCommandPalette: () => void;
   onOpenHelp?: () => void;
+  onOpenAccountSwitcher?: () => void;
   onToggleContextPanel: () => void;
   contextPanelOpen: boolean;
   onToggleMobileNav: () => void;
@@ -24,6 +26,7 @@ export const SystemHeader = React.memo(function SystemHeader({
   systemStatus,
   onOpenCommandPalette,
   onOpenHelp,
+  onOpenAccountSwitcher,
   onToggleContextPanel,
   contextPanelOpen,
   onToggleMobileNav,
@@ -38,6 +41,9 @@ export const SystemHeader = React.memo(function SystemHeader({
   const toggleTheme = useStore((s) => s.toggleTheme);
   const fontSize = useStore((s) => s.fontSize);
   const setFontSize = useStore((s) => s.setFontSize);
+
+  const activeAccount = token ? getActiveAccount(token) : null;
+  const profileLabel = activeAccount?.name || (token && token !== 'default' ? `Account ${token.slice(0, 4)}` : 'Default');
 
   let latencyColor = 'var(--accent-green)';
   let latencyBars = 4;
@@ -280,6 +286,33 @@ export const SystemHeader = React.memo(function SystemHeader({
             {latency !== null ? `${latency}ms` : '--'}
           </span>
         </div>
+
+        {/* Account Profile Switcher */}
+        <button
+          className="mecha-btn"
+          onClick={() => {
+            if (onOpenAccountSwitcher) {
+              onOpenAccountSwitcher();
+            } else {
+              window.dispatchEvent(new CustomEvent('agy:open-account-switcher'));
+            }
+          }}
+          title={`Active Profile: ${profileLabel}. Click to switch profile / account.`}
+          aria-label="Switch account profile"
+          style={{
+            padding: '2px 8px',
+            fontSize: '10px',
+            color: 'var(--accent-blue)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <UserIcon size={12} />
+          <span className="desktop-only" style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {profileLabel}
+          </span>
+        </button>
 
         {/* Interactive Help & Feature Guide Trigger */}
         <button

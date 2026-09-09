@@ -341,3 +341,18 @@ export const ChevronLeftIcon = createIcon('ChevronLeftIcon', (
   <polyline points="15 18 9 12 15 6" />
 ));
 
+export const UserIcon = createIcon('UserIcon', (
+  <>
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </>
+));
+
+export const KeyIcon = createIcon('KeyIcon', (
+  <>
+    <path d="M21 2l-2 2m-1.5 1.5L14 9l-1.5-1.5L11 9l-1.5-1.5L8 9" />
+    <circle cx="7.5" cy="15.5" r="5.5" />
+  </>
+));
+
+
