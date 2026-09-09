@@ -47,6 +47,7 @@ honor its STOP conditions, and update your row when done.
 | [037](037-antigravity-google-auth-multi-profile-switcher.md) | Implement Antigravity Google Auth Multi-Profile Switcher with OAuth Helper | P1 | M | 036 | DONE |
 | [038](038-remove-redundant-legacy-files-and-workspaces.md) | Remove Redundant Legacy Node Server, Claude Artifacts, Orphan Hooks, and Obsolete Workspaces | P1 | S | — | DONE |
 | [039](039-rebrand-and-rename-to-agy-online.md) | Rebrand and Rename Project Fully to AGY Online and Comprehensive Documentation Overhaul | P1 | M | — | DONE |
+| [040](040-paginate-skills-for-performance.md) | Paginate Skills Discovery and Registry Search for Performance and Low-Spec Device Resilience | P1 | M | 034 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -80,6 +81,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 036 is independent**: Streamlines the persistent top telemetry header by condensing system status to a compact dot indicator, removing redundant font steppers, theme toggles, and account switcher buttons, while introducing a dedicated Settings (`⚙`) trigger that routes all workspace configuration into `SettingsModal.tsx`.
 - **Plan 038 is independent**: Completely removes the obsolete legacy Node server (`server/`, 25+ files), unrelated Claude artifacts (`.claude/` skills, `CLAUDE.md`), stale scratch directories (`.scratch/`), and unreferenced hooks (`usePasteFloat.ts`), while updating root `package.json` to purge the legacy workspace and `dev:server` script, and aligning `bin/ai-cli-online.mjs` with the Go native binary.
 - **Plan 039 is independent**: Completely rebrands and renames the project from `ai-cli-online` to `agy-online` across directories (`cmd/agy-online`), binaries (`bin/agy-online`), Go module namespaces (`github.com/huacheng/agy-online`), package dependencies (`agy-online-shared`, `agy-online-web`), tmux socket namespaces (`~/.tmux-sockets/agy-online`), runtime state directories (`~/.agy-online`), client-side localStorage keys with backward compatibility, and completely rewrites `README.md` and `README.zh-CN.md` from the ground up to reflect the modern architecture.
+- **Plan 040 builds on Plan 034**: Extends the Skills Hub with server-side pagination, 5s TTL discovery caching, TypeScript client options, and antislop-compliant responsive pagination controls to eliminate disk I/O bottlenecks and excessive DOM allocations on mobile/low-spec devices.
 
 ## Findings considered and rejected
 
