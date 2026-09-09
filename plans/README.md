@@ -44,6 +44,7 @@ honor its STOP conditions, and update your row when done.
 | [034](034-skills-sh-integration.md) | Integrate skills.sh Registry, Skill Discovery, and 1-Click Download/Setup Engine | P1 | M | 033 | DONE |
 | [035](035-hermes-plugin-converter.md) | Automatic Hermes Plugin to AGY Agent Skill Converter and Importer | P1 | M | 034 | DONE |
 | [036](036-minimize-dashboard-and-move-items-to-settings.md) | Minimize Dashboard Telemetry and Relocate Controls to Settings Modal | P1 | M | — | DONE |
+| [037](037-antigravity-google-auth-multi-profile-switcher.md) | Implement Antigravity Google Auth Multi-Profile Switcher with OAuth Helper | P1 | M | 036 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
