@@ -5,11 +5,6 @@
 .github/
 ref-projects/
 
-# Server sensitive files
-server/certs/
-server/.env
-server/data/
-
 # Generated service files
 *.service
 
@@ -20,7 +15,6 @@ node_modules/
 *.map
 
 # TypeScript source (dist is included)
-server/src/
 web/src/
 shared/src/
 

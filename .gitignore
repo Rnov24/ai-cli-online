@@ -32,15 +32,14 @@ npm-debug.log*
 # Data files
 data/
 
-# SSL certificates (generate locally, don't commit)
-server/certs/
-
 # Executables
 *.exe
 *.exe~
 
 # Agent survey scratch files
 .agents/
+.claude/
+.scratch/
 ORIGINAL_REQUEST.md
 PROJECT.md
 TEST_INFRA.md

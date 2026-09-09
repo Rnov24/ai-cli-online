@@ -45,6 +45,7 @@ honor its STOP conditions, and update your row when done.
 | [035](035-hermes-plugin-converter.md) | Automatic Hermes Plugin to AGY Agent Skill Converter and Importer | P1 | M | 034 | DONE |
 | [036](036-minimize-dashboard-and-move-items-to-settings.md) | Minimize Dashboard Telemetry and Relocate Controls to Settings Modal | P1 | M | — | DONE |
 | [037](037-antigravity-google-auth-multi-profile-switcher.md) | Implement Antigravity Google Auth Multi-Profile Switcher with OAuth Helper | P1 | M | 036 | DONE |
+| [038](038-remove-redundant-legacy-files-and-workspaces.md) | Remove Redundant Legacy Node Server, Claude Artifacts, Orphan Hooks, and Obsolete Workspaces | P1 | S | — | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -76,6 +77,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 034 builds on Plan 033**: Delivers skills.sh registry search proxy, resilient 1-click GitHub/registry skill installation, safe uninstallation with builtin protection, lockfile synchronization, and the "Explore Skills.sh" interactive marketplace in the Skills Hub.
 - **Plan 035 builds on Plan 034**: Delivers automated Hermes plugin detection, manifest and Python schema parsing, markdown generation with parameter tables, universal runner injection, and 1-click import in the Skills Hub.
 - **Plan 036 is independent**: Streamlines the persistent top telemetry header by condensing system status to a compact dot indicator, removing redundant font steppers, theme toggles, and account switcher buttons, while introducing a dedicated Settings (`⚙`) trigger that routes all workspace configuration into `SettingsModal.tsx`.
+- **Plan 038 is independent**: Completely removes the obsolete legacy Node server (`server/`, 25+ files), unrelated Claude artifacts (`.claude/` skills, `CLAUDE.md`), stale scratch directories (`.scratch/`), and unreferenced hooks (`usePasteFloat.ts`), while updating root `package.json` to purge the legacy workspace and `dev:server` script, and aligning `bin/ai-cli-online.mjs` with the Go native binary.
 
 ## Findings considered and rejected
 

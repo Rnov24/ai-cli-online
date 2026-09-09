@@ -32,9 +32,6 @@
     "bin/",
     "shared/dist/",
     "shared/package.json",
-    "server/dist/",
-    "server/package.json",
-    "server/.env.example",
     "web/dist/",
     "web/package.json",
     "start.sh",
@@ -42,12 +39,10 @@
   ],
   "workspaces": [
     "shared",
-    "server",
     "web"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
-    "dev:server": "npm run dev --workspace=server",
+    "dev": "npm run dev --workspace=web",
     "dev:web": "npm run dev --workspace=web",
     "build": "npm run build --workspace=shared && npm run build --workspace=web && go build -o bin/ai-cli-online ./cmd/ai-cli-online",
     "build:go": "go build -o bin/ai-cli-online ./cmd/ai-cli-online",
