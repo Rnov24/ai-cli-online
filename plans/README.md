@@ -49,7 +49,7 @@ honor its STOP conditions, and update your row when done.
 | [039](039-rebrand-and-rename-to-agy-online.md) | Rebrand and Rename Project Fully to AGY Online and Comprehensive Documentation Overhaul | P1 | M | — | DONE |
 | [040](040-paginate-skills-for-performance.md) | Paginate Skills Discovery and Registry Search for Performance and Low-Spec Device Resilience | P1 | M | 034 | DONE |
 | [041](041-stream-verbosity-controls-and-subagent-seeker.md) | Stream Verbosity Controls, Live Process Telemetry, and Subagent Seeking Interface | P1 | M | 040 | DONE |
-| [042](042-redesign-and-relayout-sidebar.md) | Redesign and Relayout Session Sidebar for IDE Left Docking, Telemetry Density, and Responsive Cockpit Ergonomics | P1 | M | 041 | TODO |
+| [042](042-redesign-and-relayout-sidebar.md) | Redesign and Relayout Session Sidebar for IDE Left Docking, Telemetry Density, and Responsive Cockpit Ergonomics | P1 | M | 041 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
