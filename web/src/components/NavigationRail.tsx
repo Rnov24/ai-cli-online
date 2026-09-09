@@ -371,8 +371,8 @@ export function NavigationRail({
             window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
             if (mobileOpen) onCloseMobile();
           }}
-          title="Antigravity Plugins Manager (⌥P)"
-          aria-label="Open plugins manager"
+          title="Plugin Management (⌥P)"
+          aria-label="Open plugin management"
           style={{
             width: '100%',
             display: 'flex',

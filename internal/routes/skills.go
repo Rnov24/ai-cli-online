@@ -1033,6 +1033,252 @@ func (h *SkillsHandler) InstallSkill(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(installed)
 }
 
+// ConvertHermesPlugin handles POST /api/skills/convert-hermes.
+func (h *SkillsHandler) ConvertHermesPlugin(w http.ResponseWriter, r *http.Request) {
+	if !h.auth.CheckAuth(r) {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req ConvertHermesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	source := strings.TrimSpace(req.Source)
+	if source == "" {
+		http.Error(w, `{"error":"Missing plugin source"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Reject dangerous shell metacharacters in source
+	if strings.ContainsAny(source, ";|&$`><\n\r") {
+		http.Error(w, `{"error":"Source contains invalid characters"}`, http.StatusBadRequest)
+		return
+	}
+
+	scope := strings.TrimSpace(req.Scope)
+	if scope == "" {
+		scope = "workspace"
+	}
+
+	home, _ := os.UserHomeDir()
+	var targetParent string
+	var lockPath string
+
+	if scope == "global" {
+		if home == "" {
+			http.Error(w, `{"error":"Unable to locate user home directory for global skill"}`, http.StatusInternalServerError)
+			return
+		}
+		targetParent = filepath.Join(home, ".agents", "skills")
+		lockPath = filepath.Join(home, "skills-lock.json")
+	} else {
+		cwd := strings.TrimSpace(req.Cwd)
+		if cwd == "" {
+			cwd = home
+		}
+		cwd = filepath.Clean(cwd)
+		targetParent = filepath.Join(cwd, ".agents", "skills")
+		lockPath = filepath.Join(cwd, "skills-lock.json")
+	}
+
+	// Resolve temporary working folder
+	tmpDir, err := os.MkdirTemp("", "hermes-convert-*")
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"Failed to create temp directory: %s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+
+	var pluginDir string
+
+	// Check if source is a local folder
+	isLocal := false
+	if fi, err := os.Stat(source); err == nil && fi.IsDir() {
+		isLocal = true
+		pluginDir = source
+	} else {
+		// If not absolute local dir, check if relative to cwd
+		cwd := strings.TrimSpace(req.Cwd)
+		if cwd != "" {
+			cand := filepath.Join(cwd, source)
+			if fi, err := os.Stat(cand); err == nil && fi.IsDir() {
+				isLocal = true
+				pluginDir = cand
+			}
+		}
+	}
+
+	if !isLocal {
+		cleanSource := strings.TrimPrefix(source, "https://github.com/")
+		cleanSource = strings.TrimPrefix(cleanSource, "http://github.com/")
+		cleanSource = strings.TrimPrefix(cleanSource, "git@github.com:")
+		cleanSource = strings.TrimSuffix(cleanSource, ".git")
+
+		var repoOwner, repoName string
+		var cloneURL string
+
+		if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") || strings.HasPrefix(source, "file://") {
+			cloneURL = source
+			parts := strings.Split(strings.TrimRight(cleanSource, "/"), "/")
+			if len(parts) > 0 {
+				repoName = parts[len(parts)-1]
+			}
+		} else {
+			parts := strings.Split(cleanSource, "/")
+			if len(parts) >= 2 {
+				repoOwner = parts[0]
+				repoName = parts[1]
+				cloneURL = fmt.Sprintf("https://github.com/%s/%s.git", repoOwner, repoName)
+			} else {
+				repoName = cleanSource
+				cloneURL = fmt.Sprintf("https://github.com/%s.git", cleanSource)
+			}
+		}
+
+		cloneSucceeded := false
+		if gitPath, err := exec.LookPath("git"); err == nil && gitPath != "" {
+			cmd := exec.Command(gitPath, "clone", "--depth", "1", cloneURL, tmpDir)
+			if err := cmd.Run(); err == nil {
+				cloneSucceeded = true
+			}
+		}
+
+		if !cloneSucceeded && repoOwner != "" && repoName != "" {
+			tarURLs := []string{
+				fmt.Sprintf("https://codeload.github.com/%s/%s/tar.gz/refs/heads/main", repoOwner, repoName),
+				fmt.Sprintf("https://codeload.github.com/%s/%s/tar.gz/refs/heads/master", repoOwner, repoName),
+			}
+			client := &http.Client{Timeout: 30 * time.Second}
+			for _, tarURL := range tarURLs {
+				resp, err := client.Get(tarURL)
+				if err == nil && resp.StatusCode == http.StatusOK {
+					if err := extractTarGz(resp.Body, tmpDir); err == nil {
+						cloneSucceeded = true
+						resp.Body.Close()
+						break
+					}
+					resp.Body.Close()
+				} else if resp != nil {
+					resp.Body.Close()
+				}
+			}
+		}
+
+		if !cloneSucceeded {
+			http.Error(w, fmt.Sprintf(`{"error":"Failed to download Hermes plugin from %s"}`, source), http.StatusBadRequest)
+			return
+		}
+
+		pluginDir = tmpDir
+	}
+
+	// Verify Hermes plugin exists in pluginDir or subdirectory
+	if !DetectHermesPlugin(pluginDir) {
+		http.Error(w, `{"error":"Not a valid Hermes plugin: missing plugin.yaml or tools.py"}`, http.StatusBadRequest)
+		return
+	}
+
+	actualPluginDir := FindHermesPluginDir(pluginDir)
+
+	// Parse manifest
+	var meta HermesPluginMetadata
+	var manifestPath string
+	for _, m := range []string{"plugin.yaml", "plugin.yml"} {
+		p := filepath.Join(actualPluginDir, m)
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			manifestPath = p
+			break
+		}
+	}
+
+	if manifestPath != "" {
+		mName, mVersion, mDesc, reqEnv, optEnv, err := ParseHermesManifest(manifestPath)
+		if err == nil {
+			meta.Name = mName
+			meta.Version = mVersion
+			meta.Description = mDesc
+			meta.RequiresEnv = reqEnv
+			meta.OptionalEnv = optEnv
+		}
+	}
+
+	// Extract tools
+	toolsPyPath := filepath.Join(actualPluginDir, "tools.py")
+	schemasPyPath := filepath.Join(actualPluginDir, "schemas.py")
+	tools, _ := ExtractPythonTools(toolsPyPath, schemasPyPath)
+	meta.Tools = tools
+
+	// Determine skill name
+	skillName := strings.TrimSpace(req.CustomName)
+	if skillName == "" {
+		skillName = meta.Name
+	}
+	if skillName == "" {
+		parts := strings.Split(strings.TrimRight(source, "/"), "/")
+		if len(parts) > 0 {
+			skillName = strings.TrimSuffix(parts[len(parts)-1], ".git")
+		}
+	}
+	// Sanitize skillName
+	skillName = strings.ToLower(skillName)
+	skillName = regexp.MustCompile(`[^a-z0-9_-]+`).ReplaceAllString(skillName, "-")
+	skillName = strings.Trim(skillName, "-_")
+	if skillName == "" {
+		skillName = "hermes-skill"
+	}
+	meta.Name = skillName
+
+	targetDir := filepath.Join(targetParent, skillName)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"Failed to create skill target directory: %s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	// Execute conversion
+	if err := ConvertHermesDirectory(actualPluginDir, targetDir, skillName, meta); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"Failed to convert Hermes plugin: %s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	// Compute hash of SKILL.md for lockfile
+	skillFile := filepath.Join(targetDir, "SKILL.md")
+	contentBytes, _ := os.ReadFile(skillFile)
+	hasher := sha256.New()
+	hasher.Write(contentBytes)
+	hashStr := fmt.Sprintf("%x", hasher.Sum(nil))
+
+	// Update skills-lock.json
+	lock, err := loadSkillLock(lockPath)
+	if err != nil || lock == nil {
+		lock = &SkillLockFile{Version: 1, Skills: make(map[string]SkillLockEntry)}
+	}
+	lock.Skills[skillName] = SkillLockEntry{
+		Source:       source,
+		SourceType:   "hermes-plugin",
+		SkillPath:    "SKILL.md",
+		ComputedHash: hashStr,
+	}
+	_ = saveSkillLock(lockPath, lock)
+
+	respItem := SkillItem{
+		Name:         skillName,
+		Description:  meta.Description,
+		Scope:        scope,
+		Path:         targetDir,
+		SkillFile:    skillFile,
+		HasScripts:   true,
+		HasResources: false,
+		Tags:         []string{"hermes-plugin"},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(respItem)
+}
+
 // DeleteSkill handles DELETE /api/skills?name=<name>&scope=<scope>&cwd=<cwd>.
 func (h *SkillsHandler) DeleteSkill(w http.ResponseWriter, r *http.Request) {
 	if !h.auth.CheckAuth(r) {
