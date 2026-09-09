@@ -93,11 +93,10 @@ hermes-plugin/
 - `internal/routes/skills.go` — Add `ConvertHermesPlugin` endpoint (`POST /api/skills/convert-hermes`).
 - `internal/server/server.go` — Register `POST /api/skills/convert-hermes`.
 - `web/src/api/skills.ts` — Add `convertHermesPlugin` typed API method and `ConvertHermesPayload`.
-- `web/src/components/HermesConverterModal.tsx` (create) — Dedicated, standalone Hermes Converter modal with source input (GitHub repo `owner/repo`, Git URL, local folder), scope selector (`Project (.agents/skills)` vs `Global (~/.agents/skills)`), custom skill name override, real-time conversion progress/spinner, error banner, and instructions preview. (Strictly separated from `SkillsManagementModal.tsx`).
-- `web/src/components/HermesConverterModal.test.tsx` (create) — Comprehensive unit tests for `HermesConverterModal`.
-- `web/src/components/NavigationRail.tsx` — Add dedicated "HERMES" navigation item in the SYSTEM menu (with keyboard shortcut `⌥H`) that opens the Hermes Converter modal.
-- `web/src/components/CommandPalette.tsx` — Add `/hermes-convert` quick command in Command Palette.
-- `web/src/App.tsx` — Register `agy:open-hermes-modal` event listener, `⌥H` global hotkey, and render `<HermesConverterModal />`.
+- `web/src/components/PluginsModal.tsx` — Enhance into comprehensive **Plugin Management** modal (`PLUGIN MANAGEMENT`) with view tabs: `[ INSTALLED PLUGINS ]` (Antigravity plugins) and `[ IMPORT / CONVERT PLUGIN ]` (Hermes & external community plugins with source input, scope selector, custom name, real-time conversion feedback, error handling, and instructions).
+- `web/src/components/PluginsModal.test.tsx` — Add unit test coverage for the Plugin Management import/convert workflow.
+- `web/src/components/NavigationRail.tsx` — Ensure the navigation rail item under SYSTEM is clearly labeled `PLUGINS` / `PLUGIN MANAGEMENT` (shortcut `⌥P`).
+- `web/src/components/CommandPalette.tsx` — Add `/plugins-import` quick command to open Plugin Management directly in the Import / Convert tab.
 
 **Out of scope**:
 - Modifying `SkillsManagementModal.tsx` (user explicitly requested not using the same menu as skill management).
@@ -267,57 +266,51 @@ export async function convertHermesPlugin(token: string, payload: ConvertHermesP
 
 **Verify**: `npx tsc --noEmit --project web/tsconfig.json` → exit 0.
 
-### Step 6: Create Dedicated `web/src/components/HermesConverterModal.tsx`
+### Step 6: Update `web/src/components/PluginsModal.tsx` for Plugin Management
 
-1. Build standalone modal:
-   - Header: `HERMES PLUGIN CONVERTER` with `PuzzleIcon` / `BoltIcon` in amber/cyan styling, badge indicator, and close button.
-   - Informative subtitle / banner: Explains how NousResearch Hermes Agent plugins (`plugin.yaml` + `tools.py`) are automatically converted into zero-touch AGY Agent Skills (`SKILL.md` + universal `runner.py`).
-   - Input fields:
-     - `Plugin Source`: Placeholder `owner/repo, https://github.com/..., or local path (e.g. ./hermes-plugins/crypto)`.
-     - `Custom Skill Name`: Optional name override (e.g. `crypto-tracker`).
-     - `Target Scope`: Radio or select between `Project (.agents/skills)` and `Global (~/.agents/skills)`.
-   - Quick Example Presets: Provide 2-3 clickable presets (e.g., `NousResearch/hermes-agent`, local sample) to pre-fill the form.
-   - Action Buttons:
-     - `Convert & Install as Skill`: Triggers `convertHermesPlugin()`, displays spinner with `CONVERTING & BUNDLING...`, disables inputs while in-flight.
-     - `Cancel`: Closes modal.
-   - Status & Result Feedback:
-     - Error alert banner: Explains missing manifest, syntax issues, or network errors with clear resolution hints.
-     - Success banner: Displays converted skill name, installation path, and sample usage command (e.g., `python3 scripts/runner.py <tool_name> '{}'`).
-   - Accessible dialog markup (`role="dialog"`, `aria-modal="true"`, Escape key dismiss, backdrop click dismiss).
+1. Modernize into complete **Plugin Management**:
+   - Header: `PLUGIN MANAGEMENT` with `PuzzleIcon` / `BoltIcon` in cyan styling, count badge, and close button.
+   - Tab switcher below header:
+     - `[ INSTALLED PLUGINS (N) ]`
+     - `[ IMPORT / CONVERT PLUGIN ]`
+   - Tab 1: `INSTALLED PLUGINS` (Preserves all existing functionality: Antigravity plugin list, search, install from marketplace, enable/disable, uninstall, CLI execution).
+   - Tab 2: `IMPORT / CONVERT PLUGIN`:
+     - Subtitle / explainer: "Import and convert external plugins (e.g. NousResearch Hermes Agent plugins) into native zero-touch AGY Agent Skills with automatic runner adapters."
+     - Input fields:
+       - `Plugin Source`: Placeholder `owner/repo, https://github.com/..., or local path (e.g. ./hermes-plugins/crypto)`.
+       - `Custom Skill Name`: Optional name override (e.g. `crypto-tracker`).
+       - `Target Scope`: Select between `Project (.agents/skills)` and `Global (~/.agents/skills)`.
+     - Quick Example Presets: Clickable chips to pre-fill known sources.
+     - Action Buttons:
+       - `Convert & Install as Skill`: Triggers `convertHermesPlugin()`, displays spinner `CONVERTING & BUNDLING...`, disables inputs during request.
+       - `Cancel`: Resets form or returns to Installed view.
+     - Status & Result Feedback:
+       - Error alert banner: Explains validation failure, missing manifest, or syntax issues.
+       - Success banner: Displays converted skill name, installation path, and CLI test command.
+   - Support `initialView?: 'installed' | 'import'` prop, and listen to `agy:open-plugins-modal` with `detail.view`.
 
 **Verify**: `npx tsc --noEmit --project web/tsconfig.json` → exit 0.
 
-### Step 7: Create Unit Tests in `web/src/components/HermesConverterModal.test.tsx`
+### Step 7: Update Unit Tests in `web/src/components/PluginsModal.test.tsx`
 
 1. Add tests covering:
-   - Rendering modal when `isOpen={true}` and not rendering when `isOpen={false}`.
+   - Tab switching between "INSTALLED PLUGINS" and "IMPORT / CONVERT PLUGIN".
+   - Rendering the plugin import & convert form.
    - Form input validation (prevent submit on empty source).
-   - Calling `convertHermesPlugin()` with correct payload upon form submit.
-   - Displaying error message when API call rejects.
-   - Displaying success message and trigger `onConverted` callback when conversion succeeds.
-   - Keyboard accessibility: pressing Escape calls `onClose`.
+   - Calling `convertHermesPlugin()` with correct payload on submit.
+   - Error banner display on conversion failure.
+   - Success banner display and list refresh on successful conversion.
 
-**Verify**: `npx vitest run web/src/components/HermesConverterModal.test.tsx` → all pass.
+**Verify**: `npx vitest run web/src/components/PluginsModal.test.tsx` → all pass.
 
-### Step 8: Wire NavigationRail, CommandPalette, and App.tsx
+### Step 8: Wire NavigationRail and CommandPalette
 
 1. In `web/src/components/NavigationRail.tsx`:
-   - Add a dedicated navigation button under the SYSTEM section:
-     - Icon: `PuzzleIcon` or `BoltIcon` (styled in `var(--accent-amber-bright)`).
-     - Label: `HERMES IMPORT` (or `HERMES CONVERTER`).
-     - Action: dispatches `window.dispatchEvent(new CustomEvent('agy:open-hermes-modal'))`.
-     - Tooltip: `Hermes Plugin Converter (⌥H)`.
+   - Ensure the SYSTEM menu button is clearly titled `Plugin Management (⌥P)` and labeled `PLUGINS` (opens `PluginsModal`).
+   - Do NOT add a separate "Hermes" button.
 2. In `web/src/components/CommandPalette.tsx`:
-   - Add command palette action:
-     - `id: 'cmd-hermes-convert'`
-     - `category: 'HERMES'`
-     - `title: 'Hermes Plugin Converter: Convert to AGY Skill'`
-     - `desc: 'Convert any Hermes Agent plugin (repo, git URL, local folder) into an Antigravity skill'`
-     - `action: () => window.dispatchEvent(new CustomEvent('agy:open-hermes-modal'))`
-3. In `web/src/App.tsx`:
-   - State: `const [hermesConverterOpen, setHermesConverterOpen] = useState(false);`
-   - Event listener: listen for `agy:open-hermes-modal` and global hotkey `Alt+H` (`⌥H`).
-   - Render `<HermesConverterModal isOpen={hermesConverterOpen} onClose={() => setHermesConverterOpen(false)} token={token} cwd={cwd || undefined} />`.
+   - Keep `/plugins`: "Plugin Management: Installed Plugins & Extensions".
+   - Add `/plugins-import`: "Plugin Management: Import & Convert Community / Hermes Plugin", dispatching `agy:open-plugins-modal` with `{ detail: { view: 'import' } }`.
 
 **Verify**: `npx vitest run web/src/components/CommandPalette.test.tsx` → all pass.
 
@@ -338,11 +331,11 @@ export async function convertHermesPlugin(token: string, payload: ConvertHermesP
   - `TestHermesConverter_ExtractTools`: Validates Python function signature and docstring extraction.
   - `TestHermesConverter_GenerateMarkdown`: Validates generated `SKILL.md` frontmatter, parameter tables, and runner instructions.
   - `TestHermesConverter_EndToEndConversion`: Validates complete conversion pipeline, runner generation, and lockfile recording.
-- **Frontend Tests** (`web/src/components/HermesConverterModal.test.tsx`):
-  - Rendering Hermes conversion modal.
+- **Frontend Tests** (`web/src/components/PluginsModal.test.tsx`):
+  - Rendering Plugin Management modal and tab navigation.
   - Successful form submission calling `convertHermesPlugin`.
   - Error alert handling on non-Hermes repositories.
-  - Escape key closing modal.
+  - Switching back to Installed view.
 - **Verification**: `npm test` → all test suites pass 100%.
 
 ## Done criteria
@@ -353,10 +346,10 @@ Machine-checkable. ALL must hold:
 - [ ] Converted skill includes working `scripts/runner.py` with executable permissions (`0755`).
 - [ ] `skills-lock.json` is updated with `"sourceType": "hermes-plugin"`.
 - [ ] `POST /api/skills/convert-hermes` returns 400 with helpful error message if source is not a valid Hermes plugin.
-- [ ] `web/src/components/HermesConverterModal.tsx` provides dedicated standalone converter modal (separated from `SkillsManagementModal.tsx`).
-- [ ] `web/src/components/NavigationRail.tsx` contains dedicated "HERMES IMPORT" navigation item with `⌥H` shortcut.
-- [ ] `web/src/components/CommandPalette.tsx` contains `/hermes-convert` command.
-- [ ] `npx vitest run web/src/components/HermesConverterModal.test.tsx` passes 100%.
+- [ ] `web/src/components/PluginsModal.tsx` provides unified Plugin Management with "INSTALLED PLUGINS" and "IMPORT / CONVERT PLUGIN" tabs.
+- [ ] `web/src/components/NavigationRail.tsx` opens Plugin Management via `⌥P`.
+- [ ] `web/src/components/CommandPalette.tsx` contains `/plugins-import` command.
+- [ ] `npx vitest run web/src/components/PluginsModal.test.tsx` passes 100%.
 - [ ] `go test -v ./internal/routes -run TestHermesConverter` passes 100%.
 - [ ] `npm test` passes across all web and Go packages with 0 errors.
 - [ ] `npm run build` succeeds, compiling static binary `bin/ai-cli-online`.
