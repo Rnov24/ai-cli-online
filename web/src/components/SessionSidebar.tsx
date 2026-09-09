@@ -19,7 +19,6 @@ import {
   CopyIcon,
   ScrollIcon,
   TabsIcon,
-  ChevronRightIcon,
 } from './icons';
 
 function formatRelativeTime(timestamp?: number): string {
@@ -88,10 +87,11 @@ function renderStatusBadge(status?: SessionStatus) {
 interface SessionCardProps {
   tabId: string;
   isCurrent: boolean;
+  isMobile?: boolean;
   onSelect: () => void;
 }
 
-function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
+function SessionCard({ tabId, isCurrent, isMobile, onSelect }: SessionCardProps) {
   const tab = useStore((s) => s.tabs.find((t) => t.id === tabId));
   const closeTab = useStore((s) => s.closeTab);
   const reopenTab = useStore((s) => s.reopenTab);
@@ -133,19 +133,31 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
-        padding: '10px 12px',
-        margin: '3px 8px',
+        gap: '4px',
+        padding: '8px 10px',
+        margin: '2px 6px',
         borderRadius: '3px',
         border: isCurrent ? '1px solid var(--accent-amber-bright)' : '1px solid var(--border)',
         backgroundColor: isCurrent ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-primary)',
         cursor: 'pointer',
         transition: 'all 0.15s ease',
       }}
+      onMouseEnter={(e) => {
+        if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-strong)';
+      }}
+      onMouseLeave={(e) => {
+        if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border)';
+      }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-          {renderStatusBadge(tab.sessionStatus)}
+          {isCurrent ? (
+            <span className="tech-badge tech-badge--online" style={{ fontSize: '9px', padding: '1px 5px' }}>
+              ● ACTIVE
+            </span>
+          ) : (
+            renderStatusBadge(tab.sessionStatus)
+          )}
           <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
             {formatRelativeTime(tab.updatedAt || tab.createdAt)}
           </span>
@@ -158,6 +170,7 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
                 className="session-card-btn"
                 onClick={startRename}
                 title="Rename session"
+                aria-label="Rename session"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -165,14 +178,16 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
                   cursor: 'pointer',
                   fontSize: '11px',
                   padding: '1px 4px',
+                  ...(isMobile ? { minHeight: '44px', minWidth: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
                 }}
               >
-                <EditIcon size={11} />
+                <EditIcon size={10} />
               </button>
               <button
                 className="session-card-btn"
                 onClick={() => closeTab(tabId)}
                 title="Archive / close session"
+                aria-label="Archive / close session"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -181,6 +196,7 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
                   fontSize: '13px',
                   padding: '1px 4px',
                   lineHeight: 1,
+                  ...(isMobile ? { minHeight: '44px', minWidth: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
                 }}
               >
                 ×
@@ -192,6 +208,7 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
                 className="session-card-btn"
                 onClick={() => reopenTab(tabId)}
                 title="Reopen archived session"
+                aria-label="Reopen archived session"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -199,6 +216,7 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
                   cursor: 'pointer',
                   fontSize: '11px',
                   padding: '1px 4px',
+                  ...(isMobile ? { minHeight: '44px', minWidth: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
                 }}
               >
                 ↺
@@ -207,6 +225,7 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
                 className="session-card-btn session-card-btn--danger"
                 onClick={() => deleteTab(tabId)}
                 title="Permanently remove"
+                aria-label="Permanently remove"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -214,9 +233,10 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
                   cursor: 'pointer',
                   fontSize: '11px',
                   padding: '1px 4px',
+                  ...(isMobile ? { minHeight: '44px', minWidth: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
                 }}
               >
-                <TrashIcon size={11} />
+                <TrashIcon size={10} />
               </button>
             </>
           )}
@@ -262,7 +282,7 @@ function SessionCard({ tabId, isCurrent, onSelect }: SessionCardProps) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
-        <span>ID: {tab.id}</span>
+        <span>ID: {tab.id.slice(0, 8)}</span>
         <span>{tab.terminalIds.length} pane{tab.terminalIds.length !== 1 ? 's' : ''}</span>
       </div>
     </div>
@@ -297,7 +317,7 @@ function OrphanedSessionItem({ sessionId, active, createdAt }: OrphanedSessionIt
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '6px 10px',
-        margin: '2px 8px',
+        margin: '2px 6px',
         backgroundColor: 'var(--bg-primary)',
         border: '1px dashed var(--border)',
         borderRadius: '3px',
@@ -349,6 +369,7 @@ interface ConversationCardProps {
   conv: ConversationSummary;
   isActive: boolean;
   isResuming: boolean;
+  isMobile?: boolean;
   onSelect: () => void;
   onCopyCli: () => void;
   onDelete: () => void;
@@ -358,6 +379,7 @@ function ConversationCard({
   conv,
   isActive,
   isResuming,
+  isMobile,
   onSelect,
   onCopyCli,
   onDelete,
@@ -373,30 +395,39 @@ function ConversationCard({
 
   return (
     <div
-      className="conversation-card"
+      className={`conversation-card ${isActive ? 'conversation-card--active' : ''}`}
+      data-testid={`conversation-card-${conv.id}`}
+      onClick={onSelect}
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
-        padding: '10px 12px',
-        margin: '4px 8px',
+        gap: '4px',
+        padding: '8px 10px',
+        margin: '2px 6px',
         borderRadius: '3px',
         border: isActive ? '1px solid var(--accent-amber-bright)' : '1px solid var(--border)',
         backgroundColor: isActive ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-primary)',
+        cursor: 'pointer',
         transition: 'all 0.15s ease',
       }}
+      onMouseEnter={(e) => {
+        if (!isActive) e.currentTarget.style.borderColor = 'var(--border-strong)';
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) e.currentTarget.style.borderColor = 'var(--border)';
+      }}
     >
-      {/* Top Metadata Row */}
+      {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap' }}>
           {isActive ? (
-            <span className="tech-badge tech-badge--active" style={{ fontSize: '9px', padding: '1px 5px' }}>
+            <span className="tech-badge tech-badge--active" style={{ fontSize: '9px', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <span className="pulse-dot pulse-dot--executing" />
-              ACTIVE
+              <span style={{ color: 'var(--accent-amber-bright)', fontWeight: 700, fontSize: '9px' }}>ACTIVE</span>
             </span>
           ) : (
-            <span className="tech-badge tech-badge--cyan" style={{ fontSize: '9px', padding: '1px 5px' }}>
-              {conv.turnCount} {conv.turnCount === 1 ? 'turn' : 'turns'}
+            <span className="tech-badge tech-badge--cyan" style={{ fontSize: '9px', padding: '1px 4px' }}>
+              {conv.turnCount} turns
             </span>
           )}
           <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
@@ -410,15 +441,18 @@ function ConversationCard({
             onDelete();
           }}
           title="Delete this conversation history"
+          aria-label="Delete conversation"
           style={{
             background: 'none',
             border: 'none',
             color: 'var(--text-muted)',
             cursor: 'pointer',
             fontSize: '11px',
-            padding: '0 4px',
+            padding: '1px 4px',
             lineHeight: 1,
-            opacity: 0.6,
+            opacity: 0.5,
+            transition: 'opacity 0.15s ease, color 0.15s ease',
+            ...(isMobile ? { minHeight: '44px', minWidth: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.color = 'var(--accent-red)';
@@ -426,42 +460,37 @@ function ConversationCard({
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.color = 'var(--text-muted)';
-            e.currentTarget.style.opacity = '0.6';
+            e.currentTarget.style.opacity = '0.5';
           }}
         >
           <TrashIcon size={11} />
         </button>
       </div>
 
-      {/* Title & Preview */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+      {/* Title & Preview row */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
         <div
           style={{
             fontSize: '11px',
-            fontWeight: 700,
+            fontWeight: 600,
             color: isActive ? 'var(--accent-amber-bright)' : 'var(--text-bright)',
-            lineHeight: 1.35,
+            lineHeight: 1.3,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
+            whiteSpace: 'nowrap',
           }}
         >
           {conv.title}
         </div>
-
         {conv.preview && (
           <div
             style={{
               fontSize: '10px',
-              color: 'var(--text-muted)',
-              lineHeight: 1.3,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.25,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
+              whiteSpace: 'nowrap',
             }}
           >
             {conv.preview}
@@ -469,14 +498,14 @@ function ConversationCard({
         )}
       </div>
 
-      {/* ID & Action Buttons */}
+      {/* Footer action row */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           marginTop: '2px',
-          paddingTop: '6px',
+          paddingTop: '4px',
           borderTop: '1px solid rgba(255, 255, 255, 0.05)',
           gap: '6px',
         }}
@@ -494,8 +523,10 @@ function ConversationCard({
             gap: '3px',
           }}
         >
-          <span>ID: {conv.id.slice(0, 8)}...</span>
-          <span style={{ fontSize: '9px', display: 'inline-flex', alignItems: 'center' }}>{copiedId ? <CheckIcon size={10} /> : <CopyIcon size={10} />}</span>
+          <span>ID: {conv.id.slice(0, 8)}</span>
+          <span style={{ fontSize: '9px', display: 'inline-flex', alignItems: 'center' }}>
+            {copiedId ? <CheckIcon size={10} /> : <CopyIcon size={10} />}
+          </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -506,7 +537,11 @@ function ConversationCard({
               onCopyCli();
             }}
             title="Copy 'agy --conversation <id>' CLI command"
-            style={{ fontSize: '9px', padding: '2px 6px' }}
+            style={{
+              fontSize: '8px',
+              padding: '1px 5px',
+              ...(isMobile ? { minHeight: '44px', display: 'inline-flex', alignItems: 'center' } : {}),
+            }}
           >
             &gt;_ CLI
           </button>
@@ -518,14 +553,14 @@ function ConversationCard({
             }}
             disabled={isResuming}
             title="Resume conversation in Chat view"
-            style={{ fontSize: '9px', padding: '2px 8px', fontWeight: 700 }}
+            style={{
+              fontSize: '8px',
+              padding: '1px 6px',
+              fontWeight: 700,
+              ...(isMobile ? { minHeight: '44px', display: 'inline-flex', alignItems: 'center' } : {}),
+            }}
           >
-            {isResuming ? 'LOADING...' : isActive ? 'CONTINUE' : (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                <ChevronRightIcon size={9} />
-                <span>RESUME</span>
-              </span>
-            )}
+            {isActive ? 'CURRENT' : isResuming ? 'LOADING...' : 'RESUME'}
           </button>
         </div>
       </div>
@@ -545,10 +580,11 @@ export function SessionSidebar() {
   const tabsLoading = useStore((s) => s.tabsLoading);
   const token = useStore((s) => s.token);
 
-  // Tab View Mode: 'conversations' (AGY Brain History) vs 'tabs' (Workspace Panes)
+  // Tab View Mode: 'conversations' | 'subagents' | 'tabs'
   const [activeView, setActiveView] = useState<'conversations' | 'subagents' | 'tabs'>('conversations');
   const [subagents, setSubagents] = useState<SubagentItem[]>([]);
   const [loadingSubagents, setLoadingSubagents] = useState(false);
+  const [subagentStatusFilter, setSubagentStatusFilter] = useState<'ALL' | 'RUNNING' | 'DONE' | 'ERROR'>('ALL');
 
   const loadSubagents = useCallback(async () => {
     if (!token) return;
@@ -583,6 +619,18 @@ export function SessionSidebar() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Keyboard accessibility: close sidebar with Escape
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        toggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sidebarOpen, toggleSidebar]);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -686,7 +734,9 @@ export function SessionSidebar() {
   // Delete conversation
   const handleDeleteConversation = async (conv: ConversationSummary) => {
     if (!token) return;
-    const ok = window.confirm(`Delete conversation "${conv.title}"?\n\nThis removes the history in ~/.gemini/antigravity-cli/brain/${conv.id}`);
+    const ok = window.confirm(`Delete conversation "${conv.title}"?
+
+This removes the history in ~/.gemini/antigravity-cli/brain/${conv.id}`);
     if (!ok) return;
 
     try {
@@ -698,17 +748,26 @@ export function SessionSidebar() {
     }
   };
 
-  // Filter conversations
+  // Filter subagents
   const filteredSubagents = useMemo(() => {
-    if (!searchQuery.trim()) return subagents;
-    const q = searchQuery.toLowerCase();
-    return subagents.filter(
+    let list = subagents;
+    if (subagentStatusFilter === 'RUNNING') {
+      list = list.filter((s) => s.status === 'running');
+    } else if (subagentStatusFilter === 'DONE') {
+      list = list.filter((s) => s.status === 'done');
+    } else if (subagentStatusFilter === 'ERROR') {
+      list = list.filter((s) => s.status === 'error');
+    }
+
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase().trim();
+    return list.filter(
       (s) =>
         s.role.toLowerCase().includes(q) ||
         s.id.toLowerCase().includes(q) ||
-        s.prompt.toLowerCase().includes(q)
+        s.prompt.toLowerCase().includes(q),
     );
-  }, [subagents, searchQuery]);
+  }, [subagents, searchQuery, subagentStatusFilter]);
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -738,6 +797,8 @@ export function SessionSidebar() {
     });
   }, [tabs, searchQuery]);
 
+  const openTabsCount = useMemo(() => tabs.filter((t) => t.status === 'open').length, [tabs]);
+
   const otherOpenTabs = useMemo(() => {
     return filteredTabs
       .filter((t) => t.status === 'open' && t.id !== activeTabId)
@@ -758,6 +819,33 @@ export function SessionSidebar() {
   const handleSelectTab = (id: string) => {
     switchTab(id);
     if (isMobile) toggleSidebar();
+  };
+
+  const handleRefresh = () => {
+    if (activeView === 'conversations') {
+      loadConversations();
+    } else if (activeView === 'subagents') {
+      loadSubagents();
+    } else {
+      fetchSessions();
+    }
+  };
+
+  const isRefreshing = loadingConversations || loadingSubagents || tabsLoading;
+
+  // Arrow key navigation between segmented views
+  const handleSwitcherKeyDown = (e: React.KeyboardEvent) => {
+    const views: Array<'conversations' | 'subagents' | 'tabs'> = ['conversations', 'subagents', 'tabs'];
+    const currentIndex = views.indexOf(activeView);
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextIndex = (currentIndex + 1) % views.length;
+      setActiveView(views[nextIndex]);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevIndex = (currentIndex - 1 + views.length) % views.length;
+      setActiveView(views[prevIndex]);
+    }
   };
 
   const panelContent = (
@@ -811,19 +899,28 @@ export function SessionSidebar() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '8px 12px',
+          padding: '0 10px',
           backgroundColor: 'var(--bg-primary)',
           borderBottom: '1px solid var(--border)',
-          height: '42px',
+          height: '40px',
+          minHeight: '40px',
           flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-amber-bright)', letterSpacing: '1px' }}>
-            {activeView === 'conversations' ? 'AGY HISTORY' : 'WORKSPACES'}
+            {activeView === 'conversations'
+              ? 'SESSIONS // HISTORY'
+              : activeView === 'subagents'
+                ? 'SESSIONS // SUBAGENTS'
+                : 'SESSIONS // WORKSPACES'}
           </span>
           <span className="tech-badge tech-badge--online" style={{ fontSize: '9px', padding: '1px 5px' }}>
-            {activeView === 'conversations' ? conversations.length : tabs.filter((t) => t.status === 'open').length}
+            {activeView === 'conversations'
+              ? conversations.length
+              : activeView === 'subagents'
+                ? subagents.length
+                : openTabsCount}
           </span>
         </div>
 
@@ -833,40 +930,69 @@ export function SessionSidebar() {
               className="mecha-btn mecha-btn--primary"
               onClick={handleStartNewConversation}
               title="Start a fresh conversation (+)"
-              style={{ padding: '2px 8px', fontSize: '10px' }}
+              style={{
+                padding: '2px 8px',
+                fontSize: '10px',
+                ...(isMobile ? { minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
+              }}
             >
               + NEW CHAT
+            </button>
+          ) : activeView === 'subagents' ? (
+            <button
+              className="mecha-btn mecha-btn--primary"
+              onClick={() => window.dispatchEvent(new CustomEvent('agy:seek-subagent'))}
+              title="Explore subagents"
+              style={{
+                padding: '2px 8px',
+                fontSize: '10px',
+                ...(isMobile ? { minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
+              }}
+            >
+              + EXPLORE
             </button>
           ) : (
             <button
               className="mecha-btn mecha-btn--primary"
               onClick={handleCreateNewTab}
               title="Create brand new workspace tab (+)"
-              style={{ padding: '2px 8px', fontSize: '10px' }}
+              style={{
+                padding: '2px 8px',
+                fontSize: '10px',
+                ...(isMobile ? { minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
+              }}
             >
               + NEW TAB
             </button>
           )}
 
           <button
-            onClick={loadConversations}
-            title="Refresh history from ~/.gemini/antigravity-cli/brain"
+            onClick={handleRefresh}
+            title="Refresh history and sessions"
+            aria-label="Refresh history and sessions"
             style={{
               background: 'none',
               border: 'none',
-              color: loadingConversations ? 'var(--accent-amber-bright)' : 'var(--text-secondary)',
+              color: isRefreshing ? 'var(--accent-amber-bright)' : 'var(--text-secondary)',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: '13px',
               padding: '0 4px',
               lineHeight: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...(isMobile ? { minHeight: '44px', minWidth: '44px' } : {}),
             }}
           >
-            ↻
+            <span style={{ display: 'inline-block', animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }}>
+              ↻
+            </span>
           </button>
 
           <button
             onClick={toggleSidebar}
-            title="Close sessions panel"
+            title="Close session sidebar (Esc)"
+            aria-label="Close session sidebar"
             style={{
               background: 'none',
               border: 'none',
@@ -875,25 +1001,35 @@ export function SessionSidebar() {
               fontSize: '14px',
               padding: '0 4px',
               lineHeight: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...(isMobile ? { minHeight: '44px', minWidth: '44px' } : {}),
             }}
           >
-            ×
+            <CloseIcon size={12} />
           </button>
         </div>
       </div>
 
-      {/* View Switcher Pills */}
+      {/* Industrial Segmented View Switcher */}
       <div
+        role="tablist"
+        tabIndex={0}
+        onKeyDown={handleSwitcherKeyDown}
         style={{
           display: 'flex',
           padding: '4px 8px',
           backgroundColor: 'var(--bg-base)',
           borderBottom: '1px solid var(--border)',
-          gap: '4px',
+          gap: '3px',
           flexShrink: 0,
         }}
       >
         <button
+          role="tab"
+          aria-selected={activeView === 'conversations'}
+          data-testid="sidebar-tab-history"
           onClick={() => setActiveView('conversations')}
           style={{
             flex: 1,
@@ -901,40 +1037,57 @@ export function SessionSidebar() {
             fontSize: '10px',
             fontFamily: 'inherit',
             fontWeight: activeView === 'conversations' ? 700 : 500,
-            color: activeView === 'conversations' ? 'var(--accent-amber-bright)' : 'var(--text-muted)',
+            color: activeView === 'conversations' ? 'var(--text-bright)' : 'var(--text-muted)',
             backgroundColor: activeView === 'conversations' ? 'var(--bg-secondary)' : 'transparent',
             border: activeView === 'conversations' ? '1px solid var(--border)' : '1px solid transparent',
+            borderBottom: activeView === 'conversations' ? '2px solid var(--accent-amber)' : '1px solid transparent',
             borderRadius: '3px',
             cursor: 'pointer',
             transition: 'all 0.15s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+            ...(isMobile ? { minHeight: '44px' } : {}),
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <ScrollIcon size={12} /> HISTORY ({conversations.length})
-          </span>
+          <ScrollIcon size={12} />
+          <span>HISTORY ({conversations.length})</span>
         </button>
+
         <button
-          onClick={() => setActiveView('subagents')}
+          role="tab"
+          aria-selected={activeView === 'subagents'}
           data-testid="sidebar-tab-subagents"
+          onClick={() => setActiveView('subagents')}
           style={{
             flex: 1,
             padding: '4px 6px',
             fontSize: '10px',
             fontFamily: 'inherit',
             fontWeight: activeView === 'subagents' ? 700 : 500,
-            color: activeView === 'subagents' ? 'var(--accent-amber-bright)' : 'var(--text-muted)',
+            color: activeView === 'subagents' ? 'var(--text-bright)' : 'var(--text-muted)',
             backgroundColor: activeView === 'subagents' ? 'var(--bg-secondary)' : 'transparent',
             border: activeView === 'subagents' ? '1px solid var(--border)' : '1px solid transparent',
+            borderBottom: activeView === 'subagents' ? '2px solid var(--accent-amber)' : '1px solid transparent',
             borderRadius: '3px',
             cursor: 'pointer',
             transition: 'all 0.15s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+            ...(isMobile ? { minHeight: '44px' } : {}),
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <BoltIcon size={12} /> SUBAGENTS ({subagents.length})
-          </span>
+          <BoltIcon size={12} />
+          <span>SUBAGENTS ({subagents.length})</span>
         </button>
+
         <button
+          role="tab"
+          aria-selected={activeView === 'tabs'}
+          data-testid="sidebar-tab-tabs"
           onClick={() => setActiveView('tabs')}
           style={{
             flex: 1,
@@ -942,26 +1095,35 @@ export function SessionSidebar() {
             fontSize: '10px',
             fontFamily: 'inherit',
             fontWeight: activeView === 'tabs' ? 700 : 500,
-            color: activeView === 'tabs' ? 'var(--accent-amber-bright)' : 'var(--text-muted)',
+            color: activeView === 'tabs' ? 'var(--text-bright)' : 'var(--text-muted)',
             backgroundColor: activeView === 'tabs' ? 'var(--bg-secondary)' : 'transparent',
             border: activeView === 'tabs' ? '1px solid var(--border)' : '1px solid transparent',
+            borderBottom: activeView === 'tabs' ? '2px solid var(--accent-amber)' : '1px solid transparent',
             borderRadius: '3px',
             cursor: 'pointer',
             transition: 'all 0.15s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+            ...(isMobile ? { minHeight: '44px' } : {}),
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <TabsIcon size={12} /> TABS ({tabs.filter((t) => t.status === 'open').length})
-          </span>
+          <TabsIcon size={12} />
+          <span>TABS ({openTabsCount})</span>
         </button>
       </div>
 
-      {/* Search Input */}
+      {/* Integrated Search Bar */}
       <div
         style={{
-          padding: '6px 10px',
+          padding: '4px 8px',
           backgroundColor: 'var(--bg-secondary)',
           borderBottom: '1px solid var(--border)',
+          minHeight: '32px',
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
           flexShrink: 0,
         }}
       >
@@ -970,10 +1132,13 @@ export function SessionSidebar() {
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            padding: '3px 8px',
+            padding: '2px 8px',
+            width: '100%',
+            height: '26px',
             backgroundColor: 'var(--bg-primary)',
             border: '1px solid var(--border)',
             borderRadius: '3px',
+            boxSizing: 'border-box',
           }}
         >
           <span style={{ color: 'var(--accent-amber-bright)', fontSize: '11px', fontWeight: 700 }}>&gt;</span>
@@ -981,7 +1146,13 @@ export function SessionSidebar() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={activeView === 'conversations' ? 'Search conversations & prompts...' : activeView === 'subagents' ? 'Search subagents...' : 'Search workspace tabs...'}
+            placeholder={
+              activeView === 'conversations'
+                ? 'Filter history & prompts...'
+                : activeView === 'subagents'
+                  ? 'Filter subagents by role/ID...'
+                  : 'Filter workspace tabs...'
+            }
             style={{
               flex: 1,
               background: 'none',
@@ -995,12 +1166,14 @@ export function SessionSidebar() {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
               style={{
                 background: 'none',
                 border: 'none',
                 color: 'var(--text-muted)',
                 cursor: 'pointer',
                 fontSize: '10px',
+                padding: '0 2px',
               }}
             >
               ×
@@ -1009,89 +1182,157 @@ export function SessionSidebar() {
         </div>
       </div>
 
+      {/* Subagent Status Filters (only in subagents view) */}
+      {activeView === 'subagents' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '4px 8px',
+            backgroundColor: 'var(--bg-base)',
+            borderBottom: '1px solid var(--border)',
+            gap: '4px',
+            flexShrink: 0,
+          }}
+        >
+          {(['ALL', 'RUNNING', 'DONE', 'ERROR'] as const).map((filterVal) => {
+            const isSelected = subagentStatusFilter === filterVal;
+            return (
+              <button
+                key={filterVal}
+                data-testid={`filter-status-${filterVal.toLowerCase()}`}
+                onClick={() => setSubagentStatusFilter(filterVal)}
+                style={{
+                  flex: 1,
+                  padding: '2px 4px',
+                  borderRadius: '3px',
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: isSelected ? 700 : 500,
+                  cursor: 'pointer',
+                  border: isSelected ? '1px solid var(--accent-amber)' : '1px solid var(--border)',
+                  backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+                  color: isSelected ? 'var(--text-bright)' : 'var(--text-muted)',
+                  transition: 'all 0.15s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  ...(isMobile ? { minHeight: '36px' } : {}),
+                }}
+              >
+                {filterVal}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Main Content Stream */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {activeView === 'subagents' ? (
-          <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ padding: '4px 0', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {filteredSubagents.length > 0 ? (
-              filteredSubagents.map((sub) => (
-                <div
-                  key={sub.id}
-                  data-testid={`sidebar-subagent-${sub.id}`}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: '3px',
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border)',
-                    borderLeft:
-                      sub.status === 'error'
-                        ? '3px solid var(--accent-red)'
-                        : sub.status === 'running'
-                          ? '3px solid var(--accent-amber)'
-                          : '3px solid var(--accent-cyan)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    fontSize: '11px',
-                    fontFamily: 'var(--font-mono)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text-bright)' }}>
-                      /{sub.role}
-                    </span>
-                    {sub.status === 'running' && (
-                      <span className="tech-badge tech-badge--active" style={{ fontSize: '8px', padding: '1px 4px' }}>
-                        <span className="pulse-dot pulse-dot--executing" />
-                        RUNNING
+              filteredSubagents.map((sub) => {
+                const statusColor =
+                  sub.status === 'error'
+                    ? 'var(--accent-red)'
+                    : sub.status === 'running'
+                      ? 'var(--accent-amber)'
+                      : 'var(--accent-green)';
+
+                return (
+                  <div
+                    key={sub.id}
+                    data-testid={`sidebar-subagent-${sub.id}`}
+                    style={{
+                      padding: '6px 10px',
+                      margin: '2px 6px',
+                      borderRadius: '3px',
+                      backgroundColor: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)',
+                      borderLeft: `3px solid ${statusColor}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '3px',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text-bright)' }}>
+                        /{sub.role}
                       </span>
-                    )}
-                    {sub.status === 'done' && (
-                      <span className="tech-badge tech-badge--online" style={{ fontSize: '8px', padding: '1px 4px' }}>
-                        ● DONE
-                      </span>
-                    )}
-                    {sub.status === 'error' && (
-                      <span className="tech-badge tech-badge--danger" style={{ fontSize: '8px', padding: '1px 4px' }}>
-                        ● STOPPED
-                      </span>
-                    )}
-                  </div>
-                  {sub.prompt && (
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {sub.prompt}
+                      {sub.status === 'running' && (
+                        <span className="tech-badge tech-badge--active" style={{ fontSize: '8px', padding: '1px 4px' }}>
+                          <span className="pulse-dot pulse-dot--executing" />
+                          RUNNING
+                        </span>
+                      )}
+                      {sub.status === 'done' && (
+                        <span className="tech-badge tech-badge--online" style={{ fontSize: '8px', padding: '1px 4px' }}>
+                          ● DONE
+                        </span>
+                      )}
+                      {sub.status === 'error' && (
+                        <span className="tech-badge tech-badge--danger" style={{ fontSize: '8px', padding: '1px 4px' }}>
+                          ● STOPPED
+                        </span>
+                      )}
                     </div>
-                  )}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', fontSize: '9px', color: 'var(--text-muted)' }}>
-                    <span>{sub.toolCount} tools</span>
-                    <button
-                      onClick={() => {
-                        if (typeof window !== 'undefined') {
-                          window.dispatchEvent(
-                            new CustomEvent('agy:seek-subagent', {
-                              detail: { id: sub.id, role: sub.role },
-                            })
-                          );
-                        }
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--accent-cyan-bright)',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: '9px',
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      [INSPECT ↗]
-                    </button>
+                    {sub.prompt && (
+                      <div
+                        style={{
+                          fontSize: '10px',
+                          color: 'var(--text-secondary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {sub.prompt}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', fontSize: '9px', color: 'var(--text-muted)' }}>
+                      <span>{sub.toolCount} tools</span>
+                      <button
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.dispatchEvent(
+                              new CustomEvent('agy:seek-subagent', {
+                                detail: { id: sub.id, role: sub.role },
+                              })
+                            );
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--accent-cyan-bright)',
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: '9px',
+                          fontFamily: 'var(--font-mono)',
+                          ...(isMobile ? { minHeight: '44px', display: 'inline-flex', alignItems: 'center' } : {}),
+                        }}
+                      >
+                        [INSPECT ↗]
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <div style={{ padding: '30px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
-                {loadingSubagents ? 'Indexing subagents...' : 'No subagents found.'}
+              <div style={{ padding: '30px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <span>{loadingSubagents ? 'INDEXING SUBAGENTS...' : 'NO SUBAGENTS DETECTED'}</span>
+                {!loadingSubagents && (
+                  <button
+                    className="mecha-btn mecha-btn--primary"
+                    onClick={() => window.dispatchEvent(new CustomEvent('agy:seek-subagent'))}
+                    style={{ fontSize: '10px', padding: '4px 12px', ...(isMobile ? { minHeight: '44px' } : {}) }}
+                  >
+                    + EXPLORE SUBAGENTS
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1105,6 +1346,7 @@ export function SessionSidebar() {
                   conv={c}
                   isActive={activeConversationId === c.id}
                   isResuming={resumingConvId === c.id}
+                  isMobile={isMobile}
                   onSelect={() => handleResumeConversation(c)}
                   onCopyCli={() => handleCopyCliCommand(c.id)}
                   onDelete={() => handleDeleteConversation(c)}
@@ -1125,18 +1367,18 @@ export function SessionSidebar() {
               >
                 <span>
                   {searchQuery
-                    ? `No conversations matching "${searchQuery}"`
+                    ? `NO CONVERSATIONS MATCHING QUERY`
                     : loadingConversations
-                      ? 'Loading AGY conversations from brain...'
-                      : 'No AGY conversations found in ~/.gemini/antigravity-cli/brain'}
+                      ? 'LOADING AGY CONVERSATIONS...'
+                      : 'NO CONVERSATIONS INDEXED'}
                 </span>
-                {!searchQuery && (
+                {!searchQuery && !loadingConversations && (
                   <button
                     className="mecha-btn mecha-btn--primary"
                     onClick={handleStartNewConversation}
-                    style={{ fontSize: '10px', padding: '4px 12px' }}
+                    style={{ fontSize: '10px', padding: '4px 12px', ...(isMobile ? { minHeight: '44px' } : {}) }}
                   >
-                    + Start New Conversation
+                    + START NEW CHAT
                   </button>
                 )}
               </div>
@@ -1162,6 +1404,7 @@ export function SessionSidebar() {
                   key={activeTab.id}
                   tabId={activeTab.id}
                   isCurrent={true}
+                  isMobile={isMobile}
                   onSelect={() => handleSelectTab(activeTab.id)}
                 />
               </div>
@@ -1186,6 +1429,7 @@ export function SessionSidebar() {
                     key={t.id}
                     tabId={t.id}
                     isCurrent={false}
+                    isMobile={isMobile}
                     onSelect={() => handleSelectTab(t.id)}
                   />
                 ))}
@@ -1211,9 +1455,37 @@ export function SessionSidebar() {
                     key={t.id}
                     tabId={t.id}
                     isCurrent={false}
+                    isMobile={isMobile}
                     onSelect={() => handleSelectTab(t.id)}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* Empty workspace tabs */}
+            {filteredTabs.length === 0 && (
+              <div
+                style={{
+                  padding: '30px 16px',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                  fontSize: '11px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <span>{searchQuery ? 'NO WORKSPACES MATCHING QUERY' : 'NO WORKSPACES FOUND'}</span>
+                {!searchQuery && (
+                  <button
+                    className="mecha-btn mecha-btn--primary"
+                    onClick={handleCreateNewTab}
+                    style={{ fontSize: '10px', padding: '4px 12px', ...(isMobile ? { minHeight: '44px' } : {}) }}
+                  >
+                    + NEW TAB
+                  </button>
+                )}
               </div>
             )}
 
@@ -1250,22 +1522,23 @@ export function SessionSidebar() {
   if (isMobile) {
     if (!sidebarOpen) return null;
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 600 }}>
-        <div className="drawer-backdrop" onClick={toggleSidebar} />
+      <div data-testid="sidebar-drawer-container" style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-drawer-backdrop)' }}>
+        <div data-testid="drawer-backdrop" className="drawer-backdrop" onClick={toggleSidebar} />
         <aside
+          data-testid="session-sidebar-drawer"
           style={{
             position: 'fixed',
             left: 0,
             top: 0,
             bottom: 0,
-            width: 'min(360px, 90vw)',
+            width: 'min(340px, 85vw)',
             height: '100%',
             backgroundColor: 'var(--bg-secondary)',
             borderRight: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
             fontFamily: 'var(--font-mono)',
-            zIndex: 601,
+            zIndex: 'var(--z-drawer)',
             overflow: 'hidden',
             boxShadow: '8px 0 30px rgba(0,0,0,0.7)',
             animation: 'slide-in-left 0.2s ease-out',
@@ -1280,8 +1553,9 @@ export function SessionSidebar() {
   return (
     <aside
       className="session-sidebar"
+      data-testid="session-sidebar-desktop"
       style={{
-        width: sidebarOpen ? 340 : 0,
+        width: sidebarOpen ? 300 : 0,
         height: '100%',
         backgroundColor: 'var(--bg-secondary)',
         borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
@@ -1291,7 +1565,7 @@ export function SessionSidebar() {
         overflow: 'hidden',
         transition: 'width 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         fontFamily: 'var(--font-mono)',
-        zIndex: 25,
+        zIndex: 20,
       }}
     >
       {panelContent}
