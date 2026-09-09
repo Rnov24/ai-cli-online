@@ -42,6 +42,7 @@ honor its STOP conditions, and update your row when done.
 | [032](032-rebrand-project-identity-artifacts-to-agy-online.md) | Rebrand Project Identity Related Artifacts to AGY Online | P2 | S | 031 | DONE |
 | [033](033-account-switch-and-auth-setup.md) | Implement Account Switching, Multi-Profile Management, and Auth Setup Hardening | P1 | M | 032 | DONE |
 | [034](034-skills-sh-integration.md) | Integrate skills.sh Registry, Skill Discovery, and 1-Click Download/Setup Engine | P1 | M | 033 | DONE |
+| [035](035-hermes-plugin-converter.md) | Automatic Hermes Plugin to AGY Agent Skill Converter and Importer | P1 | M | 034 | TODO |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -71,6 +72,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 032 builds on Plan 031**: Synchronizes project identity artifacts (README, README.zh-CN, package descriptions, installation scripts) to reflect the AGY Online brand, single-binary Go architecture, and 13-skill lifecycle engine.
 - **Plan 033 builds on Plan 032**: Adds token-validated login handling, multi-account profile storage, interactive account switching, and token-namespaced tab persistence.
 - **Plan 034 builds on Plan 033**: Delivers skills.sh registry search proxy, resilient 1-click GitHub/registry skill installation, safe uninstallation with builtin protection, lockfile synchronization, and the "Explore Skills.sh" interactive marketplace in the Skills Hub.
+- **Plan 035 builds on Plan 034**: Delivers automated Hermes plugin detection, manifest and Python schema parsing, markdown generation with parameter tables, universal runner injection, and 1-click import in the Skills Hub.
 
 ## Findings considered and rejected
 
