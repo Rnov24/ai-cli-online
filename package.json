@@ -1,7 +1,7 @@
 {
   "name": "ai-cli-online",
   "version": "3.0.17",
-  "description": "AI-Cli Online - Web Terminal for Google Antigravity CLI (agy) via xterm.js + tmux",
+  "description": "AGY Online — Autonomous Terminal & Development Workspace for Google Antigravity CLI (agy)",
   "license": "MIT",
   "bin": {
     "ai-cli-online": "bin/ai-cli-online.mjs"

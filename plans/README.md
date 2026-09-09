@@ -39,6 +39,7 @@ honor its STOP conditions, and update your row when done.
 | [029](029-git-history-commit-search-and-filter-ergonomics.md) | Git History Commit Message Search, Query Injection Guard, and Filter Ergonomics | P1 | M | 028 | DONE |
 | [030](030-terminal-pty-zombie-reaping-and-winsize-sanitization.md) | Terminal PTY Zombie Process Reaping, Auto-Cleanup on Exit, and Window Size Clamping | P1 | M | 029 | DONE |
 | [031](031-binary-content-detection-permission-preservation-and-download.md) | Content-Based Binary Detection, File Permission Preservation, and Binary Download UX | P1 | M | 030 | DONE |
+| [032](032-rebrand-project-identity-artifacts-to-agy-online.md) | Rebrand Project Identity Related Artifacts to AGY Online | P2 | S | 031 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -65,6 +66,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 029 builds on Plan 028**: Delivers git commit message search (`q`), query injection protection, search clear ergonomics, and DOMPurify aria-label retention.
 - **Plan 030 builds on Plan 029**: Delivers background process reaping (`cmd.Wait()`) for direct and tmux sessions, auto-cleanup on shell exit, and terminal geometry sanitization.
 - **Plan 031 builds on Plan 030**: Delivers content-based binary detection, executable permission preservation on file write, and direct binary download action.
+- **Plan 032 builds on Plan 031**: Synchronizes project identity artifacts (README, README.zh-CN, package descriptions, installation scripts) to reflect the AGY Online brand, single-binary Go architecture, and 13-skill lifecycle engine.
 
 ## Findings considered and rejected
 

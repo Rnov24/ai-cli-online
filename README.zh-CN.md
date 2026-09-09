@@ -1,12 +1,12 @@
-# AI-Cli Online
+# AGY Online — Antigravity 开发工作区
 
 [![npm version](https://img.shields.io/npm/v/ai-cli-online.svg)](https://www.npmjs.com/package/ai-cli-online)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green.svg)](https://nodejs.org/)
+[![Go Report](https://img.shields.io/badge/Go-%3E%3D1.22-blue.svg)](https://golang.org/)
 
-在浏览器中运行的 AI 开发环境。持久化终端会话、结构化任务生命周期、自主执行 — 单个 Node.js 进程即可运行。
+在浏览器中运行的 AI 开发环境。持久化终端会话、结构化 13-skill 任务生命周期、自主执行 — 单个编译好的静态 Go 二进制可执行文件 (`bin/ai-cli-online`) 内嵌 Web UI 资源即可运行。
 
-专为运行 **Google Antigravity CLI (`agy`)** 而构建。tmux 保证断网后进程存活；浏览器 UI 在终端旁提供规划、批注和对话面板。
+专为运行 **Google Antigravity CLI (`agy`)** 而构建。tmux 保证断网后进程存活；浏览器 UI 在终端旁提供规划、批注、Git 历史可视化和对话面板。
 
 **npm:** https://www.npmjs.com/package/ai-cli-online | **GitHub:** https://github.com/huacheng/ai-cli-online
 
@@ -39,29 +39,34 @@
 - **终端** — 完整 xterm.js + WebGL 渲染，二进制协议实现超低延迟，带手机触控辅助按键栏
 - **Chat 编辑器** — 多行 Markdown 编辑器，Antigravity 斜杠命令，草稿服务端持久化
 - **移动端与 Termux 原生支持** — 支持 Termux:Boot 开机自启，wake-lock 防休眠，注册独立 PID
-- **空闲节能服务 (Idle Serving)** — 无客户端连接时自动进入低功耗休眠，提交 SQLite WAL，GC 回收内存 (仅 ~70MB RSS)
+- **空闲节能服务 (Idle Serving)** — 无客户端连接时自动进入低功耗休眠，提交 SQLite WAL，GC 回收内存 (空闲内存低于 15MB，仅约 13.7MB RSS)
 - 面板可同时打开，各自独立调整大小
 
 ## AI 任务生命周期
 
-`ai-cli-task` 插件提供 8 个 skill 的完整任务执行生命周期：
+`ai-cli-task` 插件提供 13 个 skill 的完整任务执行生命周期：
 
 ```
 init → plan → check → exec → check → merge → report
-                ↑        ↓
-              re-plan ←──┘ (遇到问题时)
+        ↑        ↓
+      re-plan ←──┘ (遇到问题时)
 ```
 
 | Skill | 功能 |
 |-------|------|
 | **init** | 创建任务模块 (`AiTasks/<name>/`)，git 分支，可选 worktree |
 | **plan** | 生成实施计划或处理人工批注 |
+| **research** | 收集并整理外部参考资料，支撑规划与执行阶段 |
 | **check** | 在 3 个检查点评估可行性 (post-plan / mid-exec / post-exec) |
-| **exec** | 逐步执行计划，每步验证 |
-| **merge** | 合并任务分支到主干，冲突解决（最多 3 次重试） |
-| **report** | 生成完成报告，提炼经验到知识库 |
-| **auto** | 在单个 Antigravity (`agy`) 会话中自主运行完整生命周期 |
-| **cancel** | 停止执行，设为已取消，可选清理 |
+| **verify** | 运行领域适配的自动化测试与验证用例，生成验证报告 |
+| **exec** | 逐步执行计划，每步独立验证 |
+| **merge** | 将已完成任务分支合并到主干，支持智能冲突解决 |
+| **report** | 生成完成报告，提炼经验沉淀至全局知识库 |
+| **auto** | 在单个 Antigravity (`agy`) 会话中自主闭环运行全生命周期 |
+| **cancel** | 停止执行，设为已取消，可选清理相关 worktree |
+| **list** | 只读查询任务状态、模块清单与依赖拓扑图谱 |
+| **annotate** | 处理 Plan 面板提交的批注（插入/删除/替换/评注） |
+| **summarize** | 重新生成浓缩上下文摘要以防止长文本溢出 |
 
 ### 自主模式
 
@@ -237,39 +242,31 @@ tmux sessions → shell → Google Antigravity CLI (agy) / AI agents
 - **会话管理**: tmux（持久化终端会话）
 - **布局系统**: Tab 标签页 + 递归分割树（LeafNode / SplitNode）
 - **传输协议**: 二进制帧（热路径）+ JSON（控制消息）
-- **任务系统**: 8-skill 插件，状态机 + 依赖门控 + 经验知识库
+- **任务系统**: 13-skill 插件，状态机 + 依赖门控 + 经验知识库
 
 ## 项目结构
 
 ```
 ai-cli-online/
-├── shared/              # 共享类型定义
-├── server/src/
-│   ├── index.ts         # 主入口 (中间件 + 路由 + 服务)
-│   ├── websocket.ts     # WebSocket ↔ PTY relay (二进制 + JSON)
-│   ├── tmux.ts          # tmux 会话管理
-│   ├── files.ts         # 文件操作 + 路径校验
-│   ├── pty.ts           # node-pty 封装
-│   ├── db.ts            # SQLite 数据库
-│   ├── auth.ts          # 认证工具
-│   ├── middleware/       # 认证中间件
-│   └── routes/          # REST API 路由 (sessions, files, editor, settings)
+├── cmd/ai-cli-online/   # CLI 命令行入口与守护进程生命周期管理
+├── internal/
+│   ├── files/           # 原子文件操作与符号链接越权安全防护
+│   ├── pid/             # 进程 PID 跟踪与生命周期注册
+│   ├── routes/          # REST 路由处理 (会话、文件、git、task-auto)
+│   ├── server/          # 内嵌 Web UI 资源的 HTTP 与 WebSocket 服务引擎
+│   ├── terminal/        # PTY 中继转发、tmux 会话管理器与 direct 降级
+│   └── ws/              # WebSocket Hub 与客户端连接监督
 ├── web/src/
-│   ├── App.tsx           # 主应用 (登录 / TabBar / 终端 / 主题)
-│   ├── store/            # Zustand 状态管理 (模块化切片)
-│   ├── components/
-│   │   ├── TerminalPane.tsx              # 2D 网格布局 (Plan + 终端 + Chat)
-│   │   ├── TerminalView.tsx              # xterm.js 终端
-│   │   ├── PlanPanel.tsx                 # Plan 批注面板
-│   │   ├── PlanAnnotationRenderer.tsx    # Markdown + 内联批注
-│   │   ├── PlanFileBrowser.tsx           # AiTasks/ 文件浏览器
-│   │   ├── MarkdownEditor.tsx            # Chat 编辑器
-│   │   └── ...
-│   ├── hooks/            # React Hooks (WebSocket, 文件流, resize 等)
-│   └── api/              # 类型化 API 客户端模块
-├── bin/                  # npx 入口
-├── start.sh              # 生产启动脚本
-└── install-service.sh    # systemd + nginx 安装器
+│   ├── App.tsx          # 主前端应用 (登录 / TabBar / 终端 / 主题)
+│   ├── store/           # Zustand 状态管理 (模块化切片)
+│   ├── components/      # UI 组件 (PlanPanel, TerminalView, AiChatView)
+│   ├── hooks/           # React Hooks (WebSocket, 自适应轮询, 视口缩放)
+│   └── api/             # 类型化 API 客户端模块
+├── shared/              # 共享 TypeScript 接口与通信协议类型
+├── ai-cli-task/         # 13-skill Antigravity 任务生命周期插件
+├── bin/                 # 编译产物单静态可执行文件 (`bin/ai-cli-online`)
+├── start.sh             # 生产启动脚本
+└── install-service.sh   # systemd + nginx 安装配置器
 ```
 
 ## 开发
@@ -306,6 +303,13 @@ sudo journalctl -u ai-cli-online -f      # 查看日志
 - TOCTOU 下载防护（流式大小检查）
 - CSP Headers (frame-ancestors, base-uri, form-action)
 - 限速（可配置读/写阈值）
+
+## 鸣谢与致敬 (Acknowledgements & Inspiration)
+
+AGY Online 的架构设计、交互工效与终端交互范式深受以下开源项目的启发与奠基：
+
+- [**ai-cli-online**](https://github.com/huacheng/ai-cli-online) — 奠定基础的浏览器 Web 终端与持久化 AI CLI 开发环境。
+- [**hermes-webui**](https://github.com/nesquena/hermes-webui) — 在 Agent Web 界面交互、终端人机工效与自主工作流设计方面的开创性灵感。
 
 ## License
 

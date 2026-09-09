@@ -1,7 +1,7 @@
 {
   "name": "ai-cli-online-shared",
   "version": "3.0.17",
-  "description": "Shared types for CLI-Online",
+  "description": "AGY Online Shared Type Definitions",
   "type": "module",
   "main": "dist/types.js",
   "types": "dist/types.d.ts",

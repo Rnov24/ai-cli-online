@@ -1,12 +1,12 @@
-# AI-Cli Online
+# AGY Online — Antigravity Development Workspace
 
 [![npm version](https://img.shields.io/npm/v/ai-cli-online.svg)](https://www.npmjs.com/package/ai-cli-online)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green.svg)](https://nodejs.org/)
+[![Go Report](https://img.shields.io/badge/Go-%3E%3D1.22-blue.svg)](https://golang.org/)
 
-An AI-powered development environment that runs in your browser. Persistent terminal sessions, structured task lifecycle, and autonomous execution — all through a single Node.js process.
+An AI-powered development environment that runs in your browser. Persistent terminal sessions, structured 13-skill task lifecycle, and autonomous execution — all through a single compiled static Go executable (`bin/ai-cli-online`) with embedded Web UI assets.
 
-Built exclusively for running **Google Antigravity CLI (`agy`)** over local or unstable networks. tmux keeps everything alive when connections drop; the browser UI provides planning, annotation, and chat panels alongside the terminal.
+Built exclusively for running **Google Antigravity CLI (`agy`)** over local or unstable networks. tmux keeps everything alive when connections drop; the browser UI provides planning, annotation, git history visualizer, and chat panels alongside the terminal.
 
 **npm:** https://www.npmjs.com/package/ai-cli-online | **GitHub:** https://github.com/huacheng/ai-cli-online
 
@@ -39,29 +39,34 @@ Built exclusively for running **Google Antigravity CLI (`agy`)** over local or u
 - **Terminal** — full xterm.js with WebGL rendering, binary protocol for ultra-low latency, and touch quick-keys for mobile
 - **Chat Editor** — multi-line Markdown editor with slash commands, server-side draft persistence
 - **Mobile & Termux Ready** — auto-start at Android device boot via Termux:Boot, wake-lock CPU protection, and registered PID tracking
-- **Idle Serving** — automatic low-power idle mode when 0 clients connected; checkpoints SQLite and trims memory (RSS ~70MB)
+- **Idle Serving** — automatic low-power idle mode when 0 clients connected; checkpoints SQLite WAL and trims memory (sub-15MB idle RAM, ~13.7MB RSS)
 - All panels can be open simultaneously, each independently resizable
 
 ## AI Task Lifecycle
 
-The `ai-cli-task` plugin provides an 8-skill lifecycle for structured AI task execution:
+The `ai-cli-task` plugin provides a 13-skill lifecycle for structured AI task execution:
 
 ```
 init → plan → check → exec → check → merge → report
-                ↑        ↓
-              re-plan ←──┘ (on issues)
+        ↑        ↓
+      re-plan ←──┘ (on issues)
 ```
 
 | Skill | What it does |
 |-------|-------------|
 | **init** | Create task module (`AiTasks/<name>/`), git branch, optional worktree |
 | **plan** | Generate implementation plan or process human annotations |
+| **research** | Collect and organize external references to support planning and execution |
 | **check** | Evaluate feasibility at 3 checkpoints (post-plan / mid-exec / post-exec) |
+| **verify** | Run domain-adapted tests and verification procedures, producing result files |
 | **exec** | Execute plan steps with per-step verification |
-| **merge** | Merge task branch to main with conflict resolution (up to 3 retries) |
+| **merge** | Merge completed task branch to main with automated conflict resolution |
 | **report** | Generate completion report, distill lessons to experience database |
 | **auto** | Run the full lifecycle autonomously in a single Antigravity (`agy`) session |
 | **cancel** | Stop execution, set status to cancelled, optional cleanup |
+| **list** | Query task status, module inventory, and dependency relationships (read-only) |
+| **annotate** | Process Plan panel annotations (insert/delete/replace/comment) |
+| **summarize** | Regenerate condensed context summaries |
 
 ### Auto Mode
 
@@ -237,39 +242,31 @@ tmux sessions → shell → Google Antigravity CLI (agy) / AI agents
 - **Session Manager**: tmux (persistent terminal sessions)
 - **Layout**: Tabs + recursive split tree (LeafNode / SplitNode)
 - **Transport**: Binary frames (hot path) + JSON (control messages)
-- **Task System**: 8-skill plugin with state machine, dependency gates, and experience database
+- **Task System**: 13-skill plugin with state machine, dependency gates, and experience database
 
 ## Project Structure
 
 ```
 ai-cli-online/
-├── shared/              # Shared type definitions
-├── server/src/
-│   ├── index.ts         # Main entry (middleware + routes + server)
-│   ├── websocket.ts     # WebSocket ↔ PTY relay (binary + JSON)
-│   ├── tmux.ts          # tmux session management
-│   ├── files.ts         # File operations + path validation
-│   ├── pty.ts           # node-pty wrapper
-│   ├── db.ts            # SQLite database
-│   ├── auth.ts          # Auth utilities
-│   ├── middleware/       # Auth middleware
-│   └── routes/          # REST API routes (sessions, files, editor, settings)
+├── cmd/ai-cli-online/   # CLI entry point & daemon lifecycle management
+├── internal/
+│   ├── files/           # Atomic file operations & symlink security guards
+│   ├── pid/             # Process ID tracking & lifecycle registry
+│   ├── routes/          # REST route handlers (sessions, files, git, task-auto)
+│   ├── server/          # HTTP & WebSocket server engine with embed.FS UI
+│   ├── terminal/        # PTY relay, tmux manager, and direct fallback
+│   └── ws/              # WebSocket hub & client connection supervision
 ├── web/src/
-│   ├── App.tsx           # Main app (Login / TabBar / Terminal / Theme)
-│   ├── store/            # Zustand store (modular slices)
-│   ├── components/
-│   │   ├── TerminalPane.tsx              # 2D grid layout (Plan + Terminal + Chat)
-│   │   ├── TerminalView.tsx              # xterm.js terminal
-│   │   ├── PlanPanel.tsx                 # Plan annotation panel
-│   │   ├── PlanAnnotationRenderer.tsx    # Markdown + inline annotations
-│   │   ├── PlanFileBrowser.tsx           # AiTasks/ file browser
-│   │   ├── MarkdownEditor.tsx            # Chat editor
-│   │   └── ...
-│   ├── hooks/            # React hooks (WebSocket, file stream, resize, etc.)
-│   └── api/              # Typed API client modules
-├── bin/                  # npx entry point
-├── start.sh              # Production start script
-└── install-service.sh    # systemd + nginx installer
+│   ├── App.tsx          # Main application (Login / TabBar / Terminal / Theme)
+│   ├── store/           # Zustand store (modular slices)
+│   ├── components/      # UI components (PlanPanel, TerminalView, AiChatView)
+│   ├── hooks/           # React hooks (WebSocket, adaptive polling, resize)
+│   └── api/             # Typed API client modules
+├── shared/              # Shared TypeScript interfaces & protocol types
+├── ai-cli-task/         # 13-skill Antigravity lifecycle plugin
+├── bin/                 # Compiled static executable (`bin/ai-cli-online`)
+├── start.sh             # Production startup script
+└── install-service.sh   # systemd + nginx installer
 ```
 
 ## Development
@@ -306,6 +303,13 @@ The install script will:
 - TOCTOU download guard (streaming size check)
 - CSP headers (frame-ancestors, base-uri, form-action)
 - Rate limiting (configurable read/write thresholds)
+
+## Acknowledgements & Inspiration
+
+AGY Online builds upon the architectural foundations, terminal ergonomics, and interaction paradigms established by:
+
+- [**ai-cli-online**](https://github.com/huacheng/ai-cli-online) — The foundational browser-based web terminal and persistent AI CLI development environment.
+- [**hermes-webui**](https://github.com/nesquena/hermes-webui) — Inspirations in agent web interface design, terminal ergonomics, and autonomous workflows.
 
 ## License
 
