@@ -297,3 +297,304 @@ func TestSkillsHandler_ScaffoldSkill(t *testing.T) {
 		t.Errorf("expected 409 on duplicate skill, got %d: %s", wConflict.Code, wConflict.Body.String())
 	}
 }
+
+func TestSkillsHandler_SearchSkills(t *testing.T) {
+	mockSearchServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query().Get("q")
+		if q == "antislop" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"query":      "antislop",
+				"searchType": "fuzzy",
+				"skills": []map[string]any{
+					{
+						"id":       "miqdadbadjuber/anti-slop/antislop",
+						"skillId":  "antislop",
+						"name":     "antislop",
+						"installs": 946,
+						"source":   "miqdadbadjuber/anti-slop",
+					},
+				},
+				"count": 1,
+			})
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer mockSearchServer.Close()
+
+	os.Setenv("SKILLS_SH_SEARCH_URL", mockSearchServer.URL)
+	defer os.Unsetenv("SKILLS_SH_SEARCH_URL")
+
+	cfg := &config.Config{AuthToken: "skill-token"}
+	auth := NewAuthHelper(cfg)
+	handler := NewSkillsHandler(auth, nil)
+
+	// 1. Successful remote search
+	req := httptest.NewRequest("GET", "/api/skills/search?q=antislop", nil)
+	req.Header.Set("Authorization", "Bearer skill-token")
+	w := httptest.NewRecorder()
+	handler.SearchSkills(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp SkillsSearchResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Count != 1 || len(resp.Skills) != 1 {
+		t.Fatalf("expected 1 skill, got %d", resp.Count)
+	}
+	if resp.Skills[0].Name != "antislop" {
+		t.Errorf("expected skill antislop, got %s", resp.Skills[0].Name)
+	}
+
+	// 2. Fallback on non-200 or empty results
+	reqFallback := httptest.NewRequest("GET", "/api/skills/search?q=improve", nil)
+	reqFallback.Header.Set("Authorization", "Bearer skill-token")
+	wFallback := httptest.NewRecorder()
+	handler.SearchSkills(wFallback, reqFallback)
+
+	if wFallback.Code != http.StatusOK {
+		t.Fatalf("expected 200 for fallback, got %d", wFallback.Code)
+	}
+	var respFallback SkillsSearchResponse
+	if err := json.NewDecoder(wFallback.Body).Decode(&respFallback); err != nil {
+		t.Fatalf("failed to decode fallback response: %v", err)
+	}
+	if respFallback.Count == 0 {
+		t.Errorf("expected fallback skills, got 0")
+	}
+	found := false
+	for _, s := range respFallback.Skills {
+		if s.Name == "improve" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected improve to be found in fallback list")
+	}
+}
+
+func TestSkillsHandler_InstallSkill(t *testing.T) {
+	tmpWorkspace, err := os.MkdirTemp("", "fake-ws-install-*")
+	if err != nil {
+		t.Fatalf("failed to create temp workspace: %v", err)
+	}
+	defer os.RemoveAll(tmpWorkspace)
+
+	tmpSourceRepo, err := os.MkdirTemp("", "fake-source-repo-*")
+	if err != nil {
+		t.Fatalf("failed to create temp source repo: %v", err)
+	}
+	defer os.RemoveAll(tmpSourceRepo)
+
+	skillDir := filepath.Join(tmpSourceRepo, "skills", "fixture-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("failed to create skill dir: %v", err)
+	}
+	skillContent := `---
+name: fixture-skill
+description: A fixture skill for testing installation
+---
+# Fixture Skill
+Instructions here.`
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
+		t.Fatalf("failed to write fixture skill: %v", err)
+	}
+
+	cfg := &config.Config{AuthToken: "skill-token"}
+	auth := NewAuthHelper(cfg)
+	handler := NewSkillsHandler(auth, nil)
+
+	installReq := InstallSkillRequest{
+		Source:    tmpSourceRepo,
+		SkillName: "fixture-skill",
+		Scope:     "workspace",
+		Cwd:       tmpWorkspace,
+	}
+	body, _ := json.Marshal(installReq)
+	req := httptest.NewRequest("POST", "/api/skills/install", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer skill-token")
+	w := httptest.NewRecorder()
+	handler.InstallSkill(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var installed SkillItem
+	if err := json.NewDecoder(w.Body).Decode(&installed); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if installed.Name != "fixture-skill" {
+		t.Errorf("expected fixture-skill, got %s", installed.Name)
+	}
+
+	installedFile := filepath.Join(tmpWorkspace, ".agents", "skills", "fixture-skill", "SKILL.md")
+	data, err := os.ReadFile(installedFile)
+	if err != nil {
+		t.Fatalf("installed file does not exist: %v", err)
+	}
+	name, desc, _ := parseSkillFrontmatter(string(data))
+	if name != "fixture-skill" || desc != "A fixture skill for testing installation" {
+		t.Errorf("unexpected frontmatter: name=%s, desc=%s", name, desc)
+	}
+
+	lockPath := filepath.Join(tmpWorkspace, "skills-lock.json")
+	lockData, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("skills-lock.json not found: %v", err)
+	}
+	var lock SkillLockFile
+	if err := json.Unmarshal(lockData, &lock); err != nil {
+		t.Fatalf("failed to parse skills-lock.json: %v", err)
+	}
+	entry, exists := lock.Skills["fixture-skill"]
+	if !exists {
+		t.Fatalf("entry fixture-skill not in lockfile")
+	}
+	if entry.Source != tmpSourceRepo {
+		t.Errorf("lock entry source mismatch: %s", entry.Source)
+	}
+	if entry.ComputedHash == "" {
+		t.Errorf("computedHash should not be empty")
+	}
+}
+
+func TestSkillsHandler_DeleteSkill(t *testing.T) {
+	tmpWorkspace, err := os.MkdirTemp("", "fake-ws-delete-*")
+	if err != nil {
+		t.Fatalf("failed to create temp workspace: %v", err)
+	}
+	defer os.RemoveAll(tmpWorkspace)
+
+	skillDir := filepath.Join(tmpWorkspace, ".agents", "skills", "to-delete")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("failed to create skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: to-delete\n---\n"), 0644); err != nil {
+		t.Fatalf("failed to write skill file: %v", err)
+	}
+
+	lockPath := filepath.Join(tmpWorkspace, "skills-lock.json")
+	lock := SkillLockFile{
+		Version: 1,
+		Skills: map[string]SkillLockEntry{
+			"to-delete": {Source: "some/repo", SourceType: "github", ComputedHash: "123"},
+		},
+	}
+	lockBytes, _ := json.Marshal(lock)
+	_ = os.WriteFile(lockPath, lockBytes, 0644)
+
+	cfg := &config.Config{AuthToken: "skill-token"}
+	auth := NewAuthHelper(cfg)
+	handler := NewSkillsHandler(auth, nil)
+
+	// 1. Delete workspace skill
+	req := httptest.NewRequest("DELETE", "/api/skills?name=to-delete&scope=workspace&cwd="+tmpWorkspace, nil)
+	req.Header.Set("Authorization", "Bearer skill-token")
+	w := httptest.NewRecorder()
+	handler.DeleteSkill(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	if _, err := os.Stat(skillDir); !os.IsNotExist(err) {
+		t.Errorf("expected skill directory to be deleted")
+	}
+
+	lockAfter, err := loadSkillLock(lockPath)
+	if err != nil {
+		t.Fatalf("failed to load lockfile after delete: %v", err)
+	}
+	if _, exists := lockAfter.Skills["to-delete"]; exists {
+		t.Errorf("expected to-delete to be removed from lockfile")
+	}
+
+	// 2. Builtin skill deletion guard
+	reqBuiltin := httptest.NewRequest("DELETE", "/api/skills?name=antigravity-guide&scope=builtin", nil)
+	reqBuiltin.Header.Set("Authorization", "Bearer skill-token")
+	wBuiltin := httptest.NewRecorder()
+	handler.DeleteSkill(wBuiltin, reqBuiltin)
+
+	if wBuiltin.Code != http.StatusForbidden {
+		t.Errorf("expected 403 Forbidden for builtin deletion, got %d", wBuiltin.Code)
+	}
+}
+
+func TestSkillsHandler_SyncSkills(t *testing.T) {
+	tmpWorkspace, err := os.MkdirTemp("", "fake-ws-sync-*")
+	if err != nil {
+		t.Fatalf("failed to create temp workspace: %v", err)
+	}
+	defer os.RemoveAll(tmpWorkspace)
+
+	tmpSourceRepo, err := os.MkdirTemp("", "fake-source-repo-sync-*")
+	if err != nil {
+		t.Fatalf("failed to create temp source repo: %v", err)
+	}
+	defer os.RemoveAll(tmpSourceRepo)
+
+	skillDir := filepath.Join(tmpSourceRepo, "skills", "restore-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("failed to create skill dir: %v", err)
+	}
+	skillContent := `---
+name: restore-skill
+description: A skill to restore via sync
+---
+# Restore Skill`
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
+		t.Fatalf("failed to write skill file: %v", err)
+	}
+
+	lockPath := filepath.Join(tmpWorkspace, "skills-lock.json")
+	lock := SkillLockFile{
+		Version: 1,
+		Skills: map[string]SkillLockEntry{
+			"restore-skill": {
+				Source:       tmpSourceRepo,
+				SourceType:   "github",
+				SkillPath:    "skills/restore-skill/SKILL.md",
+				ComputedHash: "abc",
+			},
+		},
+	}
+	lockBytes, _ := json.Marshal(lock)
+	_ = os.WriteFile(lockPath, lockBytes, 0644)
+
+	cfg := &config.Config{AuthToken: "skill-token"}
+	auth := NewAuthHelper(cfg)
+	handler := NewSkillsHandler(auth, nil)
+
+	req := httptest.NewRequest("POST", "/api/skills/sync?cwd="+tmpWorkspace, nil)
+	req.Header.Set("Authorization", "Bearer skill-token")
+	w := httptest.NewRecorder()
+	handler.SyncSkills(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var syncResp SyncSkillsResponse
+	if err := json.NewDecoder(w.Body).Decode(&syncResp); err != nil {
+		t.Fatalf("failed to decode sync response: %v", err)
+	}
+
+	if syncResp.Synced != 1 {
+		t.Errorf("expected 1 synced, got %d", syncResp.Synced)
+	}
+	if len(syncResp.Restored) != 1 || syncResp.Restored[0] != "restore-skill" {
+		t.Errorf("expected restore-skill in restored list, got %v", syncResp.Restored)
+	}
+
+	restoredFile := filepath.Join(tmpWorkspace, ".agents", "skills", "restore-skill", "SKILL.md")
+	if _, err := os.Stat(restoredFile); os.IsNotExist(err) {
+		t.Errorf("restored file does not exist at %s", restoredFile)
+	}
+}
