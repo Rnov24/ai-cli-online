@@ -367,11 +367,22 @@ export const CommandPalette = React.memo(function CommandPalette({
     {
       id: 'cmd-plugins-manager',
       category: 'SYSTEM',
-      title: 'Antigravity Plugins: Manage Extensions & Toolkits',
+      title: 'Plugin Management: Manage Extensions & Toolkits (/plugins)',
       desc: 'Inspect installed plugins, components, and marketplace packages',
       shortcut: '⌥P',
       action: () => {
         window.dispatchEvent(new CustomEvent('agy:open-plugins-modal'));
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-plugins-import',
+      category: 'SYSTEM',
+      title: 'Plugin Management: Import & Convert Plugin (/plugins-import)',
+      desc: 'Convert Hermes plugins or external repositories into AGY agent skills',
+      shortcut: '/plugins-import',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('agy:open-plugins-modal', { detail: { view: 'import' } }));
         onClose();
       },
     },
@@ -444,7 +455,8 @@ export const CommandPalette = React.memo(function CommandPalette({
       return (
         item.title.toLowerCase().includes(q) ||
         item.category.toLowerCase().includes(q) ||
-        (item.desc && item.desc.toLowerCase().includes(q))
+        (item.desc && item.desc.toLowerCase().includes(q)) ||
+        (item.shortcut && item.shortcut.toLowerCase().includes(q))
       );
     });
   }, [items, activeCategory, query]);

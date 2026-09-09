@@ -8,6 +8,7 @@ import {
   togglePlugin,
   type PluginItem,
 } from '../api/plugins';
+import { convertHermesPlugin, type SkillItem } from '../api/skills';
 
 vi.mock('../api/plugins', () => ({
   fetchPlugins: vi.fn(),
@@ -16,10 +17,15 @@ vi.mock('../api/plugins', () => ({
   togglePlugin: vi.fn(),
 }));
 
+vi.mock('../api/skills', () => ({
+  convertHermesPlugin: vi.fn(),
+}));
+
 const mockFetchPlugins = vi.mocked(fetchPlugins);
 const mockInstallPlugin = vi.mocked(installPlugin);
 const mockUninstallPlugin = vi.mocked(uninstallPlugin);
 const mockTogglePlugin = vi.mocked(togglePlugin);
+const mockConvertHermesPlugin = vi.mocked(convertHermesPlugin);
 
 const mockPlugins: PluginItem[] = [
   {
@@ -67,7 +73,9 @@ describe('PluginsModal', { timeout: 35000 }, () => {
   it('renders modal with installed plugins when isOpen is true', async () => {
     render(<PluginsModal isOpen={true} onClose={vi.fn()} token="test-tok" />);
 
-    expect(screen.getByText('ANTIGRAVITY PLUGINS')).toBeInTheDocument();
+    expect(screen.getByText('PLUGIN MANAGEMENT')).toBeInTheDocument();
+    expect(screen.getByText('INSTALLED PLUGINS')).toBeInTheDocument();
+    expect(screen.getByText('IMPORT / CONVERT PLUGIN')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('ai-cli-task')).toBeInTheDocument();
@@ -81,7 +89,7 @@ describe('PluginsModal', { timeout: 35000 }, () => {
 
   it('does not render when isOpen is false', () => {
     render(<PluginsModal isOpen={false} onClose={vi.fn()} token="test-tok" />);
-    expect(screen.queryByText('ANTIGRAVITY PLUGINS')).not.toBeInTheDocument();
+    expect(screen.queryByText('PLUGIN MANAGEMENT')).not.toBeInTheDocument();
   });
 
   it('filters plugins by search query', async () => {
@@ -160,6 +168,75 @@ describe('PluginsModal', { timeout: 35000 }, () => {
 
     await waitFor(() => {
       expect(mockUninstallPlugin).toHaveBeenCalledWith('test-tok', 'ai-cli-task');
+    });
+  });
+
+  it('switches to IMPORT / CONVERT tab and fills preset', async () => {
+    render(<PluginsModal isOpen={true} onClose={vi.fn()} token="test-tok" />);
+
+    const importTabBtn = screen.getByRole('button', { name: /IMPORT \/ CONVERT PLUGIN/i });
+    fireEvent.click(importTabBtn);
+
+    expect(screen.getByText(/HERMES AGENT TO AGY SKILL CONVERTER/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/PLUGIN SOURCE/i)).toBeInTheDocument();
+
+    // Click preset
+    const presetBtn = screen.getByRole('button', { name: 'crypto-tracker' });
+    fireEvent.click(presetBtn);
+
+    const sourceInput = screen.getByLabelText(/PLUGIN SOURCE/i) as HTMLInputElement;
+    expect(sourceInput.value).toBe('NousResearch/hermes-agent');
+
+    const nameInput = screen.getByLabelText(/CUSTOM SKILL NAME/i) as HTMLInputElement;
+    expect(nameInput.value).toBe('crypto-tracker');
+  });
+
+  it('submits Hermes conversion and displays success banner', async () => {
+    const mockConverted: SkillItem = {
+      name: 'crypto-tracker',
+      description: 'Crypto price tracking skill',
+      scope: 'workspace',
+      path: '/workspace/.agents/skills/crypto-tracker',
+      skillFile: '/workspace/.agents/skills/crypto-tracker/SKILL.md',
+      hasScripts: true,
+      hasResources: false,
+    };
+    mockConvertHermesPlugin.mockResolvedValue(mockConverted);
+
+    render(<PluginsModal isOpen={true} onClose={vi.fn()} token="test-tok" initialTab="import" />);
+
+    const sourceInput = screen.getByLabelText(/PLUGIN SOURCE/i);
+    fireEvent.change(sourceInput, { target: { value: 'NousResearch/hermes-agent' } });
+
+    const submitBtn = screen.getByRole('button', { name: /CONVERT & INSTALL AS AGENT SKILL/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockConvertHermesPlugin).toHaveBeenCalledWith('test-tok', {
+        source: 'NousResearch/hermes-agent',
+        customName: undefined,
+        scope: 'workspace',
+        cwd: undefined,
+      });
+      expect(screen.getByText(/PLUGIN SUCCESSFULLY CONVERTED & INSTALLED/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/crypto-tracker/i).length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it('displays error banner when Hermes conversion fails', async () => {
+    mockConvertHermesPlugin.mockRejectedValue(new Error('Not a valid Hermes plugin: missing plugin.yaml or tools.py'));
+
+    render(<PluginsModal isOpen={true} onClose={vi.fn()} token="test-tok" initialTab="import" />);
+
+    const sourceInput = screen.getByLabelText(/PLUGIN SOURCE/i);
+    fireEvent.change(sourceInput, { target: { value: 'invalid/repo' } });
+
+    const submitBtn = screen.getByRole('button', { name: /CONVERT & INSTALL AS AGENT SKILL/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('CONVERSION FAILED')).toBeInTheDocument();
+      expect(screen.getByText('Not a valid Hermes plugin: missing plugin.yaml or tools.py')).toBeInTheDocument();
     });
   });
 

@@ -96,4 +96,27 @@ describe('CommandPalette', () => {
 
     window.removeEventListener('agy:open-persona-modal', eventSpy);
   });
+
+  it('triggers agy:open-plugins-modal with import detail when plugins-import is selected', () => {
+    const onClose = vi.fn();
+    let eventDetail: any = null;
+    const eventHandler = (e: any) => {
+      eventDetail = e.detail;
+    };
+    window.addEventListener('agy:open-plugins-modal', eventHandler);
+
+    render(<CommandPalette isOpen={true} onClose={onClose} />);
+
+    const searchInput = screen.getByPlaceholderText(/Type a command/i);
+    fireEvent.change(searchInput, { target: { value: '/plugins-import' } });
+
+    const importItem = screen.getByText(/Plugin Management: Import & Convert Plugin/i);
+    expect(importItem).toBeInTheDocument();
+    fireEvent.click(importItem);
+
+    expect(eventDetail).toEqual({ view: 'import' });
+    expect(onClose).toHaveBeenCalled();
+
+    window.removeEventListener('agy:open-plugins-modal', eventHandler);
+  });
 });

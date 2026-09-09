@@ -85,6 +85,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("POST /api/skills/install", skillsH.InstallSkill)
 	mux.HandleFunc("DELETE /api/skills", skillsH.DeleteSkill)
 	mux.HandleFunc("POST /api/skills/sync", skillsH.SyncSkills)
+	mux.HandleFunc("POST /api/skills/convert-hermes", skillsH.ConvertHermesPlugin)
 
 	// Plugins Management
 	mux.HandleFunc("GET /api/plugins", plugH.ListPlugins)

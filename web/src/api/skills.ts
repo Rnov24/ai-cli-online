@@ -163,3 +163,26 @@ export async function syncSkills(token: string, cwd?: string): Promise<SyncSkill
   }
   return res.json();
 }
+
+export interface ConvertHermesPayload {
+  source: string;
+  customName?: string;
+  scope: 'workspace' | 'global';
+  cwd?: string;
+}
+
+export async function convertHermesPlugin(token: string, payload: ConvertHermesPayload): Promise<SkillItem> {
+  const res = await fetch('/api/skills/convert-hermes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error || `Failed to convert Hermes plugin: ${res.statusText}`);
+  }
+  return res.json();
+}
