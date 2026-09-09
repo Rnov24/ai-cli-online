@@ -58,7 +58,7 @@ export function ThinkingBlock({ thinking, isStreaming }: ThinkingBlockProps) {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}>
-            {isStreaming ? 'AGY // ANALYZING REQUEST...' : 'COGNITIVE TRACE LOG'}
+            {isStreaming ? `REASONING // ${thinking.length} CHARS` : `REASONING TRACE // ${thinking.length} CHARS`}
           </span>
           {isStreaming && (
             <span className="pulse-dot pulse-dot--executing" style={{ flexShrink: 0 }} />
