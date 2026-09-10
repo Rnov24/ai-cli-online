@@ -50,6 +50,7 @@ honor its STOP conditions, and update your row when done.
 | [040](040-paginate-skills-for-performance.md) | Paginate Skills Discovery and Registry Search for Performance and Low-Spec Device Resilience | P1 | M | 034 | DONE |
 | [041](041-stream-verbosity-controls-and-subagent-seeker.md) | Stream Verbosity Controls, Live Process Telemetry, and Subagent Seeking Interface | P1 | M | 040 | DONE |
 | [042](042-redesign-and-relayout-sidebar.md) | Redesign and Relayout Session Sidebar for IDE Left Docking, Telemetry Density, and Responsive Cockpit Ergonomics | P1 | M | 041 | DONE |
+| [043](043-subagent-delegation-stream-and-log-rendering.md) | Render Subagent Delegation Cards in Streaming and Historical Log Chat | P1 | M | 042 | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason) | `REJECTED` (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -86,6 +87,7 @@ Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with one-line reason
 - **Plan 040 builds on Plan 034**: Extends the Skills Hub with server-side pagination, 5s TTL discovery caching, TypeScript client options, and antislop-compliant responsive pagination controls to eliminate disk I/O bottlenecks and excessive DOM allocations on mobile/low-spec devices.
 - **Plan 041 builds on Plan 040**: Replaces generic synthesizing placeholders with live telemetry, adds global tri-mode chat verbosity controls (compact, verbose, minimal), and implements a dedicated Subagent Seeking & Inspection interface across Go backend endpoints, chat tool cards, sidebar, and a dedicated Subagents modal.
 - **Plan 042 builds on Plan 041**: Relayouts the desktop SessionSidebar to dock cleanly on the left between NavigationRail and the workspace, redesigns the header and view switcher into an avionics telemetry cockpit with segmented controls, compacts cards into high-density telemetry rows, adds inline status filters for subagents, standardizes mobile drawer z-indexes and touch targets, and adds comprehensive unit test coverage.
+- **Plan 043 builds on Plans 041 and 042**: Correlates generic transcript steps to tool call outputs in Go backend, normalizes streaming tool names and error states, makes subagent delegation cards persistently visible across compact worklog and stream modes, and provides robust argument/ID normalization for seek subagent triggers.
 
 ## Findings considered and rejected
 
