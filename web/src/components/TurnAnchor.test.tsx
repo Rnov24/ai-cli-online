@@ -112,4 +112,55 @@ describe('TurnAnchor', () => {
     );
     expect(screen.getByText(/WORKLOG SUMMARY/)).toBeInTheDocument();
   });
+
+  it('renders subagent delegation card prominently in compact worklog mode', () => {
+    const subMessage: ChatMessage = {
+      ...baseMessage,
+      status: 'done',
+      toolCalls: [
+        {
+          id: 'tc-sub',
+          name: 'invoke_subagent',
+          args: { Subagents: '[{"Role":"Worker"}]' },
+          status: 'success',
+        },
+      ],
+    };
+
+    render(
+      <TurnAnchor
+        message={subMessage}
+        turnIndex={0}
+        isStreaming={false}
+        verbosityMode="compact"
+      />
+    );
+
+    expect(screen.getByTestId('subagent-dispatch-card')).toBeInTheDocument();
+    expect(screen.getByText('/Worker')).toBeInTheDocument();
+  });
+
+  it('renders subagent badge in turn header', () => {
+    const subMessage: ChatMessage = {
+      ...baseMessage,
+      toolCalls: [
+        {
+          id: 'tc-sub-1',
+          name: 'invoke_subagent',
+          args: { Subagents: '[{"Role":"Worker"}]' },
+          status: 'success',
+        },
+      ],
+    };
+
+    render(
+      <TurnAnchor
+        message={subMessage}
+        turnIndex={0}
+        isStreaming={false}
+      />
+    );
+
+    expect(screen.getByText('1 SUBAGENT')).toBeInTheDocument();
+  });
 });
