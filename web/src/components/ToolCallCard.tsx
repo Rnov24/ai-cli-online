@@ -23,7 +23,13 @@ function parseSubagents(subagentsArg: unknown): ParsedSubagent[] {
   if (!subagentsArg) return [];
   if (typeof subagentsArg === 'string') {
     try {
-      const parsed = JSON.parse(subagentsArg);
+      let parsed = JSON.parse(subagentsArg);
+      // Handle double-serialized JSON strings
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {}
+      }
       return Array.isArray(parsed) ? parsed : [parsed];
     } catch {
       return [];
@@ -38,10 +44,34 @@ function parseSubagents(subagentsArg: unknown): ParsedSubagent[] {
   return [];
 }
 
-function extractSubagentId(output?: string): string | undefined {
-  if (!output) return undefined;
-  const m = output.match(/["']?(?:conversationId|conversation_id)["']?\s*[:=]\s*["']?([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : undefined;
+function extractSubagentId(output?: string, args?: Record<string, unknown>): string | undefined {
+  if (output) {
+    const m = output.match(/["']?(?:conversationId|conversation_id|id)["']?\s*[:=]\s*["']?([a-zA-Z0-9_-]+)/i);
+    if (m) return m[1];
+  }
+  if (args) {
+    if (typeof args.conversationId === 'string') return args.conversationId;
+    if (typeof args.conversation_id === 'string') return args.conversation_id;
+  }
+  return undefined;
+}
+
+function extractRoleFromFallback(args?: Record<string, unknown>, prompt?: string): string | undefined {
+  if (args) {
+    const summary = args.toolSummary ?? args.toolAction ?? args.summary ?? args.action;
+    if (typeof summary === 'string' && summary.trim()) {
+      const cleaned = summary
+        .replace(/^"|"$/g, '')
+        .replace(/^Dispatch(ing)?\s*(executor\s*subagent\s*(for\s*)?)?/i, '')
+        .trim();
+      if (cleaned) return cleaned;
+    }
+  }
+  if (prompt) {
+    const match = prompt.match(/#\s*(Plan\s*\d+[:\s][^\r\n]+)/i);
+    if (match) return match[1].trim();
+  }
+  return undefined;
 }
 
 function getToolCategory(name: string): string {
@@ -64,12 +94,19 @@ function getToolCategory(name: string): string {
 function getTargetInfo(tool: ToolCall): { target?: string; detail?: string } {
   if (!tool.args) return {};
   if (tool.name === 'invoke_subagent') {
-    const subs = parseSubagents(tool.args.Subagents);
-    if (subs.length > 0) {
-      const first = subs[0];
-      const role = first.Role || first.role;
-      return { target: role ? `DELEGATE // ${role}` : 'DELEGATE SUBAGENT' };
+    const rawSubs =
+      tool.args.Subagents ??
+      tool.args.subagents ??
+      tool.args.Subagent ??
+      tool.args.subagent ??
+      (typeof tool.args === 'object' && ('Model' in tool.args || 'model' in tool.args) ? [tool.args] : undefined);
+    const subs = parseSubagents(rawSubs);
+    let role = subs.length > 0 ? (subs[0].Role || subs[0].role) : undefined;
+    if (!role || role === 'Subagent') {
+      const fallback = extractRoleFromFallback(tool.args as Record<string, unknown>, subs[0]?.Prompt || subs[0]?.prompt);
+      if (fallback) role = fallback;
     }
+    return { target: role ? `DELEGATE // ${role}` : 'DELEGATE SUBAGENT' };
   }
   if (tool.name === 'run_command' && tool.args.CommandLine) {
     return { target: String(tool.args.CommandLine) };
@@ -119,9 +156,35 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
 
   // Specialized Subagent Dispatch Card
   if (isSubagent) {
-    const subs = parseSubagents(toolCall.args?.Subagents);
-    const subId = extractSubagentId(toolCall.output);
-    const firstRole = subs.length > 0 ? (subs[0].Role || subs[0].role || 'Subagent') : 'Subagent';
+    const rawSubagents =
+      toolCall.args?.Subagents ??
+      toolCall.args?.subagents ??
+      toolCall.args?.Subagent ??
+      toolCall.args?.subagent ??
+      (toolCall.args && typeof toolCall.args === 'object' && ('Model' in toolCall.args || 'model' in toolCall.args) ? [toolCall.args] : undefined);
+    const subs = parseSubagents(rawSubagents);
+    const subId = extractSubagentId(toolCall.output, toolCall.args as Record<string, unknown> | undefined);
+
+    let firstRole = subs.length > 0 ? (subs[0].Role || subs[0].role) : undefined;
+    if (!firstRole || firstRole === 'Subagent') {
+      const fallback = extractRoleFromFallback(toolCall.args as Record<string, unknown> | undefined, subs[0]?.Prompt || subs[0]?.prompt);
+      if (fallback) {
+        firstRole = fallback;
+      } else {
+        firstRole = firstRole || 'Subagent';
+      }
+    }
+
+    const effectiveSubs: ParsedSubagent[] = subs.length > 0 ? subs : [
+      {
+        Role: firstRole,
+        Prompt: (typeof toolCall.args?.Prompt === 'string' ? toolCall.args.Prompt : undefined) ||
+                (typeof toolCall.args?.prompt === 'string' ? toolCall.args.prompt : undefined) ||
+                (typeof toolCall.args?.toolSummary === 'string' ? String(toolCall.args.toolSummary).replace(/^"|"$/g, '') : undefined),
+        TypeName: typeof toolCall.args?.TypeName === 'string' ? toolCall.args.TypeName : undefined,
+        Model: typeof toolCall.args?.Model === 'string' ? toolCall.args.Model : undefined,
+      },
+    ];
     return (
       <div
         data-testid="subagent-dispatch-card"
@@ -182,9 +245,9 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
             >
               /{firstRole}
             </span>
-            {subs.length > 1 && (
+            {effectiveSubs.length > 1 && (
               <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
-                (+{subs.length - 1} more)
+                (+{effectiveSubs.length - 1} more)
               </span>
             )}
           </div>
@@ -215,7 +278,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
         {/* Expanded Subagent Details */}
         {expanded && (
           <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-primary)' }}>
-            {subs.map((sub, idx) => {
+            {effectiveSubs.map((sub, idx) => {
               const role = sub.Role || sub.role || 'Subagent';
               const typeName = sub.TypeName || sub.typeName || 'self';
               const model = sub.Model || sub.model || 'inherit';
@@ -230,7 +293,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
                     borderRadius: '3px',
                     border: '1px solid var(--border-subtle)',
                     backgroundColor: 'var(--bg-secondary)',
-                    marginBottom: idx < subs.length - 1 ? '8px' : '0',
+                    marginBottom: idx < effectiveSubs.length - 1 ? '8px' : '0',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>

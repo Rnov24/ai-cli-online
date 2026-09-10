@@ -233,6 +233,7 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [showSubagentsModal, setShowSubagentsModal] = useState(false);
   const [activeSubagentId, setActiveSubagentId] = useState<string | undefined>(undefined);
+  const [subagentSearchQuery, setSubagentSearchQuery] = useState<string | undefined>(undefined);
   const [verbosityMode, setVerbosityMode] = useState<VerbosityMode>(() => {
     try {
       const stored = localStorage.getItem('agy:chat_verbosity');
@@ -256,6 +257,9 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
       const customEvent = e as CustomEvent<{ id?: string; role?: string }>;
       if (customEvent.detail?.id) {
         setActiveSubagentId(customEvent.detail.id);
+      } else if (customEvent.detail?.role) {
+        // Fallback to role search if id was not yet captured
+        setSubagentSearchQuery(customEvent.detail.role);
       }
       setShowSubagentsModal(true);
     };
@@ -1290,9 +1294,23 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
             } else if (data.event === 'tool' && data.tool_call) {
               flushPendingDeltas(assistantId);
               setAgentState('EXECUTING');
+              let toolName = data.tool_call.name || '';
+              if (!toolName) {
+                if (
+                  data.tool_call.args &&
+                  ('Subagents' in data.tool_call.args ||
+                    'subagents' in data.tool_call.args ||
+                    'Subagent' in data.tool_call.args ||
+                    'subagent' in data.tool_call.args)
+                ) {
+                  toolName = 'invoke_subagent';
+                } else {
+                  toolName = 'tool';
+                }
+              }
               const tc: ToolCall = {
                 id: data.tool_call.id || `tool_${Date.now()}`,
-                name: data.tool_call.name,
+                name: toolName,
                 args: data.tool_call.args || {},
                 output: data.tool_call.output,
                 status: data.tool_call.status || 'running',
@@ -2664,10 +2682,12 @@ export function AiChatView({ sessionId, token, externalCommand, onStatsChange }:
 
       {/* Subagents Explorer Modal */}
       <SubagentsModal
+        key={subagentSearchQuery ? `subagents-${subagentSearchQuery}` : 'subagents-modal'}
         isOpen={showSubagentsModal}
         onClose={() => {
           setShowSubagentsModal(false);
           setActiveSubagentId(undefined);
+          setSubagentSearchQuery(undefined);
         }}
         token={token}
         initialSubagentId={activeSubagentId}

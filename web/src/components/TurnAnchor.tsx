@@ -48,9 +48,16 @@ export const TurnAnchor = memo(function TurnAnchor({
     second: '2-digit',
   });
 
+  const subagentToolCalls = toolCalls.filter(
+    (tc) => tc.name === 'invoke_subagent' || tc.name.toLowerCase().includes('subagent')
+  );
+  const hasSubagent = subagentToolCalls.length > 0;
+
   const runningTool = toolCalls.find((tc) => tc.status === 'running');
   const runningTarget = runningTool
-    ? (runningTool.args?.CommandLine
+    ? (runningTool.name === 'invoke_subagent'
+        ? (runningTool.args?.toolSummary ? String(runningTool.args.toolSummary).replace(/^"|"$/g, '') : 'SUBAGENT')
+        : runningTool.args?.CommandLine
         ? String(runningTool.args.CommandLine)
         : String(runningTool.args?.TargetFile || runningTool.args?.AbsolutePath || runningTool.args?.Query || ''))
     : '';
@@ -59,6 +66,7 @@ export const TurnAnchor = memo(function TurnAnchor({
 
   const renderStreamingIndicator = (mode: PresentationMode) => {
     if (runningTool) {
+      const isSubagent = runningTool.name === 'invoke_subagent';
       return (
         <div
           data-testid="executing-telemetry"
@@ -66,13 +74,13 @@ export const TurnAnchor = memo(function TurnAnchor({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            color: 'var(--accent-amber-bright)',
+            color: isSubagent ? 'var(--accent-purple, #a78bfa)' : 'var(--accent-amber-bright)',
             fontSize: '11px',
             fontFamily: 'var(--font-mono)',
           }}
         >
           <span className="pulse-dot pulse-dot--executing" />
-          <span>EXECUTING // {runningTool.name.toUpperCase()} {runningTarget ? `> ${runningTarget}` : ''}</span>
+          <span>EXECUTING // {isSubagent ? 'DELEGATE SUBAGENT' : runningTool.name.toUpperCase()} {runningTarget ? `> ${runningTarget}` : ''}</span>
         </div>
       );
     }
@@ -187,6 +195,22 @@ export const TurnAnchor = memo(function TurnAnchor({
               }}
             >
               {message.turnStatus}
+            </span>
+          )}
+          {hasSubagent && (
+            <span
+              style={{
+                fontSize: '9px',
+                padding: '1px 5px',
+                borderRadius: '3px',
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--accent-purple, #a78bfa)',
+                border: '1px solid var(--border)',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+              }}
+            >
+              {subagentToolCalls.length} SUBAGENT{subagentToolCalls.length > 1 ? 'S' : ''}
             </span>
           )}
           {toolCount > 0 && (
@@ -344,6 +368,11 @@ export const TurnAnchor = memo(function TurnAnchor({
                 </span>
                 <span style={{ color: 'var(--text-muted)' }}>//</span>
                 <span>{toolCount} tool calls</span>
+                {hasSubagent && (
+                  <span style={{ color: 'var(--accent-purple, #a78bfa)', fontWeight: 600 }}>
+                    // {subagentToolCalls.length} DELEGATED
+                  </span>
+                )}
                 {runningTool ? (
                   <span style={{ color: 'var(--accent-amber-bright)', display: 'inline-flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <span className="pulse-dot pulse-dot--executing" />
@@ -358,6 +387,15 @@ export const TurnAnchor = memo(function TurnAnchor({
               </span>
             </div>
 
+            {/* Always surface Subagent Dispatch Cards even in compact worklog mode */}
+            {!isAutoExpanded && subagentToolCalls.length > 0 && (
+              <div style={{ margin: '8px 0' }}>
+                {subagentToolCalls.map((tc) => (
+                  <ToolCallCard key={tc.id || tc.name} toolCall={tc} />
+                ))}
+              </div>
+            )}
+
             {isAutoExpanded && (
               <div style={{ marginTop: '8px' }}>
                 {message.thinking && (
@@ -369,7 +407,7 @@ export const TurnAnchor = memo(function TurnAnchor({
                 {toolCalls.length > 0 && (
                   <div style={{ margin: '6px 0 10px 0' }}>
                     {toolCalls.map((tc) => (
-                      <ToolCallCard key={tc.id} toolCall={tc} />
+                      <ToolCallCard key={tc.id || tc.name} toolCall={tc} />
                     ))}
                   </div>
                 )}
@@ -401,7 +439,7 @@ export const TurnAnchor = memo(function TurnAnchor({
             {toolCalls.length > 0 && (
               <div style={{ margin: '6px 0 10px 0' }}>
                 {toolCalls.map((tc) => (
-                  <ToolCallCard key={tc.id} toolCall={tc} />
+                  <ToolCallCard key={tc.id || tc.name} toolCall={tc} />
                 ))}
               </div>
             )}
