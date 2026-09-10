@@ -384,7 +384,7 @@ func (h *ConversationsHandler) GetConversationMessages(w http.ResponseWriter, r 
 				Status:     "done",
 				TurnStatus: "completed",
 			})
-		} else if raw.Type == "PLANNER_RESPONSE" {
+		} else if raw.Type == "PLANNER_RESPONSE" || raw.Type == "MODEL" {
 			if currentAssistant == nil {
 				currentAssistant = &ChatMessageItem{
 					ID:         fmt.Sprintf("assistant-%d", raw.StepIndex),
@@ -405,7 +405,11 @@ func (h *ConversationsHandler) GetConversationMessages(w http.ResponseWriter, r 
 				currentAssistant.Thinking = raw.Thinking
 			}
 			if len(raw.ToolCalls) > 0 {
-				for _, tc := range raw.ToolCalls {
+				for idx, tc := range raw.ToolCalls {
+					toolId := tc.Id
+					if toolId == "" {
+						toolId = fmt.Sprintf("tool_%d_%d", raw.StepIndex, idx)
+					}
 					toolName := tc.Name
 					if toolName == "" {
 						toolName = "tool"
@@ -415,7 +419,7 @@ func (h *ConversationsHandler) GetConversationMessages(w http.ResponseWriter, r 
 						status = "success"
 					}
 					currentAssistant.ToolCalls = append(currentAssistant.ToolCalls, TranscriptToolItem{
-						Id:     tc.Id,
+						Id:     toolId,
 						Name:   toolName,
 						Args:   tc.Args,
 						Output: tc.Output,
@@ -424,6 +428,20 @@ func (h *ConversationsHandler) GetConversationMessages(w http.ResponseWriter, r 
 				}
 			}
 			currentAssistant.Timestamp = timestamp
+		} else if raw.Type == "GENERIC" || raw.Type == "TOOL_OUTPUT" {
+			if currentAssistant != nil && len(currentAssistant.ToolCalls) > 0 {
+				// Attach output to the most recent tool call that has empty output
+				lastIdx := len(currentAssistant.ToolCalls) - 1
+				for i := lastIdx; i >= 0; i-- {
+					if currentAssistant.ToolCalls[i].Output == "" {
+						currentAssistant.ToolCalls[i].Output = raw.Content
+						if raw.Status == "ERROR" || raw.Status == "FAILED" {
+							currentAssistant.ToolCalls[i].Status = "error"
+						}
+						break
+					}
+				}
+			}
 		}
 	}
 
