@@ -55,3 +55,47 @@ func TestParseStreamWithFixtures(t *testing.T) {
 		t.Errorf("expected event[4] to be done success, got: %+v", events[4])
 	}
 }
+
+func TestParseStream_InvokeSubagentToolUpdate(t *testing.T) {
+	jsonlInput := `{"event":"step_update","conversation_id":"conv-sub-123","step_update":{"step_index":1,"step_type":"tool","tool_name":"","state":"DONE","duration_seconds":1.2,"tool_info":{"name":"invoke_subagent","parameters":{"Subagents":"[{\"Prompt\":\"test\"}]"},"output":"Created subagents:\n{\"conversationId\":\"child-conv-999\"}"}}}
+{"event":"step_update","conversation_id":"conv-sub-123","step_update":{"step_index":2,"step_type":"tool","tool_name":"","state":"ERROR","duration_seconds":0.5,"tool_info":{"name":"invoke_subagent","parameters":{},"output":"Permission denied"}}}
+`
+
+	var events []StreamEvent
+	_, err := ParseStream(strings.NewReader(jsonlInput), func(evt StreamEvent) {
+		events = append(events, evt)
+	})
+
+	if err != nil {
+		t.Fatalf("ParseStream failed: %v", err)
+	}
+
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+
+	// First event: tool_name was empty, tool_info.name was invoke_subagent, state DONE
+	if events[0].Event != "tool" {
+		t.Errorf("expected event[0] to be tool, got: %s", events[0].Event)
+	}
+	if events[0].ToolCall.Name != "invoke_subagent" {
+		t.Errorf("expected tool name 'invoke_subagent', got: %s", events[0].ToolCall.Name)
+	}
+	if events[0].ToolCall.Status != "success" {
+		t.Errorf("expected tool status 'success', got: %s", events[0].ToolCall.Status)
+	}
+	if !strings.Contains(events[0].ToolCall.Output, "child-conv-999") {
+		t.Errorf("expected output to contain child-conv-999, got: %s", events[0].ToolCall.Output)
+	}
+
+	// Second event: state ERROR
+	if events[1].Event != "tool" {
+		t.Errorf("expected event[1] to be tool, got: %s", events[1].Event)
+	}
+	if events[1].ToolCall.Name != "invoke_subagent" {
+		t.Errorf("expected tool name 'invoke_subagent', got: %s", events[1].ToolCall.Name)
+	}
+	if events[1].ToolCall.Status != "error" {
+		t.Errorf("expected tool status 'error', got: %s", events[1].ToolCall.Status)
+	}
+}

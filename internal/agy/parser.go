@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 )
 
 type ParseResult struct {
@@ -89,11 +90,34 @@ func ParseStream(r io.Reader, onEvent func(StreamEvent)) (ParseResult, error) {
 				res.ConversationId = su.ConversationId
 			}
 
-			if su.StepType == "tool" {
-				toolStatus := "running"
-				if su.State == "DONE" {
-					toolStatus = "success"
+			if su.StepType == "tool" || su.StepType == "tool_result" || su.StepType == "tool_output" {
+				toolName := strings.TrimSpace(su.ToolName)
+				if toolName == "" {
+					toolName = strings.TrimSpace(su.ToolInfo.Name)
 				}
+				if toolName == "" {
+					toolName = "tool"
+				}
+
+				toolStatus := "running"
+				if su.StepType == "tool_result" || su.StepType == "tool_output" {
+					toolStatus = "success"
+					if su.State == "ERROR" || su.State == "FAILED" {
+						toolStatus = "error"
+					}
+				} else {
+					if su.State == "DONE" || su.State == "COMPLETED" || su.State == "SUCCESS" {
+						toolStatus = "success"
+					} else if su.State == "ERROR" || su.State == "FAILED" {
+						toolStatus = "error"
+					}
+				}
+
+				args := su.ToolInfo.Parameters
+				if args == nil {
+					args = make(map[string]any)
+				}
+
 				if onEvent != nil {
 					onEvent(StreamEvent{
 						Event:        "tool",
@@ -101,8 +125,8 @@ func ParseStream(r io.Reader, onEvent func(StreamEvent)) (ParseResult, error) {
 						Conversation: res.ConversationId,
 						ToolCall: &ToolCallData{
 							Id:       fmt.Sprintf("tool_%d", su.StepIndex),
-							Name:     su.ToolName,
-							Args:     su.ToolInfo.Parameters,
+							Name:     toolName,
+							Args:     args,
 							Output:   su.ToolInfo.Output,
 							Status:   toolStatus,
 							Duration: su.DurationSeconds,
