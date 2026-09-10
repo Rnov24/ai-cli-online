@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -274,3 +275,85 @@ func TestExtractUserPrompt(t *testing.T) {
 	}
 }
 
+func TestConversationsHandler_SubagentOutputCorrelation(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "fake-home-subagent-*")
+	if err != nil {
+		t.Fatalf("failed to create temp home: %v", err)
+	}
+	defer os.RemoveAll(tmpHome)
+
+	oldHome := os.Getenv("HOME")
+	oldUserProfile := os.Getenv("USERPROFILE")
+	defer func() {
+		os.Setenv("HOME", oldHome)
+		os.Setenv("USERPROFILE", oldUserProfile)
+	}()
+	os.Setenv("HOME", tmpHome)
+	os.Setenv("USERPROFILE", tmpHome)
+
+	fakeBrain := filepath.Join(tmpHome, ".gemini", "antigravity-cli", "brain")
+	convDir := filepath.Join(fakeBrain, "conv-subagent-1", ".system_generated", "logs")
+	if err := os.MkdirAll(convDir, 0755); err != nil {
+		t.Fatalf("failed to create fake conv dir: %v", err)
+	}
+
+	transcriptContent := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-05T20:00:00Z","content":"<USER_REQUEST>\nRun task\n</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-05T20:00:05Z","tool_calls":[{"name":"invoke_subagent","args":{"Subagents":"[{\"Model\":\"inherit\",\"Prompt\":\"test\"}]"}}]}
+{"step_index":2,"source":"MODEL","type":"GENERIC","status":"DONE","created_at":"2026-09-05T20:00:08Z","content":"Created the following subagents:\n{\n  \"conversationId\": \"sub-conv-456\",\n  \"workspaceUris\": [\"/test/ws\"]\n}"}
+{"step_index":3,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-05T20:00:10Z","content":"I have dispatched the subagent."}
+`
+	if err := os.WriteFile(filepath.Join(convDir, "transcript.jsonl"), []byte(transcriptContent), 0644); err != nil {
+		t.Fatalf("failed to write fake transcript: %v", err)
+	}
+
+	cfg := &config.Config{
+		AuthToken: "test-token",
+	}
+	auth := NewAuthHelper(cfg)
+	handler := NewConversationsHandler(auth)
+
+	req := httptest.NewRequest("GET", "/api/agy/conversations/conv-subagent-1/messages", nil)
+	req.SetPathValue("id", "conv-subagent-1")
+	req.Header.Set("Authorization", "Bearer test-token")
+	w := httptest.NewRecorder()
+	handler.GetConversationMessages(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var msgRes struct {
+		Ok             bool              `json:"ok"`
+		ConversationId string            `json:"conversationId"`
+		Messages       []ChatMessageItem `json:"messages"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&msgRes); err != nil {
+		t.Fatalf("failed to decode messages response: %v", err)
+	}
+
+	if len(msgRes.Messages) < 2 {
+		t.Fatalf("expected at least 2 messages, got %d", len(msgRes.Messages))
+	}
+
+	assistantMsg := msgRes.Messages[1]
+	if assistantMsg.Role != "assistant" {
+		t.Fatalf("expected assistant message, got %s", assistantMsg.Role)
+	}
+	if len(assistantMsg.ToolCalls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d", len(assistantMsg.ToolCalls))
+	}
+
+	tc := assistantMsg.ToolCalls[0]
+	if tc.Name != "invoke_subagent" {
+		t.Errorf("expected tool name 'invoke_subagent', got '%s'", tc.Name)
+	}
+	if !strings.Contains(tc.Output, "sub-conv-456") {
+		t.Errorf("expected output to contain 'sub-conv-456', got '%s'", tc.Output)
+	}
+	if tc.Status != "success" {
+		t.Errorf("expected status 'success', got '%s'", tc.Status)
+	}
+	if tc.Id == "" {
+		t.Errorf("expected tool ID to be non-empty")
+	}
+}
